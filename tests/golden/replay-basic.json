@@ -1,0 +1,12 @@
+{
+  "seed": 12345,
+  "frames": 200,
+  "log": [
+    { "frame": 20, "command": { "type": "togglePause" } },
+    { "frame": 35, "command": { "type": "togglePause" } },
+    { "frame": 80, "command": { "type": "reset", "seed": 777 } },
+    { "frame": 150, "command": { "type": "togglePause" } },
+    { "frame": 151, "command": { "type": "togglePause" } }
+  ],
+  "expectedHash": "a43485d9"
+}

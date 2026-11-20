@@ -1,0 +1,48 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.overlay {
+  pointer-events: auto;
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  min-width: 180px;
+  font:
+    13px/1.4 ui-monospace,
+    monospace;
+  color: #e6e8ee;
+  background: rgb(0 0 0 / 0.55);
+  border-radius: 6px;
+}
+
+.overlay .row {
+  display: flex;
+  gap: 6px;
+}
+
+.overlay input {
+  width: 80px;
+}
