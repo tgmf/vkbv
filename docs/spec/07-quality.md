@@ -63,7 +63,8 @@ that the fog, an approximation, stays close to the reference simulation.
    predicted probability `p` that each event in `events` has happened by the chapter's
    end, as seen from tick `atTick` (the frame's requirement and fact probabilities);
 2. run one **reality**: the reference simulation, a single history (`03` §12.4) in
-   stream `100000 + seed`, and record whether each event happened.
+   stream `100000 + seed`, and record whether each event happened. Its starting stats
+   are the seed's (`03` §5); only its behaviour rolls use that stream.
 
 Group all `(p, outcome)` pairs into ten buckets by `p`. For every bucket with at least
 `calibration.minPerBucket` pairs, the mean of `p` and the share of outcomes that

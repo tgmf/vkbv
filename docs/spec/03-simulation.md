@@ -64,7 +64,7 @@ Scopes used by the simulation:
 
 | Scope | Used for |
 | --- | --- |
-| `s<stream>:<catId>` | a cat's sampled noise: initial gauges, activity choices, durations, places. Stream 0 in the lantern; other streams only in single-history mode (§12.4) |
+| `s<stream>:<catId>` | a cat's sampled noise: activity choices, durations, places. Stream 0 in the lantern; other streams only in single-history mode (§12.4). Initial gauges always use `s0:<catId>` (§5) |
 | `s<stream>:world` | sampled world noise: `chance` effects, `randomNode`. Stream 0 in the lantern |
 | `s<stream>:branch` | branch outcomes in single-history mode and in the lantern (§12.4) |
 | `obs` | placement at the lantern's edge, observation and Gaze (§15) |
@@ -247,13 +247,15 @@ The initial state of a history whose streams are all `s` (the lantern uses `s = 
   from `world.counters[*].start`;
 - each cat at its `start` node, activity `startActivity` with `activityLeft` sampled
   as for a free choice (§8.2) and `control: 'free'`; `base[g] = lo + rand(seed,
-  "s<s>:<cat>", 0, "init:<g>", hi − lo + 1)` for every trait and hook range in
+  "s0:<cat>", 0, "init:<g>", hi − lo + 1)` for every trait and hook range in
   cast.json, then clamped to the gauge's range (hooks start at least at `hooks.floor`); everything else empty or zero;
 - every storylet inactive; every pool empty; `anchor` both null.
 
-In the fog, initial stats are **part of the wave**: a fogged cat's banded gauges start
-spread over the bands its ranges cover, and watching narrows them (§13.2). Protagonists
-are live from tick 0, so their stats are drawn once per seed.
+**The seed fixes every cat's starting stats.** Initial gauges are drawn in scope
+`s0:<cat>` whatever the history's stream, so every stream, the lantern and the fog start
+from the same stats for a given seed; streams differ only in behaviour. The fog's
+uncertainty is behaviour, weather and hazards, never who a cat is (decided
+2026-11-21, replacing "initial stats are part of the wave").
 
 ## 6. One step
 
@@ -684,10 +686,10 @@ interface ChainState {
   hold a role in, in hooks.json order. The cat's other changing gauges and all traits
   are **mean-field**: one expected value per cat and case, updated by the same rules.
 - **Initial distribution.** At tick 0 each cat is at its `start` with
-  `startActivity`. Each banded gauge's mass is spread over the bands its cast.json range
-  overlaps, in proportion to the overlap. Mean-field gauges start at the range's middle.
-  Protagonists are the exception: they are live from tick 0 with stats drawn as in §5,
-  stream 0.
+  `startActivity` (its `leftSteps` spread uniformly over the activity's duration) and
+  its seeded stats (§5): each banded gauge's mass sits in the band holding its seeded
+  value, and traits and mean-field gauges hold their seeded values. Protagonists are
+  live from tick 0 with the same stats.
 - **Rise and decay.** A hook rule that would add `add` to a gauge over a step moves
   `trunc(add × 1 000 000 / bandWidth)` ppm of each state's mass to the next band (or
   the previous one for a negative add), scaled by the ppm of the rule's `when`
@@ -888,8 +890,7 @@ each fogged cat `c`, in cast order:
    live: position and activity from that state; `activityLeft` drawn uniformly within
    the state's remaining steps (purpose `"left:" + c`); each banded gauge drawn
    uniformly within its band, and mean-field gauges set to their expected value
-   (purpose `"gauge:" + c + ":" + g`); traits drawn from cast.json as in §5 with
-   stream 0; flags and `heard` set where their probability is at least 500 000.
+   (purpose `"gauge:" + c + ":" + g`); traits are the seeded ones (§5); flags and `heard` set where their probability is at least 500 000.
    `c` gets `dwell = tuning.lantern.dwellTicks`: while it is above 0, phase 6 makes no
    free decision for `c` (it keeps its activity) and it counts down each tick. Then
    apply the evidence "`c` is in that state at `t`" by the backward pass (§14).

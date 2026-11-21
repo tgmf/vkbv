@@ -49,9 +49,12 @@ Before the first recompute of a new game, the worker vets the seed once (pacing)
 ```
 for k in 0 .. tuning.vetting.maxCandidates - 1:
   candidate = k == 0 ? requested : hash32(requested + "|vet|" + k)
-  compute the untouched timeline (no pins, no watched facts, conditioning off)
-  pass if, for every fact in tuning.vetting.requireFacts, the raw probability that
-       it holds by the chapter's end is >= tuning.vetting.minPpm
+  compute the untouched timeline (no pins, no watched facts, conditioning off): the
+       projection of the whole day, nothing played (03 §13.1), with the candidate's
+       seeded stats (03 §5)
+  pass if, for every fact in the anchor's requirement tree (its story storylets'
+       outcomes) and every fact in tuning.vetting.requireFacts, the raw probability
+       that it holds by the chapter's end is >= tuning.vetting.minPpm
 take the first candidate that passes; if none does, take the requested seed
 ```
 

@@ -50,7 +50,10 @@ is: it is the lantern's `step` and the reference simulation.
 ## Acceptance
 
 - [ ] M1's golden hashes and single-history tests pass unchanged after the ppm
-      refactor and the new `step` arguments.
+      refactor and the new `step` arguments. The one intended change: initial gauges
+      now use scope `s0:<cat>` in every stream (`03` §5), so single histories in
+      streams other than 0 start from the seed's stats; stream-0 results are unchanged,
+      and the handoff note lists any expected file that moved and why.
 - [ ] One decision function: for a live state and the matching point-mass chain
       state, the fog and the lantern produce the same choice probabilities (test).
 - [ ] Chains: every cat's chain sums to 1 000 000 in every case after every step;
@@ -78,7 +81,8 @@ is: it is the lantern's `step` and the reference simulation.
       `fog.frayBelowPpm`, and the played stretch frays when `fraysIf` holds live.
 - [ ] Recompute from a checkpoint gives byte-identical results to a recompute from
       tick 0 (property test over 20 random pin sets).
-- [ ] Vetting is deterministic and stores the vetted seed.
+- [ ] Vetting is deterministic and stores the vetted seed; two seeds with different
+      seeded stats can get different verdicts (test on the tiny world).
 - [ ] Quick calibration passes. `npm run calibrate` passes; its table is in the
       handoff note. If it does not, the handoff note shows which events and buckets
       miss, with numbers, and the question is in `docs/questions.md`.
