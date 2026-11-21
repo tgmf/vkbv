@@ -6,3 +6,4 @@ src/sim/exp-table.ts
 docs
 instructions
 tests/golden/*.expected.json
+src/sim/phi-table.ts

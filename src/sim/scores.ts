@@ -1,7 +1,7 @@
 // Score terms and hazard rates (spec 03 §9.2, §10.2).
 import type { HazardTerm, Score, ScoreTerm } from '../content/schemas/dsl';
-import { chance, PPM, readGauge } from './conditions';
-import { clamp } from './math';
+import { chance, readGauge } from './conditions';
+import { clamp, PPM } from './math';
 import type { CatId, Ctx, Scope } from './types';
 
 /** `add` scaled by a probability: trunc(add × ppm / 1 000 000) (03 §13.3). */

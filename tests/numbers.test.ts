@@ -1,8 +1,9 @@
 // Test vectors from spec 03 §1 and §1.1.
 import { describe, expect, it } from 'vitest';
 import { EXP } from '../src/sim/exp-table';
+import { PHI } from '../src/sim/phi-table';
 import { hashState } from '../src/sim/hash';
-import { clamp, isqrt, mulPm, sample, softmax } from '../src/sim/math';
+import { clamp, isqrt, mulPm, probAtLeast, sample, softmax } from '../src/sim/math';
 import { hash32, rand } from '../src/sim/rng';
 
 describe('rng', () => {
@@ -90,5 +91,38 @@ describe('integer helpers', () => {
       expect(r * r).toBeLessThanOrEqual(n);
       expect((r + 1) * (r + 1)).toBeGreaterThan(n);
     }
+  });
+});
+
+describe('PHI table (03 §13.7)', () => {
+  it('has 401 entries and the standard normal CDF at known points', () => {
+    expect(PHI).toHaveLength(401);
+    const vectors: [number, number][] = [
+      [0, 500000],
+      [50, 691462],
+      [100, 841345],
+      [196, 975002],
+      [200, 977250],
+      [300, 998650],
+      [400, 999968],
+    ];
+    for (const [k, v] of vectors) expect(PHI[k], `PHI[${k}]`).toBe(v);
+  });
+
+  it('is non-decreasing integers', () => {
+    for (let k = 1; k < PHI.length; k++) {
+      expect(Number.isInteger(PHI[k])).toBe(true);
+      expect(PHI[k]).toBeGreaterThanOrEqual(PHI[k - 1] ?? 0);
+    }
+  });
+
+  it('P(X >= x) for a counter: certain with no variance, mirrored below the mean', () => {
+    expect(probAtLeast(5, 0, 5)).toBe(1_000_000);
+    expect(probAtLeast(4, 0, 5)).toBe(0);
+    // mean 10, variance 4 (sd 2): P(X >= 12) uses z = (10 − 12 + ½)/2 = −0.75
+    expect(probAtLeast(10, 4, 12)).toBe(1_000_000 - (PHI[75] ?? 0));
+    // P(X >= 9): z = (10 − 9 + ½)/2 = 0.75
+    expect(probAtLeast(10, 4, 9)).toBe(PHI[75]);
+    expect(probAtLeast(0, 1, 100)).toBe(1_000_000 - (PHI[400] ?? 0));
   });
 });

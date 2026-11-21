@@ -1,6 +1,6 @@
 // Conditions (spec 03 §8.1, §10.1) and the reads they need.
 import type { Condition } from '../content/schemas/dsl';
-import { clamp } from './math';
+import { clamp, PPM } from './math';
 import { catNode, catPos, inWindow, nodePos, within } from './space';
 import type { CatId, Ctx, NodeId, Pos, Scope } from './types';
 import { need } from './types';
@@ -88,7 +88,7 @@ const cmp = (
   (c.lt === undefined || v < c.lt) &&
   (c.eq === undefined || v === c.eq);
 
-export const PPM = 1_000_000;
+
 const ppmOf = (b: boolean): number => (b ? PPM : 0);
 
 /**

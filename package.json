@@ -21,7 +21,8 @@
     "balance": "tsx scripts/not-yet.ts balance M4",
     "calibrate": "tsx scripts/not-yet.ts calibrate M2",
     "golden:update": "vitest run tests/golden --update",
-    "gen:exp-table": "tsx scripts/gen-exp-table.ts"
+    "gen:exp-table": "tsx scripts/gen-exp-table.ts",
+    "gen:phi-table": "tsx scripts/gen-phi-table.ts"
   },
   "dependencies": {
     "@solidjs/web": "2.0.3",

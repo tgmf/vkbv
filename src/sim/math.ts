@@ -1,5 +1,6 @@
 // Integer maths for the simulation (spec 03 §1, §1.1). No floats are stored or compared.
 import { EXP } from './exp-table';
+import { PHI } from './phi-table';
 
 export const PPM = 1_000_000;
 
@@ -44,4 +45,16 @@ export function sample(ppm: readonly number[], r: number): number {
     if (sum > r) return i;
   }
   return ppm.length - 1;
+}
+
+/**
+ * P(X >= x) in ppm for a quantity with integer mean `mu` and variance `v`, by the committed PHI
+ * table on the standardised distance with a half-unit continuity correction (03 §13.7).
+ */
+export function probAtLeast(mu: number, v: number, x: number): number {
+  if (v <= 0) return mu >= x ? PPM : 0;
+  // z = (mu − x + ½) × 100 / sqrt(v), kept in integers: (2(mu − x) + 1) × 50 / isqrt(v)
+  const z = Math.trunc(((2 * (mu - x) + 1) * 50) / Math.max(1, isqrt(v)));
+  const p = PHI[Math.min(Math.abs(z), 400)] ?? PPM;
+  return z >= 0 ? p : PPM - p;
 }
