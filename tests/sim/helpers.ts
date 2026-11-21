@@ -5,6 +5,7 @@ import { CHAPTER1_FILES, TUNING_FILE } from '../../src/content/chapter1';
 import { loadChapter, loadTuning, type Content } from '../../src/content/load';
 import { initialState, uniformStreams } from '../../src/sim/history';
 import type { BranchPoint, CatState, Ctx, Pin, SimState } from '../../src/sim/types';
+import { newDecisionMemo } from '../../src/sim/types';
 
 export const tuning = loadTuning(TUNING_FILE);
 export const TINY_DIR = join(import.meta.dirname, '..', 'fixtures', 'tiny');
@@ -48,6 +49,7 @@ export function makeCtx(
     pick: opts.pick ?? (() => 0),
     chanceN: 0,
     memo: {},
+    decisions: newDecisionMemo(),
   };
 }
 
@@ -63,7 +65,7 @@ export function place(ctx: Ctx, id: string, node: string): CatState {
   cs.pos = { at: node };
   cs.route = [];
   cs.activity = 'none';
-  cs.activityLeft = 0;
+  cs.boredom = 0;
   cs.activityPlace = null;
   cs.control = 'free';
   cs.interrupt = null;

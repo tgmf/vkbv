@@ -1,5 +1,5 @@
 // One step of one history (spec 03 §6): eight phases in a fixed order.
-import { body, catState, clampBase, decide, insertSorted, reaches } from './cats';
+import { body, catState, clampBase, decide, decisionKey, insertSorted, reaches } from './cats';
 import { hasFact, test } from './conditions';
 import { addFact, emitNamed } from './effects';
 import { perceives, type Source } from './perception';
@@ -18,7 +18,7 @@ import type {
   SimState,
   Streams,
 } from './types';
-import { isLive } from './types';
+import { isLive, need, newDecisionMemo, type DecisionMemo } from './types';
 
 /** Thrown inside a step when it meets a branch point beyond the decided list. */
 interface NeedBranch {
@@ -50,6 +50,7 @@ export function step(
   branch: readonly number[] | ((bp: BranchPoint) => number),
   memo: PathMemo = {},
   lantern: LanternArgs | null = null,
+  decisions: DecisionMemo = newDecisionMemo(),
 ): StepResult {
   let used = 0;
   const pick =
@@ -75,6 +76,7 @@ export function step(
     pick,
     chanceN: 0,
     memo,
+    decisions,
     ...(lantern && { live: lantern.live, held: lantern.held }),
   };
   try {
@@ -83,7 +85,7 @@ export function step(
     for (const def of c.cats) if (isLive(ctx, def.id)) body(ctx, def.id); // 3
     storyletsPhase(ctx); // 4
     siftingPhase(ctx); // 5
-    decisions(ctx); // 6
+    decisionsPhase(ctx); // 6
     perception(ctx); // 7
     anchor(ctx); // 8
   } catch (e) {
@@ -192,8 +194,12 @@ function weather(ctx: Ctx): void {
   }
 }
 
-/** Phase 6: free decisions (03 §6, §8.2). */
-function decisions(ctx: Ctx): void {
+/**
+ * Phase 6: free decisions at triggers (03 §6, §8.2). At once: the cat arrived with an empty route,
+ * control returned to it (a storylet's activity, a `delay`), it was blocked or a built-in ended,
+ * or an offer was born. On decision ticks also: its decision key changed, or its interrupt ended.
+ */
+function decisionsPhase(ctx: Ctx): void {
   const { c, t } = ctx;
   const decisionTick = t % c.decisionEveryTicks === 0;
   const busy = openChoiceActors(ctx);
@@ -202,15 +208,19 @@ function decisions(ctx: Ctx): void {
     if (!isLive(ctx, id)) continue;
     const cs = catState(ctx, id);
     if (cs.control !== 'free' || cs.interrupt || !('at' in cs.pos) || busy.includes(id)) continue;
+    const was = need(ctx.prev.cats, id, 'cat');
     const ended = ctx.events.some(
       (e) => (e.type === 'activityFinished' || e.type === 'blocked') && e.cat === id,
     );
     const arrived =
       cs.route.length === 0 && ctx.events.some((e) => e.type === 'arrive' && e.cat === id);
+    const returned = was.control !== 'free';
     const offered = ctx.s.effects.some(
       (e) => e.born === t && (e.kind === 'attract' || e.kind === 'repel') && reaches(ctx, e, id),
     );
-    if (decisionTick || ended || arrived || offered) decide(ctx, id);
+    const atOnce = ended || arrived || returned || offered;
+    if (atOnce || (decisionTick && (was.interrupt !== null || decisionKey(ctx, id) !== cs.lastKey)))
+      decide(ctx, id);
   }
 }
 

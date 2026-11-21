@@ -4,7 +4,8 @@ import { sample } from './math';
 import { rand } from './rng';
 import type { PathMemo } from './space';
 import { step } from './step';
-import type { Content, Ctx, End, Pin, SimEvent, SimState, Streams } from './types';
+import type { Content, Ctx, DecisionMemo, End, Pin, SimEvent, SimState, Streams } from './types';
+import { newDecisionMemo } from './types';
 
 /** Every cat and the world on the same stream (single-history mode, 03 §12.4). */
 export const uniformStreams = (c: Content, stream: number): Streams =>
@@ -46,7 +47,9 @@ export function initialState(
       pos: { at: def.start },
       route: [],
       activity: 'none',
-      activityLeft: 0,
+      boredom: 0,
+      forcedLeft: 0,
+      lastKey: -1,
       activityStart: 0,
       activityPlace: null,
       control: 'free',
@@ -74,6 +77,7 @@ export function initialState(
     pick: () => 0,
     chanceN: 0,
     memo,
+    decisions: newDecisionMemo(),
   };
   for (const def of c.cats) startActivity(ctx, def.id, def.startActivity, 'free');
   return s;
@@ -94,6 +98,7 @@ export function runHistory(
   seed: number,
   stream: number,
   pins: readonly Pin[] = [],
+  decisions: DecisionMemo = newDecisionMemo(),
 ): History {
   const streams = uniformStreams(c, stream);
   const log = sortPins(pins);
@@ -115,6 +120,8 @@ export function runHistory(
           rand(seed, `s${stream}:branch`, t, bp.key, 1_000_000),
         ),
       memo,
+      null,
+      decisions,
     );
     if (!r.state) throw new Error('a sampled step cannot stop at a branch point');
     s = r.state;

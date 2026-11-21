@@ -113,7 +113,10 @@ export function chance(ctx: Ctx, cond: Condition, scope: Scope): number {
     return PPM - q;
   }
   if ('not' in cond) return PPM - chance(ctx, cond.not, scope);
-  return ctx.fog ? fogLeaf(ctx, ctx.fog, cond, scope) : ppmOf(leaf(ctx, cond, scope));
+  if (!ctx.fog) return ppmOf(leaf(ctx, cond, scope));
+  const p = fogLeaf(ctx, ctx.fog, cond, scope);
+  // a fog decision reads leaves rounded down to `fog.ppmQuantum` (03 §8.2)
+  return ctx.quantum ? p - (p % ctx.quantum) : p;
 }
 
 // --- leaves in the fog (03 §13.3, §13.6) ---------------------------------------------------------

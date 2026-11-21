@@ -169,7 +169,8 @@ function fire(
         touch(cat);
         const cs = catState(ctx, cat);
         cs.activity = p.action;
-        cs.activityLeft = sampleTicks(p.ticks, cat);
+        cs.forcedLeft = sampleTicks(p.ticks, cat);
+        cs.boredom = 0;
         cs.activityStart = ctx.t;
         cs.activityPlace = 'at' in cs.pos ? cs.pos.at : cs.pos.to;
         cs.route = [];

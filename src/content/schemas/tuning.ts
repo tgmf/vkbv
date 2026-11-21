@@ -23,6 +23,9 @@ export const TuningSchema = z.strictObject({
     stepTicks: int('Ticks per fog step (03 §13.2)').min(1),
     minStatePpm: ppm('Chain states below this are dropped and the chain renormalised'),
     bands: int('Bands per changing gauge (03 §13.2)').min(1),
+    ppmQuantum: int(
+      'Fog probabilities in decision keys and fog decisions are rounded down to this (03 §8.2)',
+    ).min(1),
     maxBandedGauges: int('Banded gauges per cat; the rest are mean-field').min(0),
     gateThresholdPpm: ppm('A gate holds in the fog at this probability (03 §13.3)'),
     maxLinks: int('Links besides the weather (03 §13.5)').min(0),
@@ -31,10 +34,13 @@ export const TuningSchema = z.strictObject({
     frayBelowPpm: ppm('A projection frays below this chance of reaching the anchor (03 §16)'),
     exactTolerancePpm: ppm('Tiny-world exactness test tolerance (03 §18)'),
   }),
+  behaviour: z.strictObject({
+    boredomWeight: int('Score taken from the current activity at full boredom (03 §8.2)').min(0),
+  }),
   lantern: z.strictObject({
-    releaseAfterTicks: int(
-      'Ticks unperceived before a live cat returns to the fog (03 §13.4)',
-    ).min(1),
+    releaseAfterTicks: int('Ticks unperceived before a live cat returns to the fog (03 §13.4)').min(
+      1,
+    ),
     dwellTicks: int('Ticks a placed cat keeps its activity before deciding (03 §15.1)').min(0),
   }),
   observation: z.strictObject({
@@ -88,7 +94,9 @@ export const TuningSchema = z.strictObject({
     displayBudget: int('Most cat markers drawn at rest (06 §2)').min(1),
   }),
   budgets: z.strictObject({
-    recomputeMs: int('Median time from an edit to the re-run’s first streamed frames (07 §4)').min(1),
+    recomputeMs: int('Median time from an edit to the re-run’s first streamed frames (07 §4)').min(
+      1,
+    ),
     rerunTps: int('Ticks per second a re-run streams at, at least (07 §4)').min(1),
   }),
   calibration: z.strictObject({

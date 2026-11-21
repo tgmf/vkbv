@@ -222,7 +222,8 @@ write('activities.json', {
       id: 'work',
       at: { node: 'street.c' },
       ticks: [10, 10],
-      gate: { not: { fact: 'workDone' } },
+      // no timers (03 §8.2): the gate closes after 10 units of work, so pal leaves it at a trigger
+      gate: { all: [{ not: { fact: 'workDone' } }, { counter: 'work', lt: 10 }] },
       score: { base: 3 },
       while: [{ counter: 'work', add: 1 }],
       onFinish: [{ fact: 'workDone' }],

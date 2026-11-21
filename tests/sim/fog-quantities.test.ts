@@ -66,7 +66,10 @@ function project(c: typeof tiny, ticks: number, each: (fog: Fog) => void): Fog {
 }
 
 const mixed = (fog: Fog, fact: string) =>
-  fog.cases.reduce((a, fc) => a + Math.trunc(((fc.q.facts[fact] ?? 0) * fc.weight) / WAVE_TOTAL), 0);
+  fog.cases.reduce(
+    (a, fc) => a + Math.trunc(((fc.q.facts[fact] ?? 0) * fc.weight) / WAVE_TOTAL),
+    0,
+  );
 
 describe('cases (03 §13.5)', () => {
   it('a link splits exactly at the transition that sets it: each case agrees with its link', () => {

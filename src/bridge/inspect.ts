@@ -4,7 +4,7 @@ import { gaugeOf, test } from '../sim/conditions';
 import type { History } from '../sim/history';
 import { catNode, catPos, hhmm } from '../sim/space';
 import { traceLine } from '../sim/trace';
-import type { Ctx } from '../sim/types';
+import { newDecisionMemo, type Ctx } from '../sim/types';
 import type { InspectView } from './protocol';
 
 /** How many earlier ticks of events the log shows besides the current one. */
@@ -28,6 +28,7 @@ export function inspectView(c: Content, h: History, tick: number): InspectView {
     pick: () => 0,
     chanceN: 0,
     memo: {},
+    decisions: newDecisionMemo(),
   };
   const hookIds = c.hooks.map((x) => x.id);
 

@@ -21,7 +21,7 @@ import { ch1, ch1Coarse, makeCtx, tiny } from './helpers';
 const ids = (c: Content) => c.cats.map((x) => x.id);
 
 describe('one decision function (03 §13.3, §18)', () => {
-  it.each([0, 40, 120, 300])(
+  it.each([40, 120, 300, 600])(
     'live and point-mass chain states give the same probabilities on Chapter 1, tick %i',
     (t) => {
       const setup = fogSetup(ch1, 1);
@@ -41,7 +41,7 @@ describe('one decision function (03 §13.3, §18)', () => {
         fc.cats[id] = pm;
         const e = pm.chain[0];
         if (!e) throw new Error('empty chain');
-        s.cats[id] = standIn(setup, id, e.s, pm.mean, ch1.tuning.fog.stepTicks);
+        s.cats[id] = standIn(setup, id, e.s, pm.mean);
       }
       const ctx = makeCtx(ch1, { state: s, t });
       let compared = 0;
@@ -133,7 +133,6 @@ describe('bands (03 §13.2)', () => {
           activity: 'nap',
           place: box.id,
           walk: null,
-          leftSteps: 9,
           bands: { ...hero.chain[0]?.s.bands, boxPull: b },
           interrupt: null,
           control: 'forced',
@@ -149,5 +148,33 @@ describe('bands (03 §13.2)', () => {
       Math.trunc((204_081 * (1_000_000 - 4_081)) / 1_000_000),
     );
     expect(bandMid(tiny, b)).toBe(20 + Math.trunc(981 / 8));
+  });
+});
+
+describe('decisions at triggers only (03 §13.3, §18)', () => {
+  it('walking mass is never polled for a decision; its arrival triggers one', () => {
+    const setup = fogSetup(tiny, 1);
+    const fog = initialFog(setup, ['bystander']);
+    const fc = fog.cases[0];
+    const by = fc?.cats['bystander'];
+    if (!fc || !by) throw new Error('no bystander');
+    by.chain = [
+      {
+        s: {
+          activity: 'fetch',
+          place: 'street.b',
+          walk: { from: 'street.a', path: ['street.b'], leftSteps: 2, ofSteps: 2 },
+          bands: { ...by.chain[0]?.s.bands },
+          interrupt: null,
+          control: 'free',
+        },
+        p: 1_000_000,
+      },
+    ];
+    const count = () => setup.decisions.calls + setup.decisions.hits;
+    const walking = fogStep(setup, { tick: 1, cases: [fc] }); // one step of the walk left
+    expect(count()).toBe(0);
+    fogStep(setup, walking); // arrives: a trigger
+    expect(count()).toBeGreaterThan(0);
   });
 });

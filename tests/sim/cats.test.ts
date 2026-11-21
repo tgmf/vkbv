@@ -95,15 +95,11 @@ describe('place selectors', () => {
 });
 
 describe('activities and decisions', () => {
-  it('an activity walks to its place, runs while effects there, and finishes with onFinish', () => {
+  it('an activity walks to its place, runs while effects there and tires; it has no timer', () => {
     let ctx = makeCtx(tiny, { t: 0 });
     place(ctx, 'pal', 'street.b');
     startActivity(ctx, 'pal', 'work', 'free');
-    expect(cat(ctx, 'pal')).toMatchObject({
-      activity: 'work',
-      activityLeft: 10,
-      route: ['street.c'],
-    });
+    expect(cat(ctx, 'pal')).toMatchObject({ activity: 'work', boredom: 0, route: ['street.c'] });
     let s = ctx.s;
     const finished: number[] = [];
     for (let t = 0; t < 20; t++) {
@@ -115,20 +111,41 @@ describe('activities and decisions', () => {
         finished.push(t);
       s = ctx.s;
     }
-    expect(s.counters['work']).toBe(10);
-    expect(s.facts).toContain('workDone');
-    expect(finished).toEqual([13]); // depart 0, arrive 3, work ticks 4..13
+    // depart 0, arrive 3, work ticks 4..19; boredom rises 100 a tick (ticks [10, 10]) to its cap
+    expect(s.counters['work']).toBe(16);
+    expect(s.cats['pal']?.boredom).toBe(1000);
+    expect(s.facts).not.toContain('workDone');
+    expect(finished).toEqual([]);
   });
 
-  it('stickiness keeps an unfinished activity; a finished one is chosen afresh', () => {
+  it('hysteresis keeps the current activity unless another beats it by the margin', () => {
     const ctx = makeCtx(tiny, { t: 5 });
     const cs = place(ctx, 'pal', 'street.c');
     cs.activity = 'work';
-    cs.activityLeft = 4;
     cs.activityPlace = 'street.c';
     decide(ctx, 'pal');
-    expect(cs).toMatchObject({ activity: 'work', activityLeft: 4 }); // work 3 + 2 beats nap 0
+    expect(cs.activity).toBe('work'); // nap 0 does not beat work 3 + margin 2
+    cs.boredom = 1000; // work 3 − 4 = −1; nap 0 still not above −1 + 2
+    decide(ctx, 'pal');
+    expect(cs.activity).toBe('work');
     expect(types(ctx)).toEqual([]);
+  });
+
+  it('switching away runs onFinish and emits activityFinished ("left that activity")', () => {
+    const ctx = makeCtx(tiny, { t: 5 });
+    const cs = place(ctx, 'pal', 'street.c');
+    cs.activity = 'work';
+    cs.activityPlace = 'street.c';
+    cs.boredom = 700;
+    ctx.s.facts = ['workDone']; // work's gate fails: it no longer counts, any candidate wins
+    decide(ctx, 'pal');
+    expect(cs).toMatchObject({ activity: 'nap', boredom: 0 });
+    expect(ctx.events).toContainEqual({
+      tick: 5,
+      type: 'activityFinished',
+      cat: 'pal',
+      activity: 'work',
+    });
   });
 
   it('a storylet-controlled cat makes no free decision; reaching its goTo target frees it', () => {

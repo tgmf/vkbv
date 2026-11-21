@@ -60,7 +60,6 @@ describe('storylet effects', () => {
     runEffects(ctx, [{ stop: '@crew' }], { roles });
     expect(cat(ctx, 'pal')).toMatchObject({
       activity: 'none',
-      activityLeft: 0,
       control: 'free',
       route: [],
     });
@@ -259,7 +258,7 @@ describe('pins and primitives', () => {
     );
     expect(cat(ctx, 'pal')).toMatchObject({
       activity: 'nap',
-      activityLeft: 6,
+      forcedLeft: 6,
       activityPlace: 'street.c',
       control: 'forced',
     });

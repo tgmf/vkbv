@@ -45,7 +45,6 @@ describe('paths', () => {
     ctx.s.facts = ['gateClosed'];
     cs.route = ['street.c'];
     cs.activity = 'work';
-    cs.activityLeft = 10;
     cs.activityPlace = 'street.c';
     const r = step(tiny, 1, ctx.streams, ctx.s, [], () => 0);
     const next = r.state?.cats['pal'];

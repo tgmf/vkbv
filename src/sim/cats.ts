@@ -1,12 +1,24 @@
 // Cats: gauges, hooks and voices, bodies, free behaviour and control (spec 03 §5, §6 phase 3/6, §8, §10.3).
 import type { PlaceSelector } from '../content/schemas/chapter';
-import { flagHolds, test } from './conditions';
+import type { Condition } from '../content/schemas/dsl';
+import { chance, flagHolds, readGauge, test } from './conditions';
 import { runEffects } from './effects';
 import { clamp, sample, softmax } from './math';
 import { term, score } from './scores';
 import { catNode, catPos, dist2, edgeBetween, nodePos, path, reach, within } from './space';
-import { rand } from './rng';
-import type { CatId, CatState, Content, Ctx, NodeId, RunningEffect, SimEvent } from './types';
+import { hash32, rand } from './rng';
+import type {
+  Candidate,
+  CatId,
+  CatState,
+  Content,
+  Ctx,
+  DecisionMemo,
+  DecisionReads,
+  NodeId,
+  RunningEffect,
+  SimEvent,
+} from './types';
 import { catScope, need } from './types';
 
 const TRAITS = ['O', 'C', 'E', 'A', 'N'];
@@ -167,9 +179,8 @@ export function startActivity(
   const route =
     place === from ? [] : path(ctx.c, from, place, { avoid: cs.knowsClosed, memo: ctx.memo });
   if (route === null) return false;
-  const [lo, hi] = def.ticks;
   cs.activity = activity;
-  cs.activityLeft = lo + rand(ctx.seed, catScope(ctx, id), ctx.t, `dur:${activity}`, hi - lo + 1);
+  cs.boredom = 0;
   cs.activityStart = ctx.t;
   cs.activityPlace = place;
   cs.route = route;
@@ -194,7 +205,7 @@ export function goTo(
       : path(ctx.c, from, node, { avoid: cs.knowsClosed, memo: ctx.memo, ...opts });
   if (route === null) return;
   cs.activity = 'goTo';
-  cs.activityLeft = 1;
+  cs.boredom = 0;
   cs.activityStart = ctx.t;
   cs.activityPlace = node;
   cs.route = route;
@@ -206,19 +217,34 @@ export function goTo(
 export function stopCat(cs: CatState): void {
   cs.route = [];
   cs.activity = 'none';
-  cs.activityLeft = 0;
   cs.activityPlace = null;
   cs.control = 'free';
 }
 
-function finish(ctx: Ctx, id: CatId, cs: CatState): void {
+/**
+ * Leaves the current activity (03 §8.2): runs its `onFinish` and emits `activityFinished`, so
+ * `activityFinished` means "left that activity". Used when switching and when a built-in ends.
+ */
+function leave(ctx: Ctx, id: CatId, cs: CatState): void {
   const activity = cs.activity;
-  cs.activityLeft = 0;
+  if (activity === 'none') return;
   const def = ctx.c.activity[activity];
   if (def?.onFinish) runEffects(ctx, def.onFinish, { self: id });
   emit(ctx, { tick: ctx.t, type: 'activityFinished', cat: id, activity });
-  if (cs.control !== 'free') cs.control = 'free';
 }
+
+/** A built-in activity ends (a goTo arrived, an attraction ended): the cat stands, free (03 §8.3). */
+function endBuiltIn(ctx: Ctx, id: CatId, cs: CatState): void {
+  leave(ctx, id, cs);
+  cs.activity = 'none';
+  cs.control = 'free';
+}
+
+/** Boredom gained per tick at an activity's place: max(1, trunc(2000 / (lo + hi))); built-ins 0. */
+export const boredomRate = (c: Content, activity: string): number => {
+  const def = c.activity[activity];
+  return def ? Math.max(1, Math.trunc(2000 / (def.ticks[0] + def.ticks[1]))) : 0;
+};
 
 // --- phase 3: bodies ------------------------------------------------------------------------------
 
@@ -295,7 +321,7 @@ export function body(ctx: Ctx, id: CatId): void {
     !ctx.s.effects.some((e) => e.kind === 'attract' && e.place === cs.activityPlace)
   ) {
     cs.route = [];
-    finish(ctx, id, cs);
+    endBuiltIn(ctx, id, cs);
     return;
   }
   const pos = cs.pos;
@@ -306,7 +332,7 @@ export function body(ctx: Ctx, id: CatId): void {
     emit(ctx, { tick: t, type: 'arrive', cat: id, node: pos.to });
     // Arriving at a goTo target with an empty route ends the goTo (03 §8.3).
     if (cs.activity === 'goTo' && cs.route.length === 0 && cs.activityPlace === pos.to)
-      finish(ctx, id, cs);
+      endBuiltIn(ctx, id, cs);
     return;
   }
   const next = cs.route[0];
@@ -329,13 +355,25 @@ export function body(ctx: Ctx, id: CatId): void {
     emit(ctx, { tick: t, type: 'depart', cat: id, from: pos.at, to: next });
     return;
   }
-  if ((cs.activityPlace === null || cs.activityPlace === pos.at) && cs.activityLeft > 0) {
+  // A goTo to where the cat already stands has arrived: it ends at once (03 §9.3).
+  if (cs.activity === 'goTo' && cs.activityPlace === pos.at) {
+    endBuiltIn(ctx, id, cs);
+    return;
+  }
+  if (cs.activityPlace === null || cs.activityPlace === pos.at) {
+    // 03 §6 phase 3f: `while` effects, boredom; a storylet's activity hands control back at full
+    // boredom, a card's `delay` when `forcedLeft` runs out (03 §8.3).
     const def = c.activity[cs.activity];
     const since = t - cs.activityStart;
     const due = (def?.while ?? []).filter((e) => since % (e.everyTicks ?? 1) === 0);
     if (due.length > 0) runEffects(ctx, due, { self: id });
-    cs.activityLeft -= 1;
-    if (cs.activityLeft === 0) finish(ctx, id, cs);
+    cs.boredom = Math.min(1000, cs.boredom + boredomRate(c, cs.activity));
+    if (cs.control === 'storylet' && cs.activity !== 'goTo' && cs.boredom >= 1000)
+      cs.control = 'free';
+    if (cs.control === 'forced') {
+      cs.forcedLeft = Math.max(0, cs.forcedLeft - 1);
+      if (cs.forcedLeft === 0) cs.control = 'free';
+    }
   }
 }
 
@@ -354,67 +392,238 @@ export function reaches(ctx: Ctx, e: RunningEffect, id: CatId): boolean {
   return within(catPos(ctx.c, catState(ctx, id)), nodePos(ctx.c, e.place), e.radiusM);
 }
 
-export interface Candidate {
-  activity: string;
-  score: number;
-  effect: RunningEffect | null; // for attracted / repelled offers
+export type { Candidate };
+
+/** The leaves, gauge refs and world-dependent place selectors an activity reads (03 §8.2). */
+function activityReads(ctx: Ctx, activity: string): DecisionReads {
+  return readsOf(ctx.c, ctx.decisions, activity);
+}
+
+/** `activityReads` for callers without a context (the fog's setup). */
+export function readsOf(c: Content, dm: DecisionMemo, activity: string): DecisionReads {
+  const memo = dm.reads;
+  const hit = memo[activity];
+  if (hit) return hit;
+  const out: DecisionReads = { gauges: [], leaves: [], places: [] };
+  const walk = (cond: Condition | undefined): void => {
+    if (!cond) return;
+    if ('all' in cond) cond.all.forEach(walk);
+    else if ('any' in cond) cond.any.forEach(walk);
+    else if ('not' in cond) walk(cond.not);
+    else if ('gauge' in cond) out.gauges.push(cond.gauge);
+    else out.leaves.push(cond);
+  };
+  const def = c.activity[activity];
+  if (def) {
+    walk(def.gate);
+    for (const t of def.score.terms ?? []) {
+      if ('gauge' in t) out.gauges.push(t.gauge);
+      if ('if' in t) walk(t.if);
+      if ('primeCount' in t) for (const p of c.world.primes.list) walk(p.cond);
+    }
+    const sel = (x: PlaceSelector): void => {
+      if ('anyOf' in x) x.anyOf.forEach(sel);
+      else if ('flag' in x || 'nearCat' in x) out.places.push(x);
+    };
+    sel(def.at);
+  }
+  memo[activity] = out;
+  return out;
+}
+
+/** The activities a cat's decision reads: its list, and its current activity if not in it. */
+function readActivities(ctx: Ctx, id: CatId): string[] {
+  const list = need(ctx.c.cat, id, 'cat').activities;
+  const cur = catState(ctx, id).activity;
+  return ctx.c.activity[cur] && !list.includes(cur) ? [...list, cur] : list;
+}
+
+/** Boredom's name where a gauge name is expected (keys, bands). */
+export const BOREDOM = '$boredom';
+
+/** The band of a gauge value: `fog.bands` equal bands of its range (03 §8.2, §13.2). */
+export function gaugeBand(c: Content, gauge: string, v: number): number {
+  const floor = gauge === BOREDOM || TRAITS.includes(gauge) ? 0 : c.hooksFloor;
+  const span = 1001 - floor;
+  return Math.min(c.tuning.fog.bands - 1, Math.trunc(((v - floor) * c.tuning.fog.bands) / span));
+}
+
+/** Running attract/repel effects that reach the cat now: its offers (03 §9.3). */
+const offersOf = (ctx: Ctx, id: CatId): RunningEffect[] =>
+  ctx.s.effects.filter((e) => (e.kind === 'attract' || e.kind === 'repel') && reaches(ctx, e, id));
+
+/**
+ * Everything a decision reads, as values (03 §8.2). Banded, it is the decision key a trigger
+ * compares; `exact`, it is what the decision cache is keyed by (exact gauges for a live cat, band
+ * midpoints for a fog stand-in), plus what place options depend on (decisions.md, M2-6).
+ */
+function decisionParts(ctx: Ctx, id: CatId, exact: boolean): unknown[] {
+  const cs = catState(ctx, id);
+  const scope = { self: id };
+  const gauges: string[] = [];
+  const leaves: Condition[] = [];
+  const places: PlaceSelector[] = [];
+  for (const a of readActivities(ctx, id)) {
+    const r = activityReads(ctx, a);
+    for (const g of r.gauges) if (!gauges.includes(g)) gauges.push(g);
+    for (const l of r.leaves) if (!leaves.includes(l)) leaves.push(l);
+    for (const p of r.places) if (!places.includes(p)) places.push(p);
+  }
+  const values = gauges.map((ref) => {
+    const v = readGauge(ctx, scope, ref);
+    return exact ? v : gaugeBand(ctx.c, ref.slice(ref.indexOf('.') + 1), v);
+  });
+  const offers = offersOf(ctx, id).map((e) =>
+    exact
+      ? [
+          e.id,
+          e.kind,
+          e.place,
+          e.strength,
+          e.kind === 'attract' && e.scale ? term(ctx, e.scale, scope, id) : 0,
+        ]
+      : e.id,
+  );
+  const parts: unknown[] = [
+    id,
+    cs.activity,
+    cs.activityPlace,
+    values,
+    exact ? cs.boredom : gaugeBand(ctx.c, BOREDOM, cs.boredom),
+    leaves.map((l) => chance(ctx, l, scope)),
+    offers,
+  ];
+  if (exact)
+    parts.push(
+      planFrom(cs),
+      cs.knowsClosed,
+      places.map((p) => placeOptions(ctx, id, p)),
+    );
+  return parts;
 }
 
 /**
- * The decision function (03 §8.2, §13.3): the candidates a cat may choose now and their
- * probabilities in ppm. The lantern samples it; the fog splits mass by it. Changes nothing.
+ * Runs `fn` with fog leaves rounded down to `fog.ppmQuantum` when in the fog (03 §8.2): the key
+ * and the decision read the same rounded values, so a cached result is exact.
+ */
+function quantised<T>(ctx: Ctx, fn: () => T): T {
+  if (!ctx.fog) return fn();
+  const saved = ctx.quantum;
+  ctx.quantum = ctx.c.tuning.fog.ppmQuantum;
+  try {
+    return fn();
+  } finally {
+    if (saved === undefined) delete ctx.quantum;
+    else ctx.quantum = saved;
+  }
+}
+
+/**
+ * The values of the conditions a cat's decision reads besides gauges, rounded in the fog (03 §8.2):
+ * the fog compares them between steps to find a changed decision key for all of a cat's mass.
+ */
+export function conditionVector(ctx: Ctx, id: CatId): number {
+  return quantised(ctx, () => {
+    const leaves: Condition[] = [];
+    for (const a of readActivities(ctx, id))
+      for (const l of activityReads(ctx, a).leaves) if (!leaves.includes(l)) leaves.push(l);
+    return hash32(JSON.stringify(leaves.map((l) => chance(ctx, l, { self: id }))));
+  });
+}
+
+/** The decision key (03 §8.2) as an integer: what a trigger compares with `lastKey`. */
+export const decisionKey = (ctx: Ctx, id: CatId): number =>
+  quantised(ctx, () => hash32(JSON.stringify(decisionParts(ctx, id, false))));
+
+/**
+ * The decision function (03 §8.2, §13.3), with hysteresis: the activities that beat the current
+ * one (less boredom) by `activities.stickiness`, with their probabilities in ppm. Empty: nothing
+ * changes. The lantern samples it; the fog splits mass by it. Cached by its exact inputs in
+ * `ctx.decisions`; results with and without the cache are identical. Changes nothing.
  */
 export function choices(ctx: Ctx, id: CatId): { cands: Candidate[]; ppm: number[] } {
+  return quantised(ctx, () => {
+    const dm = ctx.decisions;
+    if (dm.off) {
+      dm.calls += 1;
+      return decideFresh(ctx, id);
+    }
+    const key = JSON.stringify(decisionParts(ctx, id, true));
+    const hit = dm.results[key];
+    if (hit) {
+      dm.hits += 1;
+      return hit;
+    }
+    dm.calls += 1;
+    const result = decideFresh(ctx, id);
+    dm.results[key] = result;
+    return result;
+  });
+}
+
+function decideFresh(ctx: Ctx, id: CatId): { cands: Candidate[]; ppm: number[] } {
   const { c } = ctx;
   const cs = catState(ctx, id);
   const def = need(c.cat, id, 'cat');
   const scope = { self: id };
-  const cands: Candidate[] = [];
-
-  for (const a of def.activities) {
+  const usable = (a: string) => {
     const ad = need(c.activity, a, 'activity');
-    if (ad.gate && !test(ctx, ad.gate, scope)) continue;
     // placeOptions only returns places the cat can reach, so no path check is needed here.
-    if (placeOptions(ctx, id, ad.at).length === 0) continue;
-    const sticky = a === cs.activity && cs.activityLeft > 0 ? c.stickiness : 0;
-    cands.push({ activity: a, score: score(ctx, ad.score, scope) + sticky, effect: null });
-  }
-  for (const e of ctx.s.effects) {
-    if ((e.kind !== 'attract' && e.kind !== 'repel') || !reaches(ctx, e, id)) continue;
+    return (!ad.gate || test(ctx, ad.gate, scope)) && placeOptions(ctx, id, ad.at).length > 0;
+  };
+  const cands: Candidate[] = [];
+  for (const a of def.activities)
+    if (a !== cs.activity && usable(a))
+      cands.push({
+        activity: a,
+        score: score(ctx, need(c.activity, a, 'activity').score, scope),
+        effect: null,
+      });
+  let cur: number | null = null; // the current activity's score less boredom; null = none
+  for (const e of offersOf(ctx, id)) {
     const extra = e.kind === 'attract' && e.scale ? term(ctx, e.scale, scope, id) : 0;
     const activity = e.kind === 'attract' ? 'attracted' : 'repelled';
-    const sticky = activity === cs.activity && cs.activityLeft > 0 ? c.stickiness : 0;
-    cands.push({ activity, score: e.strength + extra + sticky, effect: e });
+    if (activity === cs.activity && e.place === cs.activityPlace) cur = e.strength + extra;
+    else cands.push({ activity, score: e.strength + extra, effect: e });
   }
-  if (cands.length === 0) return { cands, ppm: [] };
+  const ad = c.activity[cs.activity];
+  if (ad && usable(cs.activity))
+    cur =
+      score(ctx, ad.score, scope) -
+      Math.trunc((cs.boredom * c.tuning.behaviour.boredomWeight) / 1000);
+  const better = cur === null ? cands : cands.filter((x) => x.score > cur + c.stickiness);
+  if (better.length === 0) return { cands: [], ppm: [] };
   return {
-    cands,
+    cands: better,
     ppm: softmax(
-      cands.map((x) => x.score),
+      better.map((x) => x.score),
       def.temperatureTenths,
     ),
   };
 }
 
-/** Phase 6 decision for one cat (03 §8.2): samples the decision function. */
+/** Phase 6 decision for one cat (03 §8.2): samples the decision function and switches. */
 export function decide(ctx: Ctx, id: CatId): void {
   const cs = catState(ctx, id);
   const { cands, ppm } = choices(ctx, id);
-  if (cands.length === 0) return;
-  const chosen = cands[sample(ppm, rand(ctx.seed, catScope(ctx, id), ctx.t, 'act', 1_000_000))];
-  if (!chosen || (chosen.activity === cs.activity && cs.activityLeft > 0)) return;
-
-  if (chosen.effect?.kind === 'attract') {
-    goTo(ctx, id, chosen.effect.place, 'free');
-    cs.activity = 'attracted';
-    cs.activityLeft = Math.max(1, chosen.effect.left);
-  } else if (chosen.effect) {
-    const away = nearestOutside(ctx, id, chosen.effect);
-    if (away !== null) {
-      goTo(ctx, id, away, 'free');
-      cs.activity = 'repelled';
+  if (cands.length > 0) {
+    const chosen = cands[sample(ppm, rand(ctx.seed, catScope(ctx, id), ctx.t, 'act', 1_000_000))];
+    if (chosen) {
+      leave(ctx, id, cs);
+      if (chosen.effect?.kind === 'attract') {
+        goTo(ctx, id, chosen.effect.place, 'free');
+        cs.activity = 'attracted';
+      } else if (chosen.effect) {
+        const away = nearestOutside(ctx, id, chosen.effect);
+        if (away !== null) {
+          goTo(ctx, id, away, 'free');
+          cs.activity = 'repelled';
+        }
+      } else startActivity(ctx, id, chosen.activity, 'free');
     }
-  } else startActivity(ctx, id, chosen.activity, 'free');
+  }
+  // the key after the decision, so the cat's own switch is not a trigger (decisions.md)
+  cs.lastKey = decisionKey(ctx, id);
 }
 
 /** The nearest place (by path minutes) outside a repel effect's radius. */

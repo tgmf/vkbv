@@ -74,9 +74,17 @@
         10
       ],
       "gate": {
-        "not": {
-          "fact": "workDone"
-        }
+        "all": [
+          {
+            "not": {
+              "fact": "workDone"
+            }
+          },
+          {
+            "counter": "work",
+            "lt": 10
+          }
+        ]
       },
       "score": {
         "base": 3

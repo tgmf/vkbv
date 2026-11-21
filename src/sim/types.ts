@@ -1,4 +1,6 @@
 // Simulation types (spec 03 §5, §6, §11). Everything here is plain JSON with integer numbers.
+import type { PlaceSelector } from '../content/schemas/chapter';
+import type { Condition } from '../content/schemas/dsl';
 import type { Content } from '../content/schemas/content';
 import type { PathMemo } from './space';
 
@@ -41,7 +43,9 @@ export interface CatState {
   pos: CatPos;
   route: NodeId[]; // places still to visit after the current edge
   activity: string;
-  activityLeft: number; // ticks left at the place; 0 = finished
+  boredom: number; // 0..1000; rises while at the activity's place, reset on a switch (03 §8.2)
+  forcedLeft: number; // ticks left of a card's `delay` (03 §9.3); 0 = none
+  lastKey: number; // hash32 of the decision key of the last decision (03 §8.2); -1 = none yet
   activityStart: number;
   activityPlace: NodeId | null; // null = here
   control: 'free' | 'storylet' | 'forced';
@@ -180,13 +184,51 @@ export interface Ctx {
   pick: (bp: BranchPoint) => number; // resolves a branch point to an option index
   chanceN: number; // counts `chance` effects this tick (purpose chance:<n>)
   memo: PathMemo; // path results for this map, shared across steps by the caller
+  decisions: DecisionMemo; // decision reads and results (03 §8.2), shared by the caller
   /** The lantern's live cats (03 §13.4); absent = every cat is live (single-history mode). */
   live?: readonly CatId[];
   /** Storylets held by the fog (03 §13.4); phase 4 skips them. */
   held?: readonly string[];
   /** Set while the fog evaluates content: reads of fogged cats and fog quantities (03 §13.3). */
   fog?: FogReader;
+  /** While a fog decision runs: fog leaves are rounded down to this many ppm (03 §8.2). */
+  quantum?: number;
 }
+
+/**
+ * The decision cache (03 §8.2): what each activity's gate and score read, and decision results by
+ * their exact inputs. Owned by the caller for one recompute; `off` disables the result cache (the
+ * cache-on/off test). `calls` and `hits` are measurements only.
+ */
+export interface DecisionMemo {
+  reads: Record<string, DecisionReads>;
+  results: Record<string, { cands: Candidate[]; ppm: number[] }>;
+  off: boolean;
+  calls: number;
+  hits: number;
+}
+
+/** What an activity's gate and score terms read: gauge refs, other leaf conditions, place selectors that depend on the world. */
+export interface DecisionReads {
+  gauges: string[];
+  leaves: Condition[];
+  places: PlaceSelector[];
+}
+
+/** One option a decision may switch to: an activity, or an attract/repel offer (03 §8.2, §9.3). */
+export interface Candidate {
+  activity: string;
+  score: number;
+  effect: RunningEffect | null;
+}
+
+export const newDecisionMemo = (off = false): DecisionMemo => ({
+  reads: {},
+  results: {},
+  off,
+  calls: 0,
+  hits: 0,
+});
 
 /** A fogged cat's chain in one case, as stand-in cat states with their probability (ppm). */
 export type StandIns = readonly { cat: CatState; p: number }[];
