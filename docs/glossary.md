@@ -1,6 +1,6 @@
 # All Cats Fear Water — Glossary
 
-> Exported on 2026-11-21 from the glossary doc (https://claude.ai/artifact/MFVrDunRgWJMG14rPQhs3B), which is the source. Tagir re-exports it when it changes; do not edit this copy. Where it says the build pack is out of date, that refers to the pack before its 2026-11-21 rewrite.
+Nov 20, 2026 · @Tagir
 
 One meaning per term, used the same way in the design doc, the build pack, code and conversation. A term not listed here is not yet a defined concept; add it before relying on it.
 
@@ -12,6 +12,7 @@ Terms still used in more than one way. Until Tagir settles a row, agents ask ins
 | --- | --- | --- | --- |
 | 1 | The mountain village | Anchor list: "the village on top of the mountain". Lore: Vysoty is a tree village, Dolgoty a valley ringed by mountains. | Tagir: another village, not yet named. |
 | 2 | When a watched fact reopens | Glossary: when an edit makes it impossible. Decisions note: only when the player knowingly breaks the chain. Design doc: "impossible or very unlikely", with a threshold knob. | Undecided. |
+| 3 | Watched fact | Glossary: a fact (a named event) collapsed by observation. Build pack spec 03 §15.2: everything the followed protagonist perceives at one tick, a watched moment that may hold no story fact at all. | Undecided. |
 
 ## World and roles
 
@@ -62,7 +63,7 @@ One English and one Russian form per name, taken from the character and encyclop
 | --- | --- | --- |
 | Timeline | The one time axis of the whole game; each chapter is a stretch of it. All threads, pins and facts sit on it. | Not "a run": there are no separate runs, only edits to one timeline. |
 | Tick | One step of simulation time. | Demo: 1 tick = 1 game minute, 900 ticks per chapter (knob). |
-| Playhead | The tick the player is currently viewing. |  |
+| Playhead | The tick the player is currently viewing, always at or behind the lantern edge. |  |
 | Playback (play mode) | Moving the playhead forward at normal speed or paused. Only during playback can protagonists collapse what they perceive. |  |
 | Scrubbing | Scrolling fast by dragging the playhead. Shows a blur and observes nothing. |  |
 | Scroll | Any move of the playhead along time, forward or back: playback or scrubbing. | Replaces rewind and time travel. |
@@ -70,8 +71,11 @@ One English and one Russian form per name, taken from the character and encyclop
 | Anchor | The canon event that ends a chapter (Chapter 1: Marti meets Rokko under the boat). Shown first as a teaser. | Treated as already seen by default (knob), so unwatched waves lean toward it. The final chapter has no anchor. |
 | Teaser | The anchor shown before the chapter is played, like a "three months earlier" opening. | The whole game is a flashback. Not the same as a locked thread. |
 | Locked thread | A protagonist's thread shown but not yet playable, like Rokko's at the end of the demo. |  |
-| Frontier | The highest story progress ever reached, in any timeline: the chapter plus progress on its anchor's requirement tree, from watched facts, otherwise from the fog's odds. | Advances only in playback. The player can scroll up to the frontier limit. |
-| Frontier limit | The tick where the current timeline's progress first passes the frontier. The playhead can't go beyond it. | An edit that speeds the story up stops the player earlier in clock time. Replaces "scrub limit". |
+| Frontier | How far the story has been played. **Story limit:** the highest story progress ever watched, in any timeline (the chapter plus progress on its anchor's requirement tree). **Time past it:** the most ticks ever played after the story limit was reached; it resets to 0 when the story limit rises. Plus the set of storylets ever watched. | Changed only by playback; re-runs and scrubbing never change it. Measured from the last beat, not the clock: a beat an edit delays is reachable at once, however long it now takes. |
+| Frontier limit | Where a re-run stops: just before the first of a never-watched main storylet becoming perceivable to the followed protagonist, progress passing the story limit, or more ticks past the story limit than were ever played there. Never past the fray or the chapter's end. After an edit it becomes the lantern edge. | Side storylets never stop a re-run; they are shown and pay only in playback. A timeline that never reaches the story limit runs on to the fray or the end. Replaces "scrub limit". |
+| Lantern edge | The end of the followed protagonist's played thread in the current timeline, and the end of the scrubber, always on its right. Live playback extends it; after an edit it moves to the frontier limit. | Nothing is drawn or placed past it. Pins an edit leaves past it: ordinary cards return to the hand, unique cards move to the edge (powers: open). The bar rescales to keep the edge on the right; it grows freely for the first 36 ticks. |
+| Re-run | After an edit, the lantern simulated again from the edit tick to the frontier limit, streamed into the scrubber like a video buffering. | How the player sees an edit's consequences without replaying. Records and pays nothing; playback over its ticks does. Repeat by default holds inside it. |
+| Main storylet, side storylet | A storylet in the anchor's requirement tree; any other authored storylet. | Only new main story stops a re-run. |
 | Requirement tree | The facts that must happen for the anchor to happen, in their dependencies. | Expressible as a pattern (see Story sifting). |
 | Thread | One protagonist's line through the timeline. | Rokko and Litta add threads to the same timeline, not new runs. |
 | Following | Choosing which thread the camera and collapse focus on. |  |
