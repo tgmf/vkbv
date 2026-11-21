@@ -22,9 +22,15 @@ balance, and strain.
 
 ## Build
 
+0. Hysteresis decisions in `step` (`03` §8.2, decided 2026-11-22): decision keys,
+   triggers, the margin, boredom instead of `activityLeft`, `forcedLeft` for `delay`,
+   and the shared decision cache. This changes single-history behaviour on purpose:
+   update M1's golden files with `npm run golden:update` once, after this item alone,
+   and name this decision as the reason in the handoff note.
 1. Conditions return ppm (`03` §13.3). Refactor `conditions.ts` and `scores.ts` so
    every condition returns 0..1 000 000 and every score term and gate uses it. In
-   single-history mode the results must be identical to M1 (golden hashes unchanged).
+   single-history mode the results must be identical to those after item 0 (golden
+   hashes unchanged by this item).
 2. `step` takes `live` and `heldStorylets` (`03` §13.4); with every cat live and none
    held it behaves exactly as in M1.
 3. `readers.ts`: the readers index and link selection (`03` §13.5); the place
@@ -59,11 +65,17 @@ balance, and strain.
 
 ## Acceptance
 
-- [ ] M1's golden hashes and single-history tests pass unchanged after the ppm
-      refactor and the new `step` arguments. The one intended change: initial gauges
-      now use scope `s0:<cat>` in every stream (`03` §5), so single histories in
-      streams other than 0 start from the seed's stats; stream-0 results are unchanged,
-      and the handoff note lists any expected file that moved and why.
+- [ ] Hysteresis (item 0): on the tiny world a cat keeps its activity until a trigger
+      fires and an activity beats it by the margin; boredom rises at the activity's
+      rate and resets on a switch; a `delay` ends after `forcedLeft`; the golden files
+      were updated once, with this decision as the reason in the handoff note.
+- [ ] After item 0, the golden hashes and single-history tests pass unchanged through
+      the ppm refactor and the new `step` arguments. The other intended change: initial
+      gauges use scope `s0:<cat>` in every stream (`03` §5), so single histories in
+      streams other than 0 start from the seed's stats; the handoff note lists any
+      expected file that moved and why.
+- [ ] The decision cache: results with the cache on and off are byte-identical; the
+      handoff note gives the hit rate and decision calls per re-run.
 - [ ] One decision function: for a live state and the matching point-mass chain
       state, the fog and the lantern produce the same choice probabilities (test).
 - [ ] Chains: every cat's chain sums to 1 000 000 in every case after every step;

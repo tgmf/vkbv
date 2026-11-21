@@ -19,7 +19,7 @@ If the content seems wrong or unbalanced, measure it (§5), report it in
 | `map.json` | 28 nodes in 3 regions (flat, town, beach), 31 edges in minutes; positions in metres. `roadworks_pass` closes when `roadBlocked` |
 | `cast.json` | 12 cats. `core: true` marks the minimal set (Marti, Rokko, Prasha, Gavrila, Bublik); the other 7 are chaos |
 | `hooks.json` | 3 shared hooks, Marti's 3, Rokko's 3; rise and decay rules; voice lines |
-| `activities.json` | 23 free behaviours; `stickiness`, `decisionEveryTicks` |
+| `activities.json` | 23 free behaviours; `stickiness` (the hysteresis margin), `decisionEveryTicks` (how often decision triggers are checked); an activity's `ticks: [lo, hi]` sets how fast it tires, not a duration (`03` §8.2) |
 | `objects.json` | 15 objects: the 5 card objects in the flat, a kettle and shelf, town props, the chain, the boat, a bottle |
 | `cards.json` | The 6-card demo deck (`demo: true`) plus 3 test cards (`demo: false`) |
 | `powers.json` | Lure (100 charge) and Gaze (40 charge, 6 m, 5 ticks) |
@@ -80,6 +80,8 @@ have **not** been checked against a model of this content; M4 measures them.
 | `fog.contributors` | 4 | contributor heap size per fact, flag and `heard` |
 | `fog.frayBelowPpm` | 1000 | a projection frays below this chance of reaching the anchor (`03` §16) |
 | `fog.exactTolerancePpm` | 20000 | tiny-world exactness test (`03` §18) |
+| `fog.ppmQuantum` | 50000 | fog probabilities in decision keys are rounded down to this (`03` §8.2) |
+| `behaviour.boredomWeight` | 4 | score taken from the current activity at full boredom (`03` §8.2) |
 | `lantern.releaseAfterTicks` | 30 | ticks unperceived before a live cat returns to the fog (`03` §13.4) |
 | `lantern.dwellTicks` | 5 | ticks a placed cat keeps its activity before deciding (`03` §15.1) |
 | `observation.reopenBelowPpm` | 0 | when a watched fact reopens (open question; keep 0) |

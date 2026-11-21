@@ -54,8 +54,10 @@ pure, tested functions, driven headless. No UI.
       and `storylets` as `04` §6 says (numbers in the test); an edit that delays the
       beat keeps it reachable, `pastTicks` beyond it; scrubbing and re-runs never
       change the frontier; `story` never decreases.
-- [ ] Pins past the new edge: an edit that pulls the edge back returns ordinary cards
-      past it to the hand and moves unique and power pins to the edge.
+- [ ] Past the new edge: an edit that pulls the edge back returns ordinary cards past
+      it to the hand and moves unique and power pins to the edge, with the warning in the
+      preview; every watched fact past it is reopened, no watched fact remains past the
+      edge, and a paid one shows in the preview's `breaks`.
 - [ ] Specials: the first pin on the source object sets `special: true`; a second does
       not; withdrawing it does not restore it.
 - [ ] Rules `spent` and `discard` work through the same script; the reshuffle order is

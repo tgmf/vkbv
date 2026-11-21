@@ -133,6 +133,9 @@ reopen (`03` §15.5) and where the new lantern edge is.
   reopen, the UI shows a **break alert** before the edit lands (`06` §6): it lists
   what would no longer happen and offers Confirm and Cancel. It is information only;
   confirming costs nothing extra.
+- Watched facts after the new lantern edge are always reopened (`03` §15.5): they
+  belong to their ticks, and the story there has moved. Paid ones are listed in the
+  break alert like any other.
 - On commit, reopened facts are removed from `watched`. The ticks of reopened
   **unpaid** facts are added to `marks.changedUnwatched` (a quiet mark, no alert).
 - Payouts already paid stay paid (they are keyed by kind, `§7`). The frontier never
@@ -140,8 +143,12 @@ reopen (`03` §15.5) and where the new lantern edge is.
 - **Pins past the new lantern edge.** On commit, every pin whose tick is after the new
   edge leaves that stretch: an ordinary card's pin is removed and the card returns to
   `hand` (under every played-card rule); a unique card's pin moves to the edge tick,
-  keeping its `seq`; a power pin moves to the edge tick at no cost (open:
-  `docs/questions.md` M2-3). Then `playhead = min(playhead, edge)`.
+  keeping its `seq`; a power pin moves to the edge tick at no cost (`docs/questions.md`
+  M2-3). Then `playhead = min(playhead, edge)`.
+- **Warning for moved pins.** If the preview's edge would move any unique or power pin
+  (its tick is after the new edge), the break alert shows before the edit lands even when
+  no paid fact reopens. It lists each such pin and where it would move, with the same
+  Confirm and Cancel (`06` §6). Ordinary cards returning to the hand need no warning.
 
 ## 5. Following
 

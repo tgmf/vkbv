@@ -112,7 +112,8 @@ Tick 0 is `world.startClock` (05:40). One tick is `world.tickMinutes` (1) game m
 the chapter has `world.ticks` (900) ticks. A clock condition `["HH:MM","HH:MM"]` holds
 when the tick's clock time is in `[from, to]`, both inclusive; if `to < from` the
 window wraps past midnight. `decisionEveryTicks` (activities.json, 5) sets the
-**decision ticks**: `tick % decisionEveryTicks === 0`.
+**decision ticks**: `tick % decisionEveryTicks === 0`, the ticks on which decision
+triggers are checked (§8.2).
 
 ## 3. Space
 
@@ -216,7 +217,8 @@ interface CatState {
   pos: { at: NodeId } | { from: NodeId; to: NodeId; edge: EdgeId; left: number; of: number };
   route: NodeId[];                          // nodes still to visit after the current edge
   activity: ActivityId;                     // 'none' at start of day if startActivity absent
-  activityLeft: number;                     // ticks left at the place; 0 = finished
+  boredom: number;                          // 0..1000; rises while at the current activity's place, reset on a switch (§8.2)
+  forcedLeft: number;                       // ticks left of a card's `delay` (§9.3); 0 = none
   activityStart: number;                    // tick the activity was chosen
   activityPlace: NodeId | null;             // chosen place, null = here
   control: 'free' | 'storylet' | 'forced';  // who decides what it does next (§8.3)
@@ -246,8 +248,8 @@ The initial state of a history whose streams are all `s` (the lantern uses `s = 
 
 - weather `dry`; no facts; flags from `world.initialFlags` (absent = none); counters
   from `world.counters[*].start`;
-- each cat at its `start` node, activity `startActivity` with `activityLeft` sampled
-  as for a free choice (§8.2) and `control: 'free'`; `base[g] = lo + rand(seed,
+- each cat at its `start` node, activity `startActivity` with `boredom: 0` and
+  `control: 'free'`; `base[g] = lo + rand(seed,
   "s0:<cat>", 0, "init:<g>", hi − lo + 1)` for every trait and hook range in
   cast.json, then clamped to the gauge's range (hooks start at least at `hooks.floor`); everything else empty or zero;
 - every storylet inactive; every pool empty; `anchor` both null.
@@ -279,20 +281,20 @@ storylets and detectors in file order, effects in creation order, pins in log or
       `arrive`);
    e. else if `route` is non-empty: if the edge to `route[0]` is closed, emit
       `blocked`, add the edge to `knowsClosed`, clear `route`, and end the current
-      activity (`activityLeft = 0`, activity `none`, `control: 'free'`); otherwise
+      activity (activity `none`, `control: 'free'`, a decision trigger); otherwise
       start the edge (`left = of = minutes / tickMinutes`), shift `route`, emit
       `depart`;
-   f. else if at its `activityPlace` (or it is null) and `activityLeft > 0`: run the
-      activity's `while` effects whose `everyTicks` (default 1) divides
-      `t − activityStart`; `activityLeft -= 1`; at 0 run `onFinish`, emit
-      `activityFinished { cat, activity }`.
+   f. else if at its `activityPlace` (or it is null): run the activity's `while`
+      effects whose `everyTicks` (default 1) divides `t − activityStart`; add the
+      activity's boredom rate to `boredom` (§8.2), capped at 1000. If
+      `control === 'forced'`: `forcedLeft -= 1`, and at 0 the delay ends (§8.3).
 4. **Storylets.** Activation, then one transition at most per storylet (§9). Choice
    exits are branch points.
 5. **Detectors.** Advance every pool (§10.3).
 6. **Free decisions.** For each cat with `control: 'free'`, no interrupt, standing at
-   a node, and not the actor of an open storylet choice (§9.2): decide (§8.2) if it is
-   a decision tick, or its activity just finished, or it arrived this tick with an
-   empty route, or an effect asked it to decide now (§9.3).
+   a node, and not the actor of an open storylet choice (§9.2): on a decision tick,
+   check its triggers (§8.2); arriving with an empty route, a returned control or an
+   effect asking it to decide now (§9.3) trigger at once.
 7. **Perception.** Go through this tick's events in emission order and apply what
    cats perceive (§4): `heard`, hook `onEvent`, `factIfPerceivedBy`, `socialSpread`
    hops (§9.3), object `onPerceived` (checked for every object every tick).
@@ -336,25 +338,61 @@ a trait letter (`O C E A N`). A cat without that gauge reads 0.
 
 ### 8.2 Free behaviour
 
-A cat's `activities` list (cast.json) names the activities it may choose. At a
-decision (phase 6):
+Decided 2026-11-22: **hysteresis, not timers.** A cat keeps doing what it is doing
+until a decision trigger fires and another activity beats the current one by the
+hysteresis margin. Activities have no duration; how long one lasts emerges from the
+cat's drives and its boredom.
+
+A cat's `activities` list (cast.json) names the activities it may choose.
+
+**Decision key.** The canonical JSON of: the cat; its current activity and place; the
+band index (edges at `tuning.fog.bands` equal bands of each gauge's range) of every
+gauge read by the gates and score terms of the current activity and of the candidates,
+`boredom` included; the value of every other condition those gates and score terms
+read (0 or 1 000 000 for live things; for fog quantities, ppm rounded down to a
+multiple of `tuning.fog.ppmQuantum`); and the offers it holds (§9.3).
+
+**Triggers**, checked on decision ticks (phase 6): the cat's decision key differs from
+the key of its last decision; it arrived with an empty route; its interrupt ended; a
+`delay` ended; control returned from a storylet; an effect asked it to decide now
+(§9.3). Arriving, a returned control and "decide now" also trigger at once, off
+decision ticks.
+
+**At a trigger:**
 
 ```
-candidates = activities in the cat's list whose `gate` holds and that have a place
-score(a)   = score terms of a (§10.2)
-             + (a.id === cat.activity && cat.activityLeft > 0 ? activities.stickiness : 0)
-             + attract/repel offers that name a (§9.3)
-p          = softmax(scores, cat.temperatureTenths)
+candidates = activities in the cat's list, other than the current one, whose `gate`
+             holds and that have a place, plus offered activities (§9.3)
+cur        = score(current) − trunc(boredom × behaviour.boredomWeight / 1000)
+             (−∞ when the current activity is `none`, or its gate no longer holds,
+             or it has no place)
+better     = candidates with score(a) > cur + activities.stickiness
+if better is empty: nothing changes
+p          = softmax(scores of better, cat.temperatureTenths)
 choice     = sample(p, rand(seed, "s<stream>:<cat>", t, "act", 1_000_000))
 ```
 
-This is **sampled noise**, not a branch: a live cat rolls it with its stream; the fog
-splits the mass over the choices instead (§13.3). If the
-choice is the current, unfinished activity, nothing changes. Otherwise the cat
-switches: `activity = choice`, `activityLeft = lo + rand(…, "dur:<a>", hi − lo + 1)`
-from the activity's `ticks: [lo, hi]`, `activityPlace` = the place selector's pick,
-`route = path(here, place)`; if it is already there `route` is empty. If no path or no
-place exists, the activity is not a candidate.
+`activities.stickiness` is the hysteresis margin. `score(a)` is §10.2's score terms
+plus offers that name `a`. This is **sampled noise**, not a branch: a live cat rolls
+it with its stream; the fog splits the mass over `better` instead (§13.3). The
+decision key is recorded as the cat's last key whether or not it switched.
+
+**Switching** from the current activity: run its `onFinish`, emit
+`activityFinished { cat, activity }` (so `activityFinished` means "left that
+activity"), then `activity = choice`, `boredom = 0`, `activityStart = t`,
+`activityPlace` = the place selector's pick, `route = path(here, place)`; if it is
+already there `route` is empty. If no path or no place exists, the activity is not a
+candidate.
+
+**Boredom** rises by the activity's rate each tick the cat is at its place: rate =
+`max(1, trunc(1000 × 2 / (lo + hi)))` from the activity's `ticks: [lo, hi]`, which now
+sets how fast the activity tires (boredom reaches 1000 after about the middle of that
+range), not a duration. Built-ins have rate 0.
+
+**Decision cache.** Within one recompute, the softmax result (`better` and `p`) is
+memoised by decision key plus the temperature; the lantern and the fog share the cache.
+It is cleared when pins or tuning change. Results with and without the cache are
+identical (a test). Only the draw is per tick.
 
 **Place selectors** (`at`), resolved when the activity starts:
 
@@ -370,7 +408,7 @@ place exists, the activity is not a candidate.
 | `{ randomNode: { region, tag } }` | a node sampled uniformly from those matching, purpose `place:<a>` |
 
 Built-in activities, available to every cat without being listed: `none` (stand
-still, `activityLeft = 0`), `goTo` (§9.3), `attracted` and `repelled` (§9.3). They
+still; it loses to any candidate at the next trigger), `goTo` (§9.3), `attracted` and `repelled` (§9.3). They
 have no score terms of their own and are never chosen by a free decision except
 through an offer.
 
@@ -380,10 +418,10 @@ through an offer.
 
 - `free`: it makes free decisions.
 - `storylet`: a storylet effect gave it a `goTo` or `startActivity`. It walks and
-  performs as told; when that activity finishes (or it arrives at a `goTo` target with
-  an empty route), `control` returns to `free` and it decides at once.
-- `forced`: a card's `delay` or `interrupt`-like effect holds it in an activity
-  (§9.3). Returns to `free` when that activity finishes.
+  performs as told; when its boredom reaches 1000 (or it arrives at a `goTo` target
+  with an empty route), `control` returns to `free` and it decides at once.
+- `forced`: a card's `delay` holds it in an activity for `forcedLeft` ticks (§9.3).
+  Returns to `free` when `forcedLeft` reaches 0, and decides at once.
 
 A cat that is the **actor** of an open choice exit (§9.2) makes no free decision while
 that exit is open; the storylet's choice replaces it.
@@ -456,9 +494,9 @@ Storylet `onEnter`, activity `while` and `onFinish`, hook rules and cards share 
 | `{ flag, value?, ttl?, at? }` | sets `flag@<node>` (or the unscoped `flag`) to `value` (default 1; `true`/`false` = 1/0); `ttl` ticks of life. `at` names a node, or a cat, meaning the node it stands at |
 | `{ gauge: "who.g", add? , set?, holdTicks? }` | `set` writes `base`; `add` writes `base`, unless `holdTicks` is given, then adds a mod of that length with no decay |
 | `{ counter, add }` | adds to a counter (used by `while`) |
-| `{ goTo: [who, node], route?, via?, tag? }` | plans a path (§3; `route`: `shortest`, `via`, `edgesTagged`), sets activity `goTo` with `activityLeft = 1` at the target, `control: 'storylet'`. For a list role, every cat |
+| `{ goTo: [who, node], route?, via?, tag? }` | plans a path (§3; `route`: `shortest`, `via`, `edgesTagged`), sets activity `goTo` (arriving at the target with an empty route ends it), `control: 'storylet'`. For a list role, every cat |
 | `{ startActivity: [who, a] }` | starts activity `a` as a free choice would, but `control: 'storylet'` |
-| `{ stop: who }` | clears `route`; if on an edge, the cat finishes that edge first; activity `none`, `activityLeft = 0`, `control: 'free'` |
+| `{ stop: who }` | clears `route`; if on an edge, the cat finishes that edge first; activity `none`, `control: 'free'` |
 | `{ interrupt: [who, action, ticks] }` | sets `interrupt` for `ticks` |
 | `{ emit, at?, from?, to?, radiusM?, factIfPerceivedBy? }` | emits event `emit` at node `at`, or at cat `from`'s position, or addressed to cat `to`; `factIfPerceivedBy: { cat: fact }` adds the fact if that cat perceives it (phase 7) |
 | `{ trigger: storyletId }` | activates that storylet |
@@ -478,7 +516,7 @@ it fires.
 | `attract { radiusM, strength, ticks, scale? }` | a running effect at the place for `ticks`: every cat within `radiusM` (straight-line) that the power's `affects` allows (absent = every cat) gets an offer: the activity `attracted` (walk to the place, stay until the effect ends) added to its candidates with score `strength + scale terms`. Affected cats decide at once on the first tick |
 | `repel { radiusM, strength, ticks }` | the mirror: an offer of `repelled` (walk to the nearest node outside the radius) with score `strength` |
 | `socialSpread { event, radiusM, hops }` | emits `event` at the target with `radiusM`. In phase 7, every cat that perceives it for the first time re-emits it from its own position next tick with `hops − 1`, while `hops > 0` |
-| `delay { ticks: [lo, hi], action }` | the target cat performs activity `action` where it stands for a sampled number of ticks, `control: 'forced'` |
+| `delay { ticks: [lo, hi], action }` | the target cat performs activity `action` where it stands for a sampled number of ticks (`forcedLeft`), `control: 'forced'` |
 | `move { to }` | `goTo` for the target cat |
 | `triggerStorylet { storylet }` | activates it (`ifTarget: cat` = only if that cat is among the affected) |
 | `setFlag { flag, at?, ticks?, onlyObjects? }` | sets the flag (scoped to the target place or object's node when `at: "$target"`) for `ticks` |
@@ -678,9 +716,8 @@ interface ChainState {
   activity: ActivityId;          // includes 'none' and the built-ins of §8.2
   place: NodeId;                 // where the activity happens (the place selector's pick)
   walk: null | { from: NodeId; path: NodeId[]; leftSteps: number; ofSteps: number };
-  leftSteps: number;             // fog steps left at the place; 0 = finished
-  bands: Record<GaugeId, number>;// band index of each banded gauge (below)
-  interrupt: null | { action: string; leftSteps: number };
+  bands: Record<GaugeId, number>;// band index of each banded gauge, boredom included (below)
+  interrupt: null | { action: string; leftSteps: number };   // also a card's `delay`
   control: 'free' | 'storylet' | 'forced';
 }
 ```
@@ -690,18 +727,21 @@ interface ChainState {
   state in canonical order (the canonical JSON of the state, sorted).
 - **Sparse.** Only states with mass are stored. After every step, states below
   `tuning.fog.minStatePpm` are dropped and the cat's chain renormalised.
-- **Durations** in steps: `ceil(ticks / stepTicks)`. An activity's duration
-  `[lo, hi]` becomes a uniform distribution over `leftSteps` values. Walking uses the
-  path of §3; its position at a tick is interpolated along the path as in §3.
+- **No activity timers** (§8.2, decided 2026-11-22). A state has no "time left" at
+  its activity: boredom, always banded, rises at the activity's rate and moves mass
+  band by band, and switching follows §8.2's triggers. Only travel and card timers
+  count down, in steps (`ceil(ticks / stepTicks)`): walking uses the path of §3, its
+  position interpolated along the path as in §3; interrupts and `delay` spread their
+  sampled duration uniformly over `leftSteps`.
 - **Bands.** A gauge that changes during the day (hooks, pressure) is banded:
   its range is cut into `tuning.fog.bands` equal bands; its value in conditions is the
   band's midpoint. At most `tuning.fog.maxBandedGauges` gauges per cat are banded:
   those read by the scores or gates of the cat's activities and of storylets it can
-  hold a role in, in hooks.json order. The cat's other changing gauges and all traits
+  hold a role in, in hooks.json order. Boredom is banded in addition and does not count
+  toward that limit. The cat's other changing gauges and all traits
   are **mean-field**: one expected value per cat and case, updated by the same rules.
 - **Initial distribution.** At tick 0 each cat is at its `start` with
-  `startActivity` (its `leftSteps` spread uniformly over the activity's duration) and
-  its seeded stats (§5): each banded gauge's mass sits in the band holding its seeded
+  `startActivity`, boredom in band 0, and its seeded stats (§5): each banded gauge's mass sits in the band holding its seeded
   value, and traits and mean-field gauges hold their seeded values. Protagonists are
   live from tick 0 with the same stats.
 - **Rise and decay.** A hook rule that would add `add` to a gauge over a step moves
@@ -727,9 +767,14 @@ Score terms use the ppm: `{ if, add }` adds `trunc(add × ppm / 1 000 000)`; a
 (500 000). `all` multiplies ppm (independence assumed), `any` is `1 − Π(1 − p)`, `not`
 is `1 − p`.
 
-At a fog decision (a decision step, an activity finished, or arrived with an empty
-route), a chain state's mass is split over the candidate activities by the same
-softmax as §8.2, with stickiness and offers. A candidate's place is the place
+Fog decisions follow §8.2's triggers; nothing is polled. On a decision step the fog
+calls the decision function only for mass whose decision key changed: mass that moved
+into another band of a gauge its decision reads (boredom included), the states of a cat
+whose world-condition values changed bucket (`fog.ppmQuantum`) this step, and mass that
+arrived or whose interrupt, `delay` or storylet control ended. All other mass keeps its
+activity without a call. A deciding state's mass stays where it is with the share for
+"nothing changes" and is split over `better` by the same softmax as §8.2, with offers;
+results come from the shared decision cache (§8.2). A candidate's place is the place
 selector's pick from the state's place; a selector that samples (`neighbour`,
 `randomNode`) splits the mass evenly over its candidates. `nearCat` picks the node
 where the nearest other cat most likely stands.
@@ -906,8 +951,7 @@ each followed protagonist `P` and each fogged cat `c`, in cast order:
    unrelated edits keep the same draw where the odds allow it.
 3. If `r < q`, **place** `c`: pick a state among those `P` would perceive, in
    proportion to mass, with a second draw (purpose `"pick:" + P + ":" + c`). Make `c`
-   live: position and activity from that state; `activityLeft` drawn uniformly within
-   the state's remaining steps (purpose `"left:" + c`); each banded gauge drawn
+   live: position and activity from that state; boredom and each banded gauge drawn
    uniformly within its band, and mean-field gauges set to their expected value
    (purpose `"gauge:" + c + ":" + g`); traits are the seeded ones (§5); flags and `heard` set where their probability is at least 500 000.
    `c` gets `dwell = tuning.lantern.dwellTicks`: while it is above 0, phase 6 makes no
@@ -986,8 +1030,13 @@ the fact:
   together have less than that probability. When a watched fact reopens is an open
   question (glossary, Open conflicts 2): keep the knob, do not change its default.
 
-Watched facts past the tick where the re-run stops are kept and tested the same way
-when live playback reaches them (open: `docs/questions.md` M2-4).
+**Facts past the new edge.** A watched fact belongs to its tick, and an edit can move
+when things happen. Every watched fact after the tick where the re-run stops is
+**reopened without a test**: the story it saw now happens at other ticks, or past the
+edge where nothing is computed. The re-run reports them in `reopened`, and the paid ones
+in `breaks`, so the break alert lists them before the edit lands (`04` §4). No watched
+fact ever lies past the lantern edge. (Tagir, 2026-11-22; replaces option (a) of
+`docs/questions.md` M2-4.)
 
 ## 16. Fray and frames
 
@@ -1055,6 +1104,11 @@ states, plus re-run time, strain and `localCauses` (debug only).
   Bayes' rule computed by hand.
 - The fog and the lantern call the same decision function: a test feeds a live state
   and the matching point-mass chain state and gets the same probabilities.
+- Hysteresis: a cat switches only at a trigger and only to an activity that beats the
+  current one (minus boredom) by `activities.stickiness`; with no trigger the fog calls
+  no decision for that mass.
+- The decision cache changes nothing: recompute results with the cache on and off are
+  byte-identical.
 - Placement draws come from states with mass above 0, or are counted in
   `stats.localCauses`.
 - **Calibration** (`07` §3): over many seeds, a probability shown at one tick matches

@@ -149,7 +149,7 @@ charge is lost (charge is never refunded); (c) it is removed and its charge refu
 Chosen for now: (a).
 Answer: Tagir, 2026-11-22: go with the defaults ("pls do").
 
-## M2-4 — Watched facts past the new lantern edge            (status: answered)
+## M2-4 — Watched facts past the new lantern edge            (status: answered, overridden)
 Where: `03` §15.5, `04` §4
 Question: A re-run stops at the frontier limit, so watched facts after it are not tested and the
 break alert cannot list them.
@@ -158,7 +158,13 @@ reopens then is a break with no alert before it; (b) reopen them all on commit a
 ones in the break alert; (c) let a preview run past the frontier limit to the last watched fact,
 only to test facts, then cut the frames at the limit (costs a longer re-run).
 Chosen for now: (a).
-Answer: Tagir, 2026-11-22: go with the defaults ("pls do").
+Answer: Tagir, 2026-11-22: go with the defaults ("pls do"). **Overridden later the same
+night (Tagir, 2026-11-22): (b).** A watched fact belongs to its tick, and an edit can move
+when things happen, so testing old facts at their old ticks is wrong. On commit every
+watched fact after the new edge is reopened without a test; the paid ones are listed in
+the break alert before the edit lands; no watched fact ever lies past the edge. The build
+pack (`instructions/acfw-build-pack`, `03` §15.5, `04` §4, M3) says this; apply it to
+`docs/spec` when the pack is next installed. Do not switch back to (a).
 
 ## M2-5 — Decisions made while applying the lantern edge to the spec            (status: answered)
 Where: `03` §12.2, §13.1, §17; `04` §4, §6; `02` §3; `06` §3; `05` §4
@@ -180,5 +186,17 @@ Question: The glossary of 2026-11-22 left these to me. Confirm or correct:
 7. New knobs: `timeline.minSpanTicks` 36, `budgets.rerunTps` 120.
 Chosen for now: as listed.
 Answer: Tagir, 2026-11-22: go with the defaults ("pls do").
+
+## M2-6 — Decision cache key vs exact decisions            (status: answered)
+Where: `03` §8.2 (decision key, decision cache), §18
+Question: The decision key holds gauge bands and fog ppm rounded to `fog.ppmQuantum`, and the
+cache must not change results. A live cat's scores read exact gauges, and fog scores read
+unrounded ppm, so one band-level key cannot index an exact result.
+Options seen: (a) two keys: triggers on the band key; the cache on the decision's actual inputs
+(exact live gauges, band midpoints in the fog), with the fog's condition ppm rounded to the
+quantum in the decision itself; (b) cache by the band key and accept differences for live cats;
+(c) live decisions read bands too.
+Chosen for now: (a).
+Answer: Tagir, 2026-11-22: (a), two keys.
 
 <!-- Gate notes and answers go above this line. -->
