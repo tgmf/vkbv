@@ -408,7 +408,7 @@ function nearestOutside(ctx: Ctx, id: CatId, e: RunningEffect): NodeId | null {
   return best;
 }
 
-/** Initial gauges of a cat for a stream (03 §5): part of the wave. */
+/** Initial gauges of a cat (03 §5). The caller passes scope `s0:<cat>`: the seed fixes them. */
 export function initialGauges(
   c: Content,
   seed: number,

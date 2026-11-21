@@ -5,7 +5,6 @@ import { rand } from './rng';
 import type { PathMemo } from './space';
 import { step } from './step';
 import type { Content, Ctx, End, Pin, SimEvent, SimState, Streams } from './types';
-import { catScope } from './types';
 
 /** Every cat and the world on the same stream (single-history mode, 03 §12.4). */
 export const uniformStreams = (c: Content, stream: number): Streams =>
@@ -41,7 +40,8 @@ export function initialState(
     anchor: { reachedAt: null, deadAt: null },
   };
   for (const def of c.cats) {
-    const base = initialGauges(c, seed, catScope({ streams }, def.id), def.id);
+    // The seed fixes every cat's starting stats: stream 0 in every mode (Tagir, 2026-11-21).
+    const base = initialGauges(c, seed, `s0:${def.id}`, def.id);
     s.cats[def.id] = {
       pos: { at: def.start },
       route: [],
