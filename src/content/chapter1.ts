@@ -13,6 +13,7 @@ import storylets from './data/ch1/storylets.json';
 import textEn from './data/ch1/text/en.json';
 import textRu from './data/ch1/text/ru.json';
 import world from './data/ch1/world.json';
+import pinsets from './data/pinsets.json';
 import tuning from './data/tuning.json';
 import type { ChapterFiles } from './load';
 
@@ -34,3 +35,5 @@ export const CHAPTER1_FILES: ChapterFiles = {
 };
 
 export const TUNING_FILE: unknown = tuning;
+
+export const PINSETS_FILE: unknown = pinsets;

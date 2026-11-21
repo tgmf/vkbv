@@ -18,7 +18,9 @@ npm run dev                       # http://localhost:5173
 ```
 
 Open with `?debug=1`, or press the backquote key, to see every tuning knob with its
-description.
+description. Open with `?dev=1` for the dev inspector: one simulated day of Chapter 1 on a map,
+with a tick slider (←/→, Shift for 10, Space plays), the event log, every cat's activity and
+gauges, and the running storylets. Pick a seed, a stream and one of the spec's pin sets.
 
 ## Commands
 

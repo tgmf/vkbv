@@ -1,0 +1,14 @@
+{
+  "note": "The pin sets of docs/spec/05-chapter1-content.md §5.1, written card@target@tick or power@place@tick; a trailing ! marks a special.",
+  "sets": {
+    "untouched": [],
+    "lure_unprimed": ["lure@flat.door@445"],
+    "lure_one_prime": ["irresistible_junk@odds_jar@430!", "lure@flat.door@445"],
+    "lure_primed": ["empty_teapot@kettle@300", "irresistible_junk@odds_jar@430!", "lure@flat.door@445"],
+    "road_tea": ["empty_teapot@kettle@300", "irresistible_junk@odds_jar@430!", "lure@flat.door@445", "tea_break@town.roadworks@180"],
+    "road_box": ["empty_teapot@kettle@300", "irresistible_junk@odds_jar@430!", "lure@flat.door@445", "box@town.roadworks@200"],
+    "road_both": ["empty_teapot@kettle@300", "irresistible_junk@odds_jar@430!", "lure@flat.door@445", "tea_break@town.roadworks@180", "box@town.roadworks@200"],
+    "late_lure": ["empty_teapot@kettle@300", "irresistible_junk@odds_jar@430!", "lure@flat.door@710", "tea_break@town.roadworks@180", "box@town.roadworks@200"],
+    "cards_on_marti": ["tea_break@marti@100", "something_shiny@marti@200"]
+  }
+}

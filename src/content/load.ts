@@ -1,5 +1,6 @@
 // Parses and cross-checks content (spec 02 §5). Every problem is collected and thrown as one error.
-import type { z } from 'zod';
+import { z } from 'zod';
+import type { Pin } from '../sim/types';
 import { checkChapter, type ParsedChapter } from './check';
 import { TextSchema, TuningSchema, type TextTable, type Tuning } from './schemas';
 import * as S from './schemas/chapter';
@@ -218,4 +219,60 @@ export function loadAll(files: {
   const content = tuning && attempt(() => loadChapter(files.chapter, tuning));
   if (!tuning || !ui || !content) throw new ContentError(problems);
   return { tuning, ui, content };
+}
+
+/** The pin sets of 05 §5.1 (src/content/data/pinsets.json), in the spec's notation. */
+const PinSetsSchema = z.strictObject({
+  note: z.string().optional(),
+  sets: z.record(z.string(), z.array(z.string())),
+});
+
+/**
+ * Parses `card@target@tick` / `power@place@tick` (a trailing `!` marks a special) into pins.
+ * The target is a cat, an object or a place, whichever id it names.
+ */
+export function parsePinSets(data: unknown, c: Content): Record<string, Pin[]> {
+  const problems: string[] = [];
+  const file = parse(PinSetsSchema, data, 'pinsets.json', problems);
+  if (!file) throw new ContentError(problems);
+  const sets: Record<string, Pin[]> = {};
+  for (const [name, list] of Object.entries(file.sets)) {
+    sets[name] = list.flatMap((text, seq): Pin[] => {
+      const special = text.endsWith('!');
+      const [what = '', target = '', tickText = ''] = text.replace(/!$/, '').split('@');
+      const tick = Number(tickText);
+      const id = `${name}.${seq}`;
+      const where = `pinsets.json: ${name}: ${text}`;
+      if (!Number.isInteger(tick) || tick < 0 || tick >= c.world.ticks)
+        problems.push(`${where}: bad tick`);
+      if (c.power[what]) {
+        if (!c.node[target]) problems.push(`${where}: unknown place ${target}`);
+        return [{ id, seq, tick, kind: 'power', power: what, place: target }];
+      }
+      if (!c.card[what]) {
+        problems.push(`${where}: unknown card or power ${what}`);
+        return [];
+      }
+      const kind = c.cat[target]
+        ? 'cat'
+        : c.object[target]
+          ? 'object'
+          : c.node[target]
+            ? 'place'
+            : null;
+      if (!kind) {
+        problems.push(`${where}: unknown target ${target}`);
+        return [];
+      }
+      const t =
+        kind === 'cat'
+          ? { cat: target }
+          : kind === 'object'
+            ? { object: target }
+            : { place: target };
+      return [{ id, seq, tick, kind: 'card', card: what, target: t, special }];
+    });
+  }
+  if (problems.length > 0) throw new ContentError(problems);
+  return sets;
 }

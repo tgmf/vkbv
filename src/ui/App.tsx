@@ -1,6 +1,7 @@
 import { createSignal, For, onCleanup, Show } from 'solid-js';
 import type { TuningRow } from '../content/schemas';
 import { LOCALES, setLocale, t, type Locale } from '../i18n/t';
+import { Inspector, type InspectorProps } from './Inspector';
 
 const [locale, setLocaleSignal] = createSignal<Locale>('en');
 
@@ -13,7 +14,8 @@ function switchLocale(next: Locale): void {
   document.documentElement.lang = next;
 }
 
-export function App(props: { tuningRows: TuningRow[] }) {
+export function App(props: { tuningRows: TuningRow[]; inspector: InspectorProps }) {
+  const dev = new URLSearchParams(location.search).get('dev') === '1';
   const [debug, setDebug] = createSignal(new URLSearchParams(location.search).get('debug') === '1');
   const onKey = (e: KeyboardEvent) => {
     if (e.key === '`') setDebug((d) => !d);
@@ -40,7 +42,11 @@ export function App(props: { tuningRows: TuningRow[] }) {
           </For>
         </div>
       </header>
-      <main class="world" data-testid="world" />
+      <main class="world" data-testid="world">
+        <Show when={dev}>
+          <Inspector {...props.inspector} />
+        </Show>
+      </main>
       <Show when={debug()}>
         <DebugPanel rows={props.tuningRows} />
       </Show>

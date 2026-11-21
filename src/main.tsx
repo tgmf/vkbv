@@ -1,8 +1,8 @@
 import { render } from '@solidjs/web';
 import { createSimClient } from './bridge/client';
-import { ContentError, loadAll } from './content/load';
+import { ContentError, loadAll, parsePinSets } from './content/load';
 import { tuningRows } from './content/schemas';
-import { CHAPTER1_FILES, TUNING_FILE } from './content/chapter1';
+import { CHAPTER1_FILES, PINSETS_FILE, TUNING_FILE } from './content/chapter1';
 import uiEn from './content/data/ui/en.json';
 import uiRu from './content/data/ui/ru.json';
 import { addTables } from './i18n/t';
@@ -25,7 +25,13 @@ try {
   void sim.request({ kind: 'init', tuning }).then((reply) => {
     document.documentElement.dataset.sim = reply.kind; // "ready"; read by the smoke test
   });
-  render(() => <App tuningRows={tuningRows(tuning)} />, root);
+  const inspector = {
+    content,
+    pinsets: Object.keys(parsePinSets(PINSETS_FILE, content)),
+    sim,
+    speeds: tuning.player.playSpeedsTps,
+  };
+  render(() => <App tuningRows={tuningRows(tuning)} inspector={inspector} />, root);
 } catch (e) {
   if (!(e instanceof ContentError)) throw e;
   addTables({ en: uiEn, ru: uiRu });

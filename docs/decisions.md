@@ -23,3 +23,6 @@ M1  A `blocked` edge counts as the activity ending: the cat decides again in pha
 M1  A decaying mod gets `left = ceil(|add| / decayPerTick)`; `attracted` ends when its attract effect is gone; running effects count down in phase 1 including those created that tick.
 M1  The start activity at tick 0 is chosen while building the initial state; its `activity` event is not part of any tick.
 M1  The 03 §18 sweep over Chapter 1 (seeds 1–50 × streams 0–31) is split into eight test files by stream so Vitest runs them in parallel; `tests/invariants/check.ts` steps without keeping every state.
+M1.5  The dev inspector talks to the worker through its own message pair (`inspect` / `inspected`), not `debugHistory`, because it needs a seed, a stream and a pin set; the worker keeps the last inspected history and answers each tick with a small `InspectView`. M8 folds it into the debug panel.
+M1.5  The `05` §5.1 pin sets are data in `src/content/data/pinsets.json`, in the spec's notation (`!` marks a special), parsed by `parsePinSets` in `load.ts`; `npm run sim -- --pinset <name>` uses them too.
+M1.5  The inspector's log shows the events of the ticks before the one viewed (they led to the state on the map); `events[t]` happen after `states[t]`.
