@@ -16,7 +16,7 @@ import {
 } from '../../src/sim/fog';
 import { runHistory } from '../../src/sim/history';
 import type { Content } from '../../src/sim/types';
-import { ch1, makeCtx, tiny } from './helpers';
+import { ch1, ch1Coarse, makeCtx, tiny } from './helpers';
 
 const ids = (c: Content) => c.cats.map((x) => x.id);
 
@@ -28,7 +28,9 @@ describe('one decision function (03 §13.3, §18)', () => {
       const live = runHistory(ch1, 1, 0).states[t];
       if (!live) throw new Error('no state');
       // Both sides from the same stand-ins: every cat as its point mass.
-      const fc: FogCase = { weight: WAVE_TOTAL, weather: live.weather.now, cats: {} };
+      const empty = initialFog(setup, []).cases[0];
+      if (!empty) throw new Error('no case');
+      const fc: FogCase = { ...empty, weight: WAVE_TOTAL, weather: live.weather.now, cats: {} };
       const s = structuredClone(setup.base);
       s.tick = t;
       s.weather = { ...live.weather };
@@ -74,7 +76,7 @@ describe('chains', () => {
   it('sum to 1 000 000 after every step on the tiny world (whole day) and Chapter 1 (morning)', () => {
     for (const [c, ticks] of [
       [tiny, tiny.world.ticks],
-      [ch1, 120],
+      [ch1Coarse, 120],
     ] as const) {
       const setup = fogSetup(c, 1);
       let fog = initialFog(setup, ids(c));
@@ -97,14 +99,15 @@ describe('chains', () => {
   });
 
   it('B1 on the morning: with no pins all of Marti’s mass stays in the flat', () => {
-    const setup = fogSetup(ch1, 1);
+    const setup = fogSetup(ch1Coarse, 1);
     let fog = initialFog(setup, ids(ch1));
     while (fog.tick < 240) {
       fog = fogStep(setup, fog);
       for (const fc of fog.cases)
         for (const e of fc.cats['marti']?.chain ?? []) {
           const nodes = [e.s.place, ...(e.s.walk ? [e.s.walk.from, ...e.s.walk.path] : [])];
-          for (const n of nodes) expect(ch1.node[n]?.region, `${n} at ${fog.tick}`).toBe('flat');
+          for (const n of nodes)
+            expect(ch1Coarse.node[n]?.region, `${n} at ${fog.tick}`).toBe('flat');
         }
     }
   }, 120_000);

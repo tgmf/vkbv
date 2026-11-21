@@ -1,12 +1,51 @@
-// The fog: cat chains per case, computed, never simulated (spec 03 §13).
-import type { Condition, Score } from '../content/schemas/dsl';
+// The fog: cat chains and world quantities per case, computed, never simulated (spec 03 §13).
+import type { StoryletDef } from '../content/schemas/chapter';
+import type { Condition, Effect, Score } from '../content/schemas/dsl';
 import { choices, clampBase, initialGauges, placeOptions } from './cats';
-import { chance } from './conditions';
+import { cats as catsOf, chance, flagKey } from './conditions';
+import {
+  addCounter,
+  addFactChance,
+  raiseFactPart,
+  setFact,
+  addHeard,
+  clearFlag,
+  counterOf,
+  flagChance,
+  INACTIVE,
+  initialQuantities,
+  mixQuantities,
+  or,
+  renormalise,
+  setFlag,
+  times,
+  type FogEvent,
+  type Quantities,
+} from './fog-quantities';
 import { initialState, uniformStreams } from './history';
 import { PPM } from './math';
-import { storyletCats } from './readers';
-import { edgeBetween, path, type PathMemo } from './space';
-import type { CatId, CatState, Content, Ctx, FogReader, NodeId, SimState, StandIns } from './types';
+import {
+  buildPerceptionTable,
+  buildReaders,
+  requirementFacts,
+  storyletCats,
+  tablePerceives,
+} from './readers';
+import type { Link, PerceptionTable } from './readers';
+import { detectorCats } from './sifting';
+import { catNode, edgeBetween, inWindow, path, type PathMemo } from './space';
+import { bindRoles, choiceOptions, exitOptions } from './storylets';
+import type {
+  CatId,
+  CatState,
+  Content,
+  Ctx,
+  FogReader,
+  NodeId,
+  Scope,
+  SimState,
+  StandIns,
+} from './types';
 import { need } from './types';
 
 /** One possible state of a fogged cat (03 §13.2). Walking and durations count fog steps. */
@@ -36,7 +75,12 @@ export type Weather = 'dry' | 'rain' | 'stopped';
 export interface FogCase {
   weight: number; // out of WAVE_TOTAL
   weather: Weather;
+  /** While raining in a projection: the start tick's distribution, [tick, ppm] by tick (03 §13.5). */
+  rainStart: [number, number][];
+  /** Each link's value in this case: 0 (not yet) or 1 (03 §13.5), by link key. */
+  links: Record<string, 0 | 1>;
   cats: Record<CatId, FogCat>;
+  q: Quantities;
 }
 
 export interface Fog {
@@ -57,7 +101,15 @@ export interface FogSetup {
   /** The state the fog's skeletons start from: tick 0 of the seed, stream 0. */
   base: SimState;
   memo: PathMemo;
+  links: Link[];
+  table: PerceptionTable;
+  /** Detectors the fog estimates: those something reads or a requirement names (03 §13.6). */
+  detectors: string[];
+  nodeIndex: Record<NodeId, number>;
 }
+
+export const linkKey = (l: Link): string =>
+  l.kind === 'fact' ? `fact:${l.fact}` : `state:${l.storylet}.${l.state}`;
 
 // --- setup --------------------------------------------------------------------------------------
 
@@ -106,7 +158,22 @@ export function fogSetup(c: Content, seed: number): FogSetup {
     seeded[def.id] = initialGauges(c, seed, `s0:${def.id}`, def.id);
   }
   const memo: PathMemo = {};
-  return { c, seed, banded, seeded, base: initialState(c, seed, uniformStreams(c, 0), memo), memo };
+  const readers = buildReaders(c);
+  const required = requirementFacts(c);
+  return {
+    c,
+    seed,
+    banded,
+    seeded,
+    base: initialState(c, seed, uniformStreams(c, 0), memo),
+    memo,
+    links: readers.links,
+    table: buildPerceptionTable(c),
+    detectors: c.detectors
+      .filter((d) => required.includes(d.emits) || readers.of[`fact:${d.emits}`] !== undefined)
+      .map((d) => d.id),
+    nodeIndex: Object.fromEntries(c.nodes.map((n, i) => [n.id, i])),
+  };
 }
 
 // --- bands --------------------------------------------------------------------------------------
@@ -117,6 +184,61 @@ export const bandOf = (c: Content, v: number): number =>
 export const bandMid = (c: Content, b: number): number =>
   c.hooksFloor + Math.trunc(((2 * b + 1) * span(c)) / (2 * c.tuning.fog.bands));
 const bandWidth = (c: Content): number => Math.trunc(span(c) / c.tuning.fog.bands);
+
+/**
+ * A gauge change of `add` on one state (03 §13.2): `trunc(|add| × 1e6 / bandWidth)` ppm of the mass,
+ * scaled by `ppm`, moves toward `limit` (whole bands first, then the fraction).
+ */
+function bandMove(
+  c: Content,
+  e: Entry,
+  g: string,
+  add: number,
+  ppm: number,
+  limit?: number,
+): Entry[] {
+  const b = e.s.bands[g];
+  if (b === undefined || add === 0 || ppm === 0) return [e];
+  const dir = add > 0 ? 1 : -1;
+  const lim = limit ?? (dir > 0 ? c.tuning.fog.bands - 1 : 0);
+  if ((dir > 0 && b >= lim) || (dir < 0 && b <= lim)) return [e];
+  const frac = times(Math.trunc((Math.abs(add) * PPM) / bandWidth(c)), ppm);
+  const whole = Math.trunc(frac / PPM);
+  const rem = frac % PPM;
+  const to = (n: number) => (dir > 0 ? Math.min(lim, b + n) : Math.max(lim, b - n));
+  const at = (n: number, p: number): Entry => ({
+    s: { ...e.s, bands: { ...e.s.bands, [g]: to(n) } },
+    p,
+  });
+  const stay = times(e.p, PPM - rem);
+  return rem > 0 ? [at(whole, stay), at(whole + 1, e.p - stay)] : [at(whole, e.p)];
+}
+
+/** A gauge set to `v` on a fraction `ppm` of one state's mass. */
+function bandSet(c: Content, e: Entry, g: string, v: number, ppm: number): Entry[] {
+  if (e.s.bands[g] === undefined) return [e];
+  const moved = times(e.p, ppm);
+  const set: Entry = {
+    s: { ...e.s, bands: { ...e.s.bands, [g]: bandOf(c, clampBase(c, g, v)) } },
+    p: moved,
+  };
+  return moved === e.p ? [set] : [{ s: e.s, p: e.p - moved }, set];
+}
+
+/** A gauge effect on a cat's mean-field value with probability `ppm`. */
+function meanEffect(
+  c: Content,
+  fc: FogCat,
+  g: string,
+  add: number | null,
+  set: number | null,
+  ppm: number,
+) {
+  const v = fc.mean[g];
+  if (v === undefined) return;
+  if (set !== null) fc.mean[g] = v + times(clampBase(c, g, set) - v, ppm);
+  else if (add !== null) fc.mean[g] = clampBase(c, g, v + times(add, ppm));
+}
 
 // --- chain states as cats ---------------------------------------------------------------------------
 
@@ -189,16 +311,29 @@ function pathTicks(c: Content, nodes: readonly NodeId[]): number {
   return Math.trunc(sum / c.world.tickMinutes);
 }
 
+/** The node a chain state stands at for perception: a walking cat at the nearer end of its edge. */
+const stateNode = (setup: FogSetup, id: CatId, s: ChainState): NodeId =>
+  s.walk ? catNode(standIn(setup, id, s, {}, setup.c.tuning.fog.stepTicks)) : s.place;
+
 // --- one case's context -------------------------------------------------------------------------------
 
-/** A step context over one case: a skeleton state, and a fog reader over the case's chains. */
+/**
+ * A step context over one case: a skeleton state, and a fog reader over the case's chains.
+ * `finished` gives P(the cat finished the activity in this step) to `activityFinished`, on the
+ * step's first tick only.
+ */
 interface CaseCtx {
   ctx: Ctx;
   standIns: Record<CatId, StandIns>;
   deciding: { id: CatId | null };
 }
 
-function caseCtx(setup: FogSetup, fc: FogCase, t: number): CaseCtx {
+function caseCtx(
+  setup: FogSetup,
+  fc: FogCase,
+  t: number,
+  finished: Record<CatId, Record<string, number>> = {},
+): CaseCtx {
   const { c } = setup;
   const K = c.tuning.fog.stepTicks;
   const s = structuredClone(setup.base);
@@ -218,15 +353,24 @@ function caseCtx(setup: FogSetup, fc: FogCase, t: number): CaseCtx {
   for (const def of c.cats) {
     let best: StandIns[number] | undefined;
     for (const x of standIns[def.id] ?? []) if (best === undefined || x.p > best.p) best = x;
-    if (best) likely[def.id] = best.cat;
+    if (best) {
+      likely[def.id] = best.cat;
+      s.cats[def.id] = best.cat; // reads that do not mix (role binding, gauges in scores) see it
+    }
   }
+  const { q } = fc;
   const fog: FogReader = {
     chain: (id) => (id === deciding.id ? null : (standIns[id] ?? null)),
     likely: (id) => likely[id] ?? null,
-    quantity: (key) =>
-      key.startsWith('flag:') && (setup.base.flags[key.slice(5)]?.value ?? 0) !== 0 ? PPM : 0,
-    counter: (name) => ({ mean: setup.base.counters[name] ?? 0, variance: 0 }),
-    heard: () => 0,
+    quantity: (key) => {
+      if (key.startsWith('fact:')) return q.facts[key.slice(5)] ?? 0;
+      if (key.startsWith('flag:')) return flagChance(q, key.slice(5), ctx.t);
+      const dot = key.indexOf('.');
+      return q.storylets[key.slice(6, dot)]?.p[key.slice(dot + 1)] ?? 0;
+    },
+    counter: (name) => counterOf(q, name),
+    heard: (id, event) => q.heard[id]?.[event] ?? 0,
+    finished: (id, a) => (ctx.t === t ? (finished[id]?.[a] ?? 0) : 0),
   };
   const ctx: Ctx = {
     c,
@@ -273,11 +417,7 @@ function durationSteps(lo: number, hi: number, K: number): [number, number][] {
     if (last && last[0] === n) last[1] += 1;
     else counts.push([n, 1]);
   }
-  const total = hi - lo + 1;
-  return split(
-    counts.map(([n, k]) => [n, k]),
-    total,
-  );
+  return split(counts, hi - lo + 1);
 }
 
 /** Splits 1 000 000 ppm by integer shares; the remainder goes to the first. */
@@ -286,6 +426,21 @@ function split<T>(shares: [T, number][], total: number): [T, number][] {
   const first = out[0];
   if (first) first[1] += PPM - out.reduce((a, [, p]) => a + p, 0);
   return out;
+}
+
+/** The walk from `here` to `place` (null: already there; undefined: no path). */
+function walkTo(
+  c: Content,
+  memo: PathMemo,
+  here: NodeId,
+  place: NodeId,
+  opts: { via?: string[] | undefined; edgesTagged?: string | undefined } = {},
+): ChainState['walk'] | undefined {
+  if (place === here) return null;
+  const route = path(c, here, place, { avoid: [], memo, ...opts });
+  if (route === null) return undefined;
+  const steps = Math.max(1, ceilDiv(pathTicks(c, [here, ...route]), c.tuning.fog.stepTicks));
+  return { from: here, path: route, leftSteps: steps, ofSteps: steps };
 }
 
 /**
@@ -314,32 +469,31 @@ function starts(
     places.map((n): [NodeId, number] => [n, 1]),
     places.length,
   )) {
-    const route = place === here ? [] : path(c, here, place, { avoid: [], memo });
-    if (route === null) continue;
-    const walkSteps =
-      route.length === 0 ? 0 : Math.max(1, ceilDiv(pathTicks(c, [here, ...route]), K));
-    const walk =
-      walkSteps === 0
-        ? null
-        : { from: here, path: route, leftSteps: walkSteps, ofSteps: walkSteps };
+    const walk = walkTo(c, memo, here, place);
+    if (walk === undefined) continue;
     for (const [leftSteps, dp] of durationSteps(ad.ticks[0], ad.ticks[1], K))
       out.push([
         { activity, place, walk, leftSteps, bands, interrupt: null, control },
-        Math.trunc((pp * dp) / PPM),
+        times(pp, dp),
       ]);
   }
   return out;
 }
 
-// --- initial chains ------------------------------------------------------------------------------------
+// --- initial fog ---------------------------------------------------------------------------------------
 
-/** The fog at tick 0: one case (dry), each cat at its start with its seeded stats (03 §13.2). */
+/** The fog at tick 0: one case, each fogged cat at its start with its seeded stats (03 §13.2). */
 export function initialFog(setup: FogSetup, fogged: readonly CatId[]): Fog {
   const { c } = setup;
+  const links: Record<string, 0 | 1> = {};
+  for (const l of setup.links) links[linkKey(l)] = 0;
   const fc: FogCase = {
     weight: WAVE_TOTAL,
     weather: c.world.weather.initial === 'rain' ? 'rain' : 'dry',
+    rainStart: c.world.weather.initial === 'rain' ? [[0, PPM]] : [],
+    links,
     cats: {},
+    q: initialQuantities(c),
   };
   const cc = caseCtx(setup, fc, 0);
   for (const def of c.cats) {
@@ -380,6 +534,7 @@ export function normalise(c: Content, chain: readonly Entry[]): Entry[] {
   const byKey: Record<string, Entry> = {};
   const keys: string[] = [];
   for (const e of chain) {
+    if (e.p <= 0) continue;
     const k = keyOf(e.s);
     const seen = byKey[k];
     if (seen) seen.p += e.p;
@@ -399,6 +554,389 @@ export function normalise(c: Content, chain: readonly Entry[]): Entry[] {
   return out;
 }
 
+// --- effects in the fog -------------------------------------------------------------------------------------
+
+/** What a case's step collects: events, and storylet effects on fogged cats to apply to chains. */
+interface Sink {
+  events: FogEvent[];
+  catFx: { cat: CatId; mass: number; effect: Effect; scope: Scope }[];
+  finished: Record<CatId, Record<string, number>>;
+}
+
+/** P(the cat stands at each node), from its chain (a live cat: its node). */
+function nodeMass(setup: FogSetup, cc: CaseCtx, id: CatId): [NodeId, number][] {
+  const chain = cc.standIns[id];
+  if (!chain) {
+    const cs = cc.ctx.s.cats[id];
+    return cs ? [[catNode(cs), PPM]] : [];
+  }
+  const out: [NodeId, number][] = [];
+  for (const x of chain) {
+    const n = catNode(x.cat);
+    const seen = out.find((y) => y[0] === n);
+    if (seen) seen[1] += x.p;
+    else out.push([n, x.p]);
+  }
+  return out;
+}
+
+/**
+ * World effects with probability `m` (03 §13.6): facts and flags gain `m`, counters a Bernoulli term,
+ * events `m` at their place, triggers activate with `m`; effects on fogged cats are queued for the
+ * chains. `here` is where `self` stands (an activity's own state). Effects on live cats are left to
+ * the lantern (decisions.md, M2).
+ */
+function fogEffects(
+  setup: FogSetup,
+  cc: CaseCtx,
+  q: Quantities,
+  list: readonly Effect[],
+  scope: Scope,
+  m: number,
+  sink: Sink,
+  here: NodeId | null = null,
+  source = '',
+): void {
+  const { c } = setup;
+  const ctx = cc.ctx;
+  const fogged = (id: CatId) => cc.standIns[id] !== undefined;
+  const atSelf = (id: CatId | null | undefined): [NodeId, number][] =>
+    !id ? [] : id === scope.self && here !== null ? [[here, PPM]] : nodeMass(setup, cc, id);
+  for (const e of list) {
+    const mass = e.chance === undefined ? m : times(m, e.chance * 1000);
+    if (mass <= 0) continue;
+    if ('goTo' in e || 'startActivity' in e || 'stop' in e || 'interrupt' in e || 'gauge' in e) {
+      const who =
+        'goTo' in e
+          ? e.goTo[0]
+          : 'startActivity' in e
+            ? e.startActivity[0]
+            : 'stop' in e
+              ? e.stop
+              : 'interrupt' in e
+                ? e.interrupt[0]
+                : e.gauge.slice(0, e.gauge.indexOf('.'));
+      for (const id of catsOf(ctx, scope, who))
+        if (fogged(id)) sink.catFx.push({ cat: id, mass, effect: e, scope });
+    } else if ('emit' in e) {
+      const source =
+        (e.from ? catsOf(ctx, scope, e.from)[0] : undefined) ?? scope.self ?? scope.origin ?? null;
+      const to = e.to ? (catsOf(ctx, scope, e.to)[0] ?? null) : null;
+      const where: [NodeId, number][] = e.at ? [[e.at, PPM]] : source ? atSelf(source) : atSelf(to);
+      for (const [node, p] of where)
+        sink.events.push({
+          name: e.emit,
+          node,
+          p: times(mass, p),
+          radiusM: e.radiusM ?? null,
+          source,
+          to,
+          global: false,
+          factIfPerceivedBy: e.factIfPerceivedBy ?? null,
+        });
+    } else if ('trigger' in e) {
+      activateMass(setup, cc, q, need(c.storylet, e.trigger, 'storylet'), mass, sink);
+    } else if ('flag' in e) {
+      const value =
+        e.value === undefined ? 1 : typeof e.value === 'boolean' ? Number(e.value) : e.value;
+      const nodes: [NodeId | null, number][] =
+        e.at === undefined
+          ? [[null, PPM]]
+          : c.node[e.at]
+            ? [[e.at, PPM]]
+            : atSelf(catsOf(ctx, scope, e.at)[0]);
+      for (const [node, p] of nodes) {
+        const key = flagKey(e.flag, node);
+        if (value === 0) clearFlag(q, key, times(mass, p));
+        else setFlag(q, key, times(mass, p), e.ttl === undefined ? null : ctx.t + e.ttl);
+      }
+    } else if ('counter' in e) {
+      addCounter(q, e.counter, e.add, mass);
+    } else if ('fact' in e) {
+      addFactChance(q, e.fact, mass, source);
+    } else {
+      const never: never = e;
+      throw new Error(`unknown effect ${JSON.stringify(never)}`);
+    }
+  }
+}
+
+/** A storylet effect on a fraction `mass` of a fogged cat's chain (03 §13.6, independence assumed). */
+function catEffect(
+  setup: FogSetup,
+  cc: CaseCtx,
+  id: CatId,
+  fc: FogCat,
+  mass: number,
+  e: Effect,
+): FogCat {
+  const { c } = setup;
+  const K = c.tuning.fog.stepTicks;
+  if ('gauge' in e) {
+    const g = gaugeName(e.gauge);
+    const mean = { ...fc.mean };
+    const out = { chain: fc.chain, mean };
+    meanEffect(c, out, g, e.add ?? null, e.set ?? null, mass);
+    // QUESTION-free approximation: a held mod (`holdTicks`) on a fogged cat does not shift back.
+    out.chain = fc.chain.flatMap((x) =>
+      e.set !== undefined ? bandSet(c, x, g, e.set, mass) : bandMove(c, x, g, e.add ?? 0, mass),
+    );
+    return out;
+  }
+  const chain: Entry[] = [];
+  for (const x of fc.chain) {
+    const moved = times(x.p, mass);
+    if (moved < x.p) chain.push({ s: x.s, p: x.p - moved });
+    if (moved === 0) continue;
+    const me = standIn(setup, id, x.s, fc.mean, K);
+    const here = 'at' in me.pos ? me.pos.at : me.pos.to;
+    if ('goTo' in e) {
+      const walk = walkTo(c, cc.ctx.memo, here, e.goTo[1], {
+        via: e.route === 'via' ? e.via : undefined,
+        edgesTagged: e.route === 'edgesTagged' ? e.tag : undefined,
+      });
+      if (walk === undefined) chain.push({ s: x.s, p: moved });
+      else
+        chain.push({
+          s: {
+            ...x.s,
+            activity: 'goTo',
+            place: e.goTo[1],
+            walk,
+            leftSteps: 1,
+            control: 'storylet',
+          },
+          p: moved,
+        });
+    } else if ('startActivity' in e) {
+      const next = starts(cc, id, me, e.startActivity[1], x.s.bands, 'storylet');
+      if (next.length === 0) chain.push({ s: x.s, p: moved });
+      for (const [s, p] of next) chain.push({ s, p: times(moved, p) });
+    } else if ('stop' in e) {
+      chain.push({
+        s: { ...x.s, activity: 'none', place: here, walk: null, leftSteps: 0, control: 'free' },
+        p: moved,
+      });
+    } else if ('interrupt' in e) {
+      chain.push({
+        s: {
+          ...x.s,
+          interrupt: { action: e.interrupt[1], leftSteps: Math.max(1, ceilDiv(e.interrupt[2], K)) },
+        },
+        p: moved,
+      });
+    } else chain.push({ s: x.s, p: moved });
+  }
+  return { chain, mean: fc.mean };
+}
+
+// --- storylets in the fog --------------------------------------------------------------------------------
+
+const isTerminal = (def: StoryletDef, st: string) => (def.states[st]?.exits.length ?? 0) === 0;
+
+const origin = (def: StoryletDef, roles: Record<string, CatId[]>): CatId | undefined => {
+  for (const name of Object.keys(def.roles)) {
+    const first = roles[name]?.[0];
+    if (first) return first;
+  }
+  return undefined;
+};
+
+/** Enters `state` with mass `m`: moves it in the distribution, runs onEnter, emits the storylet event. */
+function enterMass(
+  setup: FogSetup,
+  cc: CaseCtx,
+  q: Quantities,
+  def: StoryletDef,
+  roles: Record<string, CatId[]>,
+  state: string,
+  m: number,
+  sink: Sink,
+): void {
+  if (m <= 0) return;
+  const scope: Scope = { roles, storylet: def.id, origin: origin(def, roles) };
+  const onEnter = need(def.states, state, 'storylet state').onEnter ?? [];
+  // a once-storylet enters a state by disjoint masses, so its facts add up (03 §13.6)
+  fogEffects(setup, cc, q, onEnter, scope, m, sink, null, def.once ? `sl:${def.id}.${state}` : '');
+  for (const [node, p] of nodeMass(setup, cc, scope.origin ?? ''))
+    sink.events.push({
+      name: `storylet:${def.id}.${state}`,
+      node,
+      p: times(m, p),
+      radiusM: null,
+      source: scope.origin ?? null,
+      to: null,
+      global: false,
+      factIfPerceivedBy: null,
+    });
+}
+
+/** Activates a fog storylet with probability `m` of its inactive mass (a trigger effect). */
+function activateMass(
+  setup: FogSetup,
+  cc: CaseCtx,
+  q: Quantities,
+  def: StoryletDef,
+  m: number,
+  sink: Sink,
+): void {
+  const sl = q.storylets[def.id];
+  if (!sl) return;
+  const roles = sl.roles ?? bindRoles(cc.ctx, def);
+  if (!roles) return;
+  const moved = times(sl.p[INACTIVE] ?? 0, m);
+  if (moved <= 0) return;
+  sl.roles = roles;
+  sl.p[INACTIVE] = (sl.p[INACTIVE] ?? 0) - moved;
+  sl.p[def.start] = (sl.p[def.start] ?? 0) + moved;
+  enterMass(setup, cc, q, def, roles, def.start, moved, sink);
+}
+
+/** P(the actor is available and chooses each option), averaged over its chain (03 §13.6). */
+function fogChoice(
+  cc: CaseCtx,
+  def: StoryletDef,
+  state: string,
+  choices: Parameters<typeof choiceOptions>[3],
+  actor: CatId,
+  scope: Scope,
+): number[] {
+  const n = choices.length + 1;
+  const chain = cc.standIns[actor];
+  const one = (cs: CatState): number[] =>
+    !('at' in cs.pos) || cs.interrupt
+      ? Array.from({ length: n }, () => 0)
+      : choiceOptions(cc.ctx, def, state, choices, actor, scope).map((o) => o.ppm);
+  if (!chain) {
+    const cs = cc.ctx.s.cats[actor];
+    return cs ? one(cs) : Array.from({ length: n }, () => 0);
+  }
+  const sum = Array.from({ length: n }, () => 0);
+  for (const x of chain) {
+    const opts = as(cc, actor, x.cat, () => one(x.cat));
+    for (let i = 0; i < n; i++) sum[i] = (sum[i] ?? 0) + times(x.p, opts[i] ?? 0);
+  }
+  return sum;
+}
+
+/** A storylet transition that sets a link still false in this case, with its mass this step. */
+interface LinkFire {
+  storylet: string;
+  state: string;
+  fact: string;
+  m: number;
+  roles: Record<string, CatId[]>;
+}
+
+/** The link fact a state's onEnter sets for sure, if that link is still 0 in the case. */
+function linkFact(
+  setup: FogSetup,
+  def: StoryletDef,
+  state: string,
+  links: Readonly<Record<string, 0 | 1>>,
+): string | null {
+  for (const e of def.states[state]?.onEnter ?? [])
+    if ('fact' in e && e.chance === undefined && links[`fact:${e.fact}`] === 0) return e.fact;
+  return null;
+}
+
+/**
+ * One fog step of every storylet the fog holds (03 §13.6): transitions, then activation. Gates
+ * and triggers are read at the step's first tick; hazards compound over its ticks; choices happen
+ * when the step holds a decision tick; at most one transition per step (decisions.md, M2).
+ */
+function storyletsTick(
+  setup: FogSetup,
+  cc: CaseCtx,
+  q: Quantities,
+  held: readonly string[],
+  sink: Sink,
+  links: Readonly<Record<string, 0 | 1>>,
+): LinkFire | null {
+  const { c } = setup;
+  const ctx = cc.ctx;
+  const K = c.tuning.fog.stepTicks;
+  const decisionStep = hits(ctx.t, K, c.decisionEveryTicks) > 0;
+  let fire: LinkFire | null = null;
+  for (const def of c.storylets) {
+    if (!held.includes(def.id)) continue;
+    const sl = need(q.storylets, def.id, 'storylet');
+    const roles = sl.roles;
+    const before = { ...sl.p };
+    const entered: [string, number][] = [];
+    const move = (from: string, to: string, m: number) => {
+      if (m <= 0) return;
+      sl.p[from] = (sl.p[from] ?? 0) - m;
+      sl.p[to] = (sl.p[to] ?? 0) + m;
+      entered.push([to, m]);
+    };
+    if (roles) {
+      const scope: Scope = { roles, storylet: def.id, origin: origin(def, roles) };
+      for (const state of Object.keys(def.states)) {
+        const m = before[state] ?? 0;
+        if (m <= 0 || isTerminal(def, state)) continue;
+        const { autos, hazard, choices, actor } = exitOptions(ctx, def, state, scope);
+        let rest = m;
+        const auto = autos[0];
+        if (auto) {
+          const mv = times(rest, auto.ppm);
+          move(state, auto.to, mv);
+          rest -= mv;
+        }
+        // hazards compound over the step's ticks: P(none) = stay^K, shared by rate
+        const stay = hazard[hazard.length - 1]?.ppm ?? PPM;
+        let none = PPM;
+        for (let k = 0; k < K; k++) none = times(none, stay);
+        const fired = times(rest, PPM - none);
+        for (const h of hazard.slice(0, -1)) {
+          const mv = PPM === stay ? 0 : Math.trunc((fired * h.ppm) / (PPM - stay));
+          move(state, h.label, mv);
+          rest -= mv;
+        }
+        if (decisionStep && actor && choices.length > 0) {
+          const ppm = fogChoice(cc, def, state, choices, actor, scope);
+          const avail = rest;
+          choices.forEach((e, i) => {
+            const mv = times(avail, ppm[i] ?? 0);
+            move(state, e.to, mv);
+            rest -= mv;
+          });
+        }
+      }
+    }
+    // activation: the running maximum of the trigger's chance (03 §13.6)
+    const bound = roles ?? bindRoles(ctx, def);
+    const inactive = sl.p[INACTIVE] ?? 0;
+    if (bound && inactive > 0) {
+      const trig = chance(ctx, def.trigger, { roles: bound });
+      const m = def.once
+        ? Math.min(inactive, Math.max(0, trig - (PPM - inactive)))
+        : times(trig, inactive);
+      if (m > 0) {
+        sl.roles = bound;
+        move(INACTIVE, def.start, m);
+      }
+    }
+    const r = sl.roles;
+    if (r)
+      for (const [state, m] of entered) {
+        // The first transition this step that sets a link still false splits the case (03 §13.5)
+        const fact: string | null = fire === null ? linkFact(setup, def, state, links) : null;
+        if (fact !== null) {
+          const same = entered.filter(([st]) => st === state).reduce((a, [, x]) => a + x, 0);
+          fire = { storylet: def.id, state, fact, m: same, roles: r };
+        }
+        if (fire?.storylet === def.id && fire.state === state) continue;
+        enterMass(setup, cc, q, def, r, state, m, sink);
+      }
+    if (!def.once)
+      for (const state of Object.keys(def.states))
+        if (isTerminal(def, state)) move(state, INACTIVE, sl.p[state] ?? 0);
+    for (const k of Object.keys(sl.p)) if ((sl.p[k] ?? 0) <= 0) delete sl.p[k];
+  }
+  return fire;
+}
+
 // --- one fog step ---------------------------------------------------------------------------------------
 
 /** Ticks in [t, t + K) that `perTicks` divides. */
@@ -412,7 +950,6 @@ const hits = (t: number, K: number, perTicks: number): number => {
 function hooksStep(cc: CaseCtx, setup: FogSetup, id: CatId, fc: FogCat, t: number): FogCat {
   const { c } = setup;
   const K = c.tuning.fog.stepTicks;
-  const width = bandWidth(c);
   const seeded = need(setup.seeded, id, 'cat');
   let chain = fc.chain;
   const mean = { ...fc.mean };
@@ -452,124 +989,539 @@ function hooksStep(cc: CaseCtx, setup: FogSetup, id: CatId, fc: FogCat, t: numbe
       if (add === 0) continue;
       if (h.id in mean) {
         let p = 0;
-        for (const e of chain) p += Math.trunc((e.p * whenPpm(e, r.when)) / PPM);
+        for (const e of chain) p += times(e.p, whenPpm(e, r.when));
         const v = mean[h.id] ?? 0;
-        let next = clampBase(c, h.id, v + Math.trunc((add * p) / PPM));
+        let next = clampBase(c, h.id, v + times(add, p));
         if (r.toward)
           next = add < 0 ? Math.max(Math.min(v, init), next) : Math.min(Math.max(v, init), next);
         mean[h.id] = next;
         continue;
       }
       const initBand = bandOf(c, init);
-      const moved: Entry[] = [];
-      for (const e of chain) {
-        const b = e.s.bands[h.id];
-        if (b === undefined) {
-          moved.push(e);
-          continue;
-        }
-        const dir = add > 0 ? 1 : -1;
-        let limit = dir > 0 ? c.tuning.fog.bands - 1 : 0;
-        if (r.toward) limit = dir > 0 ? Math.min(limit, initBand) : Math.max(limit, initBand);
-        if ((dir > 0 && b >= limit) || (dir < 0 && b <= limit)) {
-          moved.push(e);
-          continue;
-        }
-        // trunc(|add| × 1e6 / bandWidth) ppm moves, scaled by the rule's condition (03 §13.2)
-        const frac = Math.trunc(
-          (Math.trunc((Math.abs(add) * PPM) / width) * whenPpm(e, r.when)) / PPM,
-        );
-        const whole = Math.trunc(frac / PPM);
-        const rem = frac % PPM;
-        const to = (n: number) => (dir > 0 ? Math.min(limit, b + n) : Math.max(limit, b - n));
-        const at = (n: number, p: number) =>
-          moved.push({ s: { ...e.s, bands: { ...e.s.bands, [h.id]: to(n) } }, p });
-        const stay = Math.trunc((e.p * (PPM - rem)) / PPM);
-        at(whole, stay);
-        if (rem > 0) at(whole + 1, e.p - stay);
-      }
-      chain = moved;
+      const lim = (dir: number) => {
+        const l = dir > 0 ? c.tuning.fog.bands - 1 : 0;
+        return r.toward ? (dir > 0 ? Math.min(l, initBand) : Math.max(l, initBand)) : l;
+      };
+      chain = chain.flatMap((e) => bandMove(c, e, h.id, add, whenPpm(e, r.when), lim(add)));
     }
   }
   return { chain, mean };
 }
 
-/** Advances one cat's chain one fog step in one case (03 §13.2, §13.3). */
-function catStep(cc: CaseCtx, setup: FogSetup, id: CatId, fc: FogCat, t: number): FogCat {
+/**
+ * Advances one cat's chain one fog step in one case (03 §13.2, §13.3): interrupts and walks count
+ * down, a running activity applies its `while` effects and counts down, a finished one its
+ * `onFinish`; then free states decide on decision steps and when their activity ended.
+ */
+function catStep(
+  cc: CaseCtx,
+  setup: FogSetup,
+  id: CatId,
+  fc: FogCat,
+  t: number,
+  q: Quantities,
+  sink: Sink,
+  blocked = 0,
+): FogCat {
   const { c } = setup;
   const K = c.tuning.fog.stepTicks;
   const decisionStep = hits(t, K, c.decisionEveryTicks) > 0;
   const hooked = hooksStep(cc, setup, id, fc, t);
+  const mean = { ...hooked.mean };
   const out: Entry[] = [];
   const decided: Record<string, { ppm: number; next: [ChainState, number][] | null }[]> = {};
-  for (const e of hooked.chain) {
-    let s = e.s;
-    let ended = false;
-    if (s.interrupt) {
-      const left = s.interrupt.leftSteps - 1;
+  const scope: Scope = { self: id };
+  const counted: Record<string, number> = {}; // `${counter}|${add}` → this cat's mass doing it
+  const selfGauge = (e: Effect) =>
+    'gauge' in e && e.gauge.slice(0, e.gauge.indexOf('.')) === 'self' ? gaugeName(e.gauge) : null;
+
+  for (const first of hooked.chain) {
+    let entries: Entry[] = [first];
+    const s0 = first.s;
+    if (s0.interrupt) {
+      const left = s0.interrupt.leftSteps - 1;
       out.push({
-        s: { ...s, interrupt: left > 0 ? { ...s.interrupt, leftSteps: left } : null },
-        p: e.p,
+        s: { ...s0, interrupt: left > 0 ? { ...s0.interrupt, leftSteps: left } : null },
+        p: first.p,
       });
       continue;
     }
-    if (s.walk) {
-      const left = s.walk.leftSteps - 1;
-      s = { ...s, walk: left > 0 ? { ...s.walk, leftSteps: left } : null };
-      ended = left === 0 && s.leftSteps === 0;
-    } else if (s.leftSteps > 0) {
-      s = { ...s, leftSteps: s.leftSteps - 1 };
-      if (s.leftSteps === 0) {
+    let ended = false;
+    const ad = c.activity[s0.activity];
+    if (s0.walk) {
+      const left = s0.walk.leftSteps - 1;
+      entries = [
+        { s: { ...s0, walk: left > 0 ? { ...s0.walk, leftSteps: left } : null }, p: first.p },
+      ];
+      ended = left === 0 && s0.leftSteps === 0;
+    } else if (s0.leftSteps > 0) {
+      // the activity runs this step: its `while` effects, then it counts down
+      for (const w of ad?.while ?? []) {
+        const n = hits(t, K, w.everyTicks ?? 1);
+        if (n === 0) continue;
+        const g = selfGauge(w);
+        if (g !== null && 'gauge' in w) {
+          if (w.add !== undefined) {
+            meanEffect(c, { chain: [], mean }, g, w.add * n, null, first.p);
+            entries = entries.flatMap((e) => bandMove(c, e, g, (w.add ?? 0) * n, PPM));
+          }
+        } else if ('counter' in w) {
+          const k = `${w.counter}|${w.add * n}`;
+          counted[k] = (counted[k] ?? 0) + first.p;
+        } else fogEffects(setup, cc, q, [w], scope, first.p, sink, s0.place);
+      }
+      const leftSteps = s0.leftSteps - 1;
+      entries = entries.map((e) => ({ s: { ...e.s, leftSteps }, p: e.p }));
+      if (leftSteps === 0) {
         ended = true;
-        s = { ...s, control: 'free' };
+        entries = entries.map((e) => ({ s: { ...e.s, control: 'free' }, p: e.p }));
+        // onFinish: gauges on the state itself, the rest on the world
+        for (const f of ad?.onFinish ?? []) {
+          const g = selfGauge(f);
+          if (g !== null && 'gauge' in f) {
+            const ppm = f.chance === undefined ? PPM : f.chance * 1000;
+            meanEffect(
+              c,
+              { chain: [], mean },
+              g,
+              f.add ?? null,
+              f.set ?? null,
+              times(first.p, ppm),
+            );
+            entries = entries.flatMap((e) =>
+              f.set !== undefined
+                ? bandSet(c, e, g, f.set, ppm)
+                : bandMove(c, e, g, f.add ?? 0, ppm),
+            );
+          } else fogEffects(setup, cc, q, [f], scope, first.p, sink, s0.place);
+        }
+        const fin = sink.finished[id] ?? {};
+        sink.finished[id] = fin;
+        fin[s0.activity] = (fin[s0.activity] ?? 0) + first.p;
       }
     }
-    if (s.control !== 'free' || s.walk || !(decisionStep || ended)) {
-      out.push({ s, p: e.p });
-      continue;
-    }
-    // The decision reads the state but not how many steps are left, only whether any are.
-    const key = decisionKey(s);
-    let outcome = decided[key];
-    if (!outcome) {
-      const me = standIn(setup, id, s, hooked.mean, K);
-      const { cands, ppm } = as(cc, id, me, () => choices(cc.ctx, id));
-      outcome = cands.map((cand, i) => ({
-        ppm: ppm[i] ?? 0,
-        next:
-          cand.activity === s.activity && s.leftSteps > 0
-            ? null
-            : starts(cc, id, me, cand.activity, s.bands, 'free'),
-      }));
-      decided[key] = outcome;
-    }
-    if (outcome.length === 0) out.push({ s, p: e.p });
-    for (const o of outcome) {
-      const p = Math.trunc((e.p * o.ppm) / PPM);
-      if (p === 0) continue;
-      if (o.next === null) out.push({ s, p });
-      else for (const [next, q] of o.next) out.push({ s: next, p: Math.trunc((p * q) / PPM) });
+    for (const e of entries) {
+      const s = e.s;
+      if (s.control !== 'free' || s.walk || !(decisionStep || ended)) {
+        out.push(e);
+        continue;
+      }
+      // The decision reads the state but not how many steps are left, only whether any are.
+      const key = decisionKey(s);
+      let outcome = decided[key];
+      if (!outcome) {
+        const me = standIn(setup, id, s, mean, K);
+        const { cands, ppm } = as(cc, id, me, () => choices(cc.ctx, id));
+        outcome = cands.map((cand, i) => ({
+          ppm: ppm[i] ?? 0,
+          next:
+            cand.activity === s.activity && s.leftSteps > 0
+              ? null
+              : starts(cc, id, me, cand.activity, s.bands, 'free'),
+        }));
+        decided[key] = outcome;
+      }
+      // the actor of an open storylet choice makes no free decision (03 §8.3)
+      const held = times(e.p, blocked);
+      if (outcome.length === 0 || held > 0) out.push({ s, p: outcome.length === 0 ? e.p : held });
+      const free = outcome.length === 0 ? 0 : e.p - held;
+      for (const o of outcome) {
+        const p = times(free, o.ppm);
+        if (p === 0) continue;
+        if (o.next === null) out.push({ s, p });
+        else for (const [next, q2] of o.next) out.push({ s: next, p: times(p, q2) });
+      }
     }
   }
-  return { chain: normalise(c, out), mean: hooked.mean };
+  // the cat's states are exclusive: one Bernoulli term per counter and amount
+  for (const k of Object.keys(counted).sort()) {
+    const bar = k.lastIndexOf('|');
+    addCounter(q, k.slice(0, bar), Number(k.slice(bar + 1)), counted[k] ?? 0);
+  }
+  return { chain: out, mean };
 }
 
 /** A chain state with its remaining steps reduced to "some" or "none": what a decision reads. */
 const decisionKey = (s: ChainState): string =>
   JSON.stringify({ ...s, leftSteps: s.leftSteps > 0 ? 1 : 0 });
 
-/** Advances the fog one step of `fog.stepTicks` ticks (03 §13.2). */
-export function fogStep(setup: FogSetup, fog: Fog): Fog {
-  const t = fog.tick;
-  const cases = fog.cases.map((fc) => {
-    const cc = caseCtx(setup, fc, t);
-    const cats: Record<CatId, FogCat> = {};
-    for (const def of setup.c.cats) {
-      const cat = fc.cats[def.id];
-      if (cat) cats[def.id] = catStep(cc, setup, def.id, cat, t);
+/**
+ * Fogged cats perceive the step's events (03 §13.6): `heard`, hook `onEvent` and
+ * `factIfPerceivedBy`, through the place perception table.
+ */
+function perceive(setup: FogSetup, fc: FogCase, events: readonly FogEvent[]): void {
+  const { c, table } = setup;
+  const weather = fc.weather === 'rain' ? 'rain' : 'dry';
+  const index = (n: NodeId) => setup.nodeIndex[n] ?? -1;
+  for (const def of c.cats) {
+    const cat = fc.cats[def.id];
+    if (!cat) continue;
+    let chain = cat.chain;
+    const mean = { ...cat.mean };
+    const at: Record<string, number> = {};
+    const nodeOf = (s: ChainState) => {
+      const k = s.walk ? JSON.stringify(s.walk) : s.place;
+      return (at[k] ??= index(stateNode(setup, def.id, s)));
+    };
+    for (const ev of events) {
+      const j = index(ev.node);
+      const sees = (s: ChainState) =>
+        ev.global ||
+        ev.to === def.id ||
+        ev.source === def.id ||
+        tablePerceives(
+          table,
+          def.id,
+          ev.radiusM === null ? 'sight' : 'hearing',
+          weather,
+          nodeOf(s),
+          j,
+          ev.radiusM,
+        );
+      let pp = 0;
+      for (const e of chain) if (sees(e.s)) pp += e.p;
+      const m = times(ev.p, pp);
+      if (m === 0) continue;
+      addHeard(fc.q, def.id, ev.name, m);
+      const fact = ev.factIfPerceivedBy?.[def.id];
+      if (fact) addFactChance(fc.q, fact, m);
+      for (const h of c.hooks) {
+        if (!(h.id in def.hooks)) continue;
+        for (const r of h.rise) {
+          if (!('onEvent' in r) || r.onEvent !== ev.name) continue;
+          meanEffect(c, { chain: [], mean }, h.id, r.add, null, m);
+          chain = chain.flatMap((e) => (sees(e.s) ? bandMove(c, e, h.id, r.add, ev.p) : [e]));
+        }
+      }
     }
-    return { ...fc, cats };
+    fc.cats[def.id] = { chain: normalise(c, chain), mean };
+  }
+}
+
+/** Detectors the fog estimates (03 §13.6): the product of each clause's highest chance so far. */
+function detectorsStep(
+  setup: FogSetup,
+  cc: CaseCtx,
+  q: Quantities,
+  events: readonly FogEvent[],
+): void {
+  const { c } = setup;
+  for (const id of setup.detectors) {
+    const d = c.detectors.find((x) => x.id === id);
+    if (!d) continue;
+    if (!detectorCats(c, d).some((x) => cc.standIns[x] !== undefined)) continue;
+    const best = q.detectors[id] ?? d.kernel.map(() => 0);
+    d.kernel.forEach((clause, i) => {
+      let p: number;
+      if ('holds' in clause) p = chance(cc.ctx, clause.holds, {});
+      else {
+        p = 0;
+        for (const ev of events)
+          if (ev.name === clause.event && (clause.at === undefined || clause.at === ev.node))
+            p = or(p, ev.p);
+      }
+      best[i] = Math.max(best[i] ?? 0, p);
+    });
+    q.detectors[id] = best;
+    const est = best.reduce((a, x) => times(a, x), PPM);
+    raiseFactPart(q, d.emits, `det:${id}`, est);
+  }
+}
+
+/** P(each cat is the actor of an open choice exit) in the storylets the fog holds (03 §8.3). */
+function choiceActors(
+  setup: FogSetup,
+  cc: CaseCtx,
+  q: Quantities,
+  held: readonly string[],
+): Record<CatId, number> {
+  const out: Record<CatId, number> = {};
+  for (const def of setup.c.storylets) {
+    const sl = q.storylets[def.id];
+    if (!held.includes(def.id) || !sl?.roles) continue;
+    const scope: Scope = { roles: sl.roles, storylet: def.id, origin: origin(def, sl.roles) };
+    for (const state of Object.keys(def.states)) {
+      const m = sl.p[state] ?? 0;
+      if (m <= 0 || isTerminal(def, state)) continue;
+      const { choices, actor } = exitOptions(cc.ctx, def, state, scope);
+      if (actor && choices.length > 0) out[actor] = or(out[actor] ?? 0, m);
+    }
+  }
+  return out;
+}
+
+/** One case through one step: chains, storylets, effects on chains, perception, detectors. */
+function caseStep(setup: FogSetup, fc: FogCase, t: number, held: readonly string[]): FogCase[] {
+  const { c } = setup;
+  const q = structuredClone(fc.q);
+  const sink: Sink = { events: [], catFx: [], finished: {} };
+  const cc = caseCtx(setup, { ...fc, q }, t);
+  const cats: Record<CatId, FogCat> = {};
+  const actors = choiceActors(setup, cc, q, held);
+  for (const def of c.cats) {
+    const cat = fc.cats[def.id];
+    if (cat) cats[def.id] = catStep(cc, setup, def.id, cat, t, q, sink, actors[def.id] ?? 0);
+  }
+  // storylets read the new chains; `activityFinished` sees this step's finishes on its first tick
+  const next: FogCase = { ...fc, q, cats };
+  const cc2 = caseCtx(setup, next, t, sink.finished);
+  const fire = storyletsTick(setup, cc2, q, held, sink, fc.links);
+  if (fire === null || fire.m <= 0) return [finishStep(setup, cc2, next, sink)];
+  // Split exactly at the transition (03 §13.5): it happened in one case and not in the other.
+  const def = need(setup.c.storylet, fire.storylet, 'storylet');
+  const yes = structuredClone(next);
+  const yesSink = structuredClone(sink);
+  yes.weight = times(fc.weight, fire.m);
+  yes.links = { ...fc.links, [`fact:${fire.fact}`]: 1 };
+  need(yes.q.storylets, def.id, 'storylet').p = { [fire.state]: PPM };
+  enterMass(setup, caseCtx(setup, yes, t), yes.q, def, fire.roles, fire.state, PPM, yesSink);
+  const no = next;
+  no.weight = fc.weight - yes.weight;
+  const sl = need(no.q.storylets, def.id, 'storylet');
+  const rest = { ...sl.p };
+  rest[fire.state] = (rest[fire.state] ?? 0) - fire.m;
+  if ((rest[fire.state] ?? 0) <= 0) delete rest[fire.state];
+  sl.p = renormalise(rest);
+  return [
+    ...(yes.weight > 0 ? [finishStep(setup, caseCtx(setup, yes, t), yes, yesSink)] : []),
+    ...(no.weight > 0 ? [finishStep(setup, cc2, no, sink)] : []),
+  ];
+}
+
+/** The rest of a case's step: storylet effects on chains, perception, detectors. */
+function finishStep(setup: FogSetup, cc: CaseCtx, fc: FogCase, sink: Sink): FogCase {
+  const { c } = setup;
+  for (const fx of sink.catFx) {
+    const cat = fc.cats[fx.cat];
+    if (cat) fc.cats[fx.cat] = catEffect(setup, cc, fx.cat, cat, fx.mass, fx.effect);
+  }
+  for (const def of c.cats) {
+    const cat = fc.cats[def.id];
+    if (cat) fc.cats[def.id] = { chain: normalise(c, cat.chain), mean: cat.mean };
+  }
+  perceive(setup, fc, sink.events);
+  detectorsStep(setup, cc, fc.q, sink.events);
+  return fc;
+}
+
+// --- weather cases, links, merging (03 §13.5) ---------------------------------------------------------
+
+/** The weather hazard at tick u, in ppm: inside the window `perMille`, certain at its last tick. */
+function hazardAt(
+  c: Content,
+  u: number,
+  h: { window: [string, string]; perMille: number },
+): number {
+  if (!inWindow(c, u, h.window)) return 0;
+  return inWindow(c, u + 1, h.window) ? h.perMille * 1000 : PPM;
+}
+
+/** Copies a case with a new weight and weather (chains and quantities shared until changed). */
+const withWeather = (
+  fc: FogCase,
+  weight: number,
+  weather: Weather,
+  rainStart: [number, number][],
+): FogCase => ({
+  ...fc,
+  weight,
+  weather,
+  rainStart,
+  q: structuredClone(fc.q),
+});
+
+/** Splits cases where the weather changes during the step [t, t + K) (projections only). */
+function weatherSplit(setup: FogSetup, cases: readonly FogCase[], t: number): FogCase[] {
+  const { c } = setup;
+  const K = c.tuning.fog.stepTicks;
+  const { rainStart: start, rainStop: stop } = c.world.weather;
+  const out: FogCase[] = [];
+  for (const fc of cases) {
+    if (fc.weather === 'dry') {
+      let surv = PPM;
+      const starts: [number, number][] = [];
+      for (let u = t; u < t + K; u++) {
+        const p = times(surv, hazardAt(c, u, start));
+        if (p > 0) starts.push([u, p]);
+        surv -= p;
+      }
+      const w = times(fc.weight, PPM - surv);
+      if (w === 0 || starts.length === 0) {
+        out.push(fc);
+        continue;
+      }
+      if (fc.weight - w > 0) out.push({ ...fc, weight: fc.weight - w });
+      const rain = withWeather(fc, w, 'rain', split(starts, PPM - surv));
+      setFact(rain.q, 'rainStarted', PPM);
+      for (const def of c.cats) addHeard(rain.q, def.id, 'rainStarted', PPM);
+      out.push(rain);
+    } else if (fc.weather === 'rain') {
+      let stopped = 0;
+      const left: [number, number][] = [];
+      for (const [s, r] of fc.rainStart) {
+        let surv = PPM;
+        for (let u = t; u < t + K; u++)
+          if (u - s >= (stop.minDurationTicks ?? 0)) surv -= times(surv, hazardAt(c, u, stop));
+        stopped += times(r, PPM - surv);
+        if (surv > 0) left.push([s, times(r, surv)]);
+      }
+      const w = left.length === 0 ? fc.weight : times(fc.weight, stopped);
+      if (w === 0) {
+        out.push(fc);
+        continue;
+      }
+      if (fc.weight - w > 0)
+        out.push({
+          ...fc,
+          weight: fc.weight - w,
+          rainStart: split(
+            left,
+            left.reduce((a, [, p]) => a + p, 0),
+          ),
+        });
+      const dry = withWeather(fc, w, 'stopped', []);
+      setFact(dry.q, 'rainStopped', PPM);
+      for (const def of c.cats) addHeard(dry.q, def.id, 'rainStopped', PPM);
+      out.push(dry);
+    } else out.push(fc);
+  }
+  return out;
+}
+
+/**
+ * Splits cases on links that rose during the step (03 §13.5): where a link is still 0 and its
+ * quantity rose to m, a new case with the link true takes weight × m; the rest keeps it false.
+ */
+function linkSplit(setup: FogSetup, cases: readonly FogCase[]): FogCase[] {
+  let out = [...cases];
+  for (const l of setup.links) {
+    const key = linkKey(l);
+    const next: FogCase[] = [];
+    for (const fc of out) {
+      if (fc.links[key] === 1) {
+        next.push(fc);
+        continue;
+      }
+      const sl = l.kind === 'state' ? fc.q.storylets[l.storylet] : undefined;
+      const m = l.kind === 'fact' ? (fc.q.facts[l.fact] ?? 0) : (sl?.p[l.state] ?? 0);
+      if (m === 0) {
+        next.push(fc);
+        continue;
+      }
+      const w = times(fc.weight, m);
+      const yes = structuredClone(fc);
+      const no = fc;
+      yes.weight = w;
+      yes.links = { ...fc.links, [key]: 1 };
+      no.weight = fc.weight - w;
+      if (l.kind === 'fact') {
+        setFact(yes.q, l.fact, PPM);
+        setFact(no.q, l.fact, 0);
+      } else {
+        const ys = yes.q.storylets[l.storylet];
+        if (ys) ys.p = { [l.state]: PPM };
+        const ns = no.q.storylets[l.storylet];
+        if (ns) {
+          const rest = { ...ns.p };
+          delete rest[l.state];
+          ns.p = renormalise(rest);
+        }
+      }
+      if (yes.weight > 0) next.push(yes);
+      if (no.weight > 0) next.push(no);
+    }
+    out = next;
+  }
+  return out;
+}
+
+const caseKey = (fc: FogCase): string => JSON.stringify([fc.weather, fc.links]);
+
+/** Merges cases with the same weather and link values (03 §13.5): weights add, the rest mixes. */
+export function mergeCases(setup: FogSetup, cases: readonly FogCase[]): FogCase[] {
+  const { c } = setup;
+  const groups: Record<string, FogCase[]> = {};
+  const keys: string[] = [];
+  for (const fc of cases) {
+    const k = caseKey(fc);
+    const g = groups[k];
+    if (g) g.push(fc);
+    else {
+      groups[k] = [fc];
+      keys.push(k);
+    }
+  }
+  keys.sort();
+  return keys.map((k) => {
+    const g = need(groups, k, 'case');
+    const first = g[0];
+    if (!first) throw new Error('empty case group');
+    if (g.length === 1) return first;
+    const weight = g.reduce((a, x) => a + x.weight, 0);
+    const share = (x: FogCase) => Math.trunc((x.weight * PPM) / weight);
+    const cats: Record<CatId, FogCat> = {};
+    for (const def of c.cats) {
+      const parts = g.flatMap((x) => {
+        const cat = x.cats[def.id];
+        return cat ? [{ cat, s: share(x) }] : [];
+      });
+      if (parts.length === 0) continue;
+      const mean: Record<string, number> = {};
+      for (const gauge of Object.keys(parts[0]?.cat.mean ?? {}))
+        mean[gauge] = Math.trunc(
+          parts.reduce((a, x) => a + (x.cat.mean[gauge] ?? 0) * x.s, 0) / PPM,
+        );
+      cats[def.id] = {
+        chain: normalise(
+          c,
+          parts.flatMap((x) => x.cat.chain.map((e) => ({ s: e.s, p: times(e.p, x.s) }))),
+        ),
+        mean,
+      };
+    }
+    const rain: [number, number][] = [];
+    for (const x of g)
+      for (const [s, p] of x.rainStart) {
+        const seen = rain.find((y) => y[0] === s);
+        if (seen) seen[1] += times(p, share(x));
+        else rain.push([s, times(p, share(x))]);
+      }
+    rain.sort((a, b) => a[0] - b[0]);
+    return {
+      weight,
+      weather: first.weather,
+      rainStart:
+        rain.length > 0
+          ? split(
+              rain,
+              rain.reduce((a, [, p]) => a + p, 0),
+            )
+          : [],
+      links: first.links,
+      cats,
+      q: mixQuantities(
+        c,
+        g.map((x) => ({ w: x.weight, q: x.q })),
+      ),
+    };
   });
+}
+
+/**
+ * Advances the fog one step of `fog.stepTicks` ticks (03 §13.2, §13.5, §13.6). `held` lists the
+ * storylets the fog runs (all of them in a projection). The weather changes by case only in a
+ * projection (`projection: true`); up to the lantern edge it is the lantern's.
+ */
+export function fogStep(
+  setup: FogSetup,
+  fog: Fog,
+  held: readonly string[] = setup.c.storylets.map((s) => s.id),
+  projection = true,
+): Fog {
+  const t = fog.tick;
+  const split1 = projection ? weatherSplit(setup, fog.cases, t) : [...fog.cases];
+  const stepped = split1.flatMap((fc) => caseStep(setup, fc, t, held));
+  const cases = mergeCases(setup, linkSplit(setup, stepped));
   return { tick: t + setup.c.tuning.fog.stepTicks, cases };
 }
 

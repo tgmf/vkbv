@@ -10,6 +10,14 @@ export const tuning = loadTuning(TUNING_FILE);
 export const TINY_DIR = join(import.meta.dirname, '..', 'fixtures', 'tiny');
 export const tiny: Content = loadChapter(readChapterDir(TINY_DIR), tuning);
 export const ch1: Content = loadChapter(CHAPTER1_FILES, tuning);
+/**
+ * Chapter 1 with the coarse fog knobs used for measuring (minStatePpm 20 000, 2 bands), so fog
+ * invariant tests over many steps stay fast while the budget question (M2-1) is open.
+ */
+export const ch1Coarse: Content = loadChapter(CHAPTER1_FILES, {
+  ...tuning,
+  fog: { ...tuning.fog, minStatePpm: 20_000, bands: 2 },
+});
 
 export const freshState = (c: Content, seed = 1, stream = 0): SimState =>
   initialState(c, seed, uniformStreams(c, stream));

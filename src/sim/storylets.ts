@@ -1,9 +1,9 @@
 // Storylets: activation, roles and exits (spec 03 §9.1, §9.2).
 import type { StoryletDef } from '../content/schemas/chapter';
 import { catState } from './cats';
-import { cat, test } from './conditions';
+import { cat, chance, test } from './conditions';
 import { runEffects } from './effects';
-import { softmax } from './math';
+import { PPM, softmax } from './math';
 import { hazardRate, score } from './scores';
 import { catPos, dist2, within } from './space';
 import type { CatId, Ctx, Scope, StoryletRun } from './types';
@@ -109,46 +109,75 @@ export function openChoiceActors(ctx: Ctx): CatId[] {
 export const hasOpenChoice = (ctx: Ctx, catId: CatId): boolean =>
   openChoiceActors(ctx).includes(catId);
 
-/** At most one transition for a running storylet (03 §9.2). Hazards and choices are branch points. */
-function transition(ctx: Ctx, def: StoryletDef): void {
-  const r = run(ctx, def.id);
-  const scope = scopeOf(def, r);
-  const exits = need(def.states, r.state ?? '', 'storylet state').exits;
-  const open = exits.filter((e) => !e.gate || test(ctx, e.gate, scope));
-
-  const auto = open.find((e) => e.kind === 'auto');
-  if (auto) return enter(ctx, def, auto.to);
-
-  const hazards = open.filter((e) => e.kind === 'hazard');
+/**
+ * The exits of a state, shared by the lantern and the fog (03 §9.2, §13.6): open auto exits with
+ * their gate's ppm, hazard outcomes in ppm (`stay` last), and the choice exits with their actor.
+ * A gate is open at `fog.gateThresholdPpm`; about live things every ppm is 0 or 1 000 000.
+ */
+export function exitOptions(ctx: Ctx, def: StoryletDef, state: string, scope: Scope) {
+  const exits = need(def.states, state, 'storylet state').exits;
+  const thr = ctx.c.tuning.fog.gateThresholdPpm;
+  const open = exits
+    .map((e) => ({ e, ppm: e.gate ? chance(ctx, e.gate, scope) : PPM }))
+    .filter((x) => x.ppm >= thr);
+  const autos = open.filter((x) => x.e.kind === 'auto').map((x) => ({ to: x.e.to, ppm: x.ppm }));
+  const hazards = open.filter((x) => x.e.kind === 'hazard').map((x) => x.e);
   let rates = hazards.map((e) => hazardRate(ctx, e.perMille ?? 0, e.terms ?? [], scope));
   const sum = rates.reduce((a, b) => a + b, 0);
   if (sum > 1000) rates = rates.map((x) => Math.trunc((x * 1000) / sum));
-  if (rates.some((x) => x > 0)) {
-    const used = rates.reduce((a, b) => a + b, 0);
-    const options = [
-      ...hazards.map((e, i) => ({ label: e.to, ppm: (rates[i] ?? 0) * 1000 })),
-      { label: 'stay', ppm: (1000 - used) * 1000 },
-    ];
-    const k = ctx.pick({ key: `sl:${def.id}:hazard`, options });
-    const fired = hazards[k];
-    if (fired) return enter(ctx, def, fired.to);
-  }
+  const used = rates.reduce((a, b) => a + b, 0);
+  const hazard = rates.some((x) => x > 0)
+    ? [
+        ...hazards.map((e, i) => ({ label: e.to, ppm: (rates[i] ?? 0) * 1000 })),
+        { label: 'stay', ppm: (1000 - used) * 1000 },
+      ]
+    : [];
+  const choices = open.filter((x) => x.e.kind === 'choice').map((x) => x.e);
+  const actorRef = choices[0]?.actor;
+  return { autos, hazard, choices, actor: actorRef ? cat(ctx, scope, actorRef) : null };
+}
 
-  if (ctx.t % ctx.c.decisionEveryTicks !== 0) return;
-  const choices = open.filter((e) => e.kind === 'choice');
-  const actor = choices[0]?.actor ? cat(ctx, scope, choices[0].actor) : null;
-  if (!actor) return;
-  const as = catState(ctx, actor);
-  if (!('at' in as.pos) || as.interrupt) return;
+/** The choice outcomes with the actor standing as its current state: exits, then `stay` (03 §9.2). */
+export function choiceOptions(
+  ctx: Ctx,
+  def: StoryletDef,
+  state: string,
+  choices: readonly StoryletDef['states'][string]['exits'][number][],
+  actor: CatId,
+  scope: Scope,
+): { label: string; ppm: number }[] {
   const scores = [
     ...choices.map((e) => score(ctx, e.score ?? { base: 0 }, scope)),
-    need(def.states, r.state ?? '', 'storylet state').stayScore ?? 0,
+    need(def.states, state, 'storylet state').stayScore ?? 0,
   ];
   const ppm = softmax(scores, need(ctx.c.cat, actor, 'cat').temperatureTenths);
-  const options = [
+  return [
     ...choices.map((e, i) => ({ label: e.to, ppm: ppm[i] ?? 0 })),
     { label: 'stay', ppm: ppm[choices.length] ?? 0 },
   ];
+}
+
+/** At most one transition for a running storylet (03 §9.2). Hazards and choices are branch points. */
+function transition(ctx: Ctx, def: StoryletDef): void {
+  const r = run(ctx, def.id);
+  const state = r.state ?? '';
+  const scope = scopeOf(def, r);
+  const { autos, hazard, choices, actor } = exitOptions(ctx, def, state, scope);
+
+  const auto = autos[0];
+  if (auto) return enter(ctx, def, auto.to);
+
+  if (hazard.length > 0) {
+    const k = ctx.pick({ key: `sl:${def.id}:hazard`, options: hazard });
+    const fired = hazard[k];
+    if (fired && k < hazard.length - 1) return enter(ctx, def, fired.label);
+  }
+
+  if (ctx.t % ctx.c.decisionEveryTicks !== 0) return;
+  if (!actor || choices.length === 0) return;
+  const as = catState(ctx, actor);
+  if (!('at' in as.pos) || as.interrupt) return;
+  const options = choiceOptions(ctx, def, state, choices, actor, scope);
   const k = ctx.pick({ key: `sl:${def.id}:choice`, options });
   const chosen = choices[k];
   if (chosen) enter(ctx, def, chosen.to);

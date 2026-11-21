@@ -203,6 +203,8 @@ export interface FogReader {
   counter(name: string): { mean: number; variance: number };
   /** P(the cat has perceived the event). */
   heard(cat: CatId, event: string): number;
+  /** P(the fogged cat finished the activity this tick). */
+  finished(cat: CatId, activity: string): number;
 }
 
 /** Whether a cat is simulated in this step: live in the lantern, or any cat in a single history. */

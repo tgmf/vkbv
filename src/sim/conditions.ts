@@ -160,12 +160,20 @@ function fogLeaf(ctx: Ctx, fog: FogReader, cond: Leaf, scope: Scope): number {
     if (id === null) return 0;
     return fog.chain(id) ? fog.heard(id, cond.heard) : ppmOf(leaf(ctx, cond, scope));
   }
+  if ('activityFinished' in cond) {
+    const id = cat(ctx, scope, cond.activityFinished[0]);
+    if (id !== null && fog.chain(id)) return fog.finished(id, cond.activityFinished[1]);
+    return ppmOf(leaf(ctx, cond, scope));
+  }
   if ('countCats' in cond) return countCatsChance(ctx, fog, cond);
   if ('near' in cond) {
-    // two references: mix over each fogged one in turn
-    const a = cat(ctx, scope, cond.near[0]);
-    const b = cat(ctx, scope, cond.near[1]);
-    return mixed(ctx, fog, [a, b], () => ppmOf(leaf(ctx, cond, scope)));
+    // two references, each a place, a live cat or a fogged cat's positions with their mass
+    const a = positions(ctx, fog, scope, cond.near[0]);
+    const b = positions(ctx, fog, scope, cond.near[1]);
+    let sum = 0;
+    for (const [pa, ma] of a)
+      for (const [pb, mb] of b) if (within(pa, pb, cond.m)) sum += Math.trunc((ma * mb) / PPM);
+    return Math.min(PPM, sum);
   }
   const inner = (): number => {
     if ('flag' in cond) {
@@ -176,6 +184,24 @@ function fogLeaf(ctx: Ctx, fog: FogReader, cond: Leaf, scope: Scope): number {
     return ppmOf(leaf(ctx, cond, scope));
   };
   return mixed(ctx, fog, [leafCat(ctx, cond, scope)], inner);
+}
+
+/** Where a reference stands, with probabilities: a fogged cat's chain grouped by position. */
+function positions(ctx: Ctx, fog: FogReader, scope: Scope, ref: string): [Pos, number][] {
+  const id = ctx.c.node[ref] ? null : cat(ctx, scope, ref);
+  const chain = id === null ? null : fog.chain(id);
+  if (!chain) {
+    const p = posOf(ctx, scope, ref);
+    return p === null ? [] : [[p, PPM]];
+  }
+  const out: [Pos, number][] = [];
+  for (const x of chain) {
+    const p = catPos(ctx.c, x.cat);
+    const seen = out.find(([q]) => q[0] === p[0] && q[1] === p[1]);
+    if (seen) seen[1] += x.p;
+    else out.push([p, x.p]);
+  }
+  return out;
 }
 
 /** `inner` averaged over the chains of the fogged cats among `ids` (independent given the case). */

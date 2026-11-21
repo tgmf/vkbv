@@ -123,7 +123,7 @@ Marti's chain (about 440 of 2 534 states at 09:40) leaves the per-edit path. To 
 measured again.
 Answer:
 
-## M2-2 — Anchor conditioning with nothing drawn past the lantern edge            (status: open)
+## M2-2 — Anchor conditioning with nothing drawn past the lantern edge            (status: answered)
 Where: `03` §14, `05` §4 `waves.anchorConditioning`; glossary Anchor ("unwatched waves lean toward it")
 Question: Conditioning multiplied the projection's case weights by P(anchor | case). Nothing
 past the lantern edge is drawn now, and vetting and calibration run with conditioning off, so
@@ -137,9 +137,9 @@ Options seen:
     conditioning depend on each other);
 (c) retire the knob.
 Chosen for now: (a), behind `waves.anchorConditioning`.
-Answer:
+Answer: Tagir, 2026-11-22: go with the defaults ("pls do").
 
-## M2-3 — Power pins an edit leaves past the lantern edge            (status: open)
+## M2-3 — Power pins an edit leaves past the lantern edge            (status: answered)
 Where: `04` §4; glossary Lantern edge ("powers: open")
 Question: When an edit pulls the edge back, ordinary cards past it return to the hand and unique
 cards move to the edge. What happens to a power pin?
@@ -147,9 +147,9 @@ Options seen: (a) it moves to the edge at no cost, like a unique card; (b) it is
 charge is lost (charge is never refunded); (c) it is removed and its charge refunded (contradicts
 "never refunded").
 Chosen for now: (a).
-Answer:
+Answer: Tagir, 2026-11-22: go with the defaults ("pls do").
 
-## M2-4 — Watched facts past the new lantern edge            (status: open)
+## M2-4 — Watched facts past the new lantern edge            (status: answered)
 Where: `03` §15.5, `04` §4
 Question: A re-run stops at the frontier limit, so watched facts after it are not tested and the
 break alert cannot list them.
@@ -158,9 +158,9 @@ reopens then is a break with no alert before it; (b) reopen them all on commit a
 ones in the break alert; (c) let a preview run past the frontier limit to the last watched fact,
 only to test facts, then cut the frames at the limit (costs a longer re-run).
 Chosen for now: (a).
-Answer:
+Answer: Tagir, 2026-11-22: go with the defaults ("pls do").
 
-## M2-5 — Decisions made while applying the lantern edge to the spec            (status: open)
+## M2-5 — Decisions made while applying the lantern edge to the spec            (status: answered)
 Where: `03` §12.2, §13.1, §17; `04` §4, §6; `02` §3; `06` §3; `05` §4
 Question: The glossary of 2026-11-22 left these to me. Confirm or correct:
 1. A main storylet is one with an effect that sets a fact in the requirement tree (Chapter 1:
@@ -179,6 +179,6 @@ Question: The glossary of 2026-11-22 left these to me. Confirm or correct:
    measures B2–B7.
 7. New knobs: `timeline.minSpanTicks` 36, `budgets.rerunTps` 120.
 Chosen for now: as listed.
-Answer:
+Answer: Tagir, 2026-11-22: go with the defaults ("pls do").
 
 <!-- Gate notes and answers go above this line. -->
