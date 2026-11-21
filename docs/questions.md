@@ -115,6 +115,70 @@ Options seen:
     the rest of the day streamed after.
 (d) a larger budget.
 Chosen for now: none; steps 4–8 wait.
+Update 2026-11-22: the lantern edge (glossary) changes the case. An edit no longer
+projects the rest of the day: it re-runs the lantern (Marti live) with the other cats
+in the fog, streamed, so (c) is now the design. `07` §4 now asks for the first frames in
+`budgets.recomputeMs` and at least `budgets.rerunTps` (120, a guess) ticks per second.
+Marti's chain (about 440 of 2 534 states at 09:40) leaves the per-edit path. To be
+measured again.
+Answer:
+
+## M2-2 — Anchor conditioning with nothing drawn past the lantern edge            (status: open)
+Where: `03` §14, `05` §4 `waves.anchorConditioning`; glossary Anchor ("unwatched waves lean toward it")
+Question: Conditioning multiplied the projection's case weights by P(anchor | case). Nothing
+past the lantern edge is drawn now, and vetting and calibration run with conditioning off, so
+the knob changes nothing the player sees. Should unwatched odds up to the edge lean toward the
+anchor?
+Options seen:
+(a) keep it on projections only (it then affects nothing in play);
+(b) after each re-run, project from the edge and multiply the case weights of the fog from the
+    edit tick on by P(anchor | case). That costs a whole projection per edit, and placements in
+    the re-run would have to use the previous projection's weights (otherwise placement and
+    conditioning depend on each other);
+(c) retire the knob.
+Chosen for now: (a), behind `waves.anchorConditioning`.
+Answer:
+
+## M2-3 — Power pins an edit leaves past the lantern edge            (status: open)
+Where: `04` §4; glossary Lantern edge ("powers: open")
+Question: When an edit pulls the edge back, ordinary cards past it return to the hand and unique
+cards move to the edge. What happens to a power pin?
+Options seen: (a) it moves to the edge at no cost, like a unique card; (b) it is removed and its
+charge is lost (charge is never refunded); (c) it is removed and its charge refunded (contradicts
+"never refunded").
+Chosen for now: (a).
+Answer:
+
+## M2-4 — Watched facts past the new lantern edge            (status: open)
+Where: `03` §15.5, `04` §4
+Question: A re-run stops at the frontier limit, so watched facts after it are not tested and the
+break alert cannot list them.
+Options seen: (a) keep them; test them when live playback reaches their tick; a paid one that
+reopens then is a break with no alert before it; (b) reopen them all on commit and list the paid
+ones in the break alert; (c) let a preview run past the frontier limit to the last watched fact,
+only to test facts, then cut the frames at the limit (costs a longer re-run).
+Chosen for now: (a).
+Answer:
+
+## M2-5 — Decisions made while applying the lantern edge to the spec            (status: open)
+Where: `03` §12.2, §13.1, §17; `04` §4, §6; `02` §3; `06` §3; `05` §4
+Question: The glossary of 2026-11-22 left these to me. Confirm or correct:
+1. A main storylet is one with an effect that sets a fact in the requirement tree (Chapter 1:
+   `door_lure`, `blocked_road`, `usual_route`, `chain_on_beach`, `tideline_wander`,
+   `rokko_morning`, `under_the_boat`). "Perceivable to Marti" = a state of it would appear in
+   his watched fact at that tick.
+2. `reach` = the first tick of the current lantern whose progress is at least `frontier.story`;
+   the frontier limit is `reach + pastTicks` unless a main storylet or new progress comes
+   first. A new game starts with the edge at 0, so the player plays from the first tick.
+3. The lantern edge is not saved: it always equals the frontier limit of the current timeline,
+   and loading re-runs to it.
+4. Every edit's preview streams; the break alert waits for the end of the re-run; Cancel
+   restores the old frames.
+5. Ordinary cards past the new edge return to the hand under every played-card rule.
+6. The whole-day projection (Marti in the fog) stays for vetting, calibration and the balance
+   measures B2–B7.
+7. New knobs: `timeline.minSpanTicks` 36, `budgets.rerunTps` 120.
+Chosen for now: as listed.
 Answer:
 
 <!-- Gate notes and answers go above this line. -->

@@ -19,7 +19,9 @@ hand yet.
 3. The accessible target list mirrored from the scene, with `data-testid`,
    `data-node` and `data-activity` (`02` §4).
 4. The timeline: ruler, weather band, story dots, pins (read only), playhead,
-   frontier fog, fray, changed-unwatched marks, play/pause, speeds, jump, keyboard.
+   the lantern edge (the bar's right end, rescaling past `timeline.minSpanTicks`),
+   re-runs streaming in, fray, changed-unwatched marks, play/pause, speeds, jump,
+   keyboard.
 5. The playback loop on `requestAnimationFrame` with a real-time accumulator; each
    tick passed in playback calls `observe` (M3) and applies rewards; scrubbing only
    moves the playhead.
@@ -37,8 +39,9 @@ hand yet.
       likeliest copies read strongest; after Marti watches them they are solid.
 - [ ] Panning the camera across the whole map changes nothing in `watched` (a
       Playwright test asserts it).
-- [ ] Dragging the playhead anywhere within the limit updates the scene within one
-      frame and observes nothing; playback observes every tick it passes.
+- [ ] Dragging the playhead anywhere up to the lantern edge updates the scene within
+      one frame and observes nothing; it cannot pass the edge; playback observes every
+      tick it passes and extends the edge when it reaches it.
 - [ ] `untouched` shows the fray when Rokko leaves; playback stops there.
 - [ ] Keyboard: Space, arrows, Home, End work.
 - [ ] A Playwright test loads `road_both`, plays to five ticks, and checks Marti's

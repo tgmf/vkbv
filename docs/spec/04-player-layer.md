@@ -24,21 +24,26 @@ interface PlayerState {
   followed: CatId[];                     // ['marti'] in the demo
   revealed: NodeId[];                    // sorted
   journal: { hooks: GaugeId[]; stories: ObjectId[] };
-  frontier: number;                      // highest progress ever reached (§6)
+  frontier: {                            // how far the story has been played (§6)
+    story: number;                       // story limit: highest progress ever watched
+    pastTicks: number;                   // most ticks ever played past the story limit
+    storylets: StoryletId[];             // storylets ever watched, sorted
+  };
   anchorWatched: boolean;
-  playhead: number;
+  playhead: number;                      // always 0..lanternEdge (§6)
   marks: { changedUnwatched: number[] }; // ticks of watched, unpaid facts that reopened
 }
 ```
 
 All changes go through pure functions in `src/player/actions.ts`:
 `(player, view, content, args) -> { player, error? }`, where `view` is the latest
-recompute result held by the UI (frames, end, gazeFacts). Actions never mutate their
+re-run result held by the UI (frames, edge, end, gazeFacts). Actions never mutate their
 input. An action that changes `pins` returns the new pins; the UI then asks the worker
 for a recompute (§4).
 
 A new game: all cards `unfound`, `charge = economy.charge.start`, `revealed` = every
 node of a region with `revealedAtStart: true`, `followed = ['marti']`, `playhead = 0`,
+`frontier = { story: 0, pastTicks: 0, storylets: [] }` (so the lantern edge is 0),
 everything else empty. The requested seed comes from the UI (`?seed=` or random);
 `src/player` never generates one.
 
@@ -50,8 +55,8 @@ Before the first recompute of a new game, the worker vets the seed once (pacing)
 for k in 0 .. tuning.vetting.maxCandidates - 1:
   candidate = k == 0 ? requested : hash32(requested + "|vet|" + k)
   compute the untouched timeline (no pins, no watched facts, conditioning off): the
-       projection of the whole day, nothing played (03 §13.1), with the candidate's
-       seeded stats (03 §5)
+       whole-day projection (03 §13.1: every cat in the fog, Marti included; never
+       drawn), with the candidate's seeded stats (03 §5)
   pass if, for every fact in the anchor's requirement tree (its story storylets'
        outcomes) and every fact in tuning.vetting.requireFacts, the raw probability
        that it holds by the chapter's end is >= tuning.vetting.minPpm
@@ -68,7 +73,7 @@ always the vetted one, so it always gives the same world.
 `playCard(cardId, target)` adds a pin at `tick = playhead`. Allowed when all hold:
 
 - the card's zone is `hand`;
-- `playhead <= frontierLimit` (§6) and the timeline has not ended before it;
+- `playhead <= lanternEdge` (§6);
 - the card has a branch for the target kind (`on.cat`, `on.object`, `on.place`, or
   the target is the card's `special.on` object);
 - place target: the node is in `revealed`;
@@ -97,7 +102,7 @@ cannot be withdrawn or moved: it stays and fires whenever its target is there.
 ### 3.2 Powers
 
 `usePower(powerId, place)`: allowed when `charge >= power.cost`, the place is in
-`revealed`, `playhead <= frontierLimit`, and the power targets `place`. Subtract the
+`revealed`, `playhead <= lanternEdge`, and the power targets `place`. Subtract the
 cost and add a power pin at the playhead. Charge is **never refunded**: withdrawing a
 power pin returns nothing, and moving it (`movePin`) costs the full cost again and is
 refused when charge is short. A power pin that fizzles keeps what was paid.
@@ -106,7 +111,7 @@ refused when charge is short. A power pin that fizzles keeps what was paid.
 
 `withdraw(pinId)` removes a pin (refused for unique cards). `movePin(pinId, tick)`
 changes its tick, keeps its `seq`, re-sorts (refused for unique cards; within
-`0..frontierLimit`). For cards, moving is free; for powers it pays again.
+`0..lanternEdge`). For cards, moving is free; for powers it pays again.
 
 ### 3.4 Draws (rule `discard` only)
 
@@ -119,8 +124,9 @@ a hook discovered). Under the other rules nothing is drawn.
 ## 4. Edits, break alerts and reopened facts
 
 Every action that changes `pins` is an **edit**. The UI sends the new pins with the
-current watched facts to the worker as a **preview**. The result says which watched
-facts would reopen (`03` §15.5).
+current watched facts and `frontier` to the worker as a **preview**: a re-run (`03`
+§17), streamed into the scrubber as it goes. Its result says which watched facts would
+reopen (`03` §15.5) and where the new lantern edge is.
 
 - A reopened watched fact is **paid** if its `summary` has a non-empty `paidBy` for
   any storylet state or detector, or it is a Gaze fact. If any paid fact would
@@ -130,7 +136,12 @@ facts would reopen (`03` §15.5).
 - On commit, reopened facts are removed from `watched`. The ticks of reopened
   **unpaid** facts are added to `marks.changedUnwatched` (a quiet mark, no alert).
 - Payouts already paid stay paid (they are keyed by kind, `§7`). The frontier never
-  decreases.
+  decreases, and a re-run never changes it.
+- **Pins past the new lantern edge.** On commit, every pin whose tick is after the new
+  edge leaves that stretch: an ordinary card's pin is removed and the card returns to
+  `hand` (under every played-card rule); a unique card's pin moves to the edge tick,
+  keeping its `seq`; a power pin moves to the edge tick at no cost (open:
+  `docs/questions.md` M2-3). Then `playhead = min(playhead, edge)`.
 
 ## 5. Following
 
@@ -142,29 +153,59 @@ and the `follow(cat)` action signature; the action refuses every cat but Marti.
 ## 6. Frontier
 
 ```
-P_t(item)    = conditioned probability (03 §14, §16) that a requirement item holds at t
-               (watched facts make it 1)
-progress(t)  = Σ weight of requirement items with P_t(item) >= tuning.frontier.countAtPpm
-frontierLimit = the largest t such that progress(t') <= frontier for every t' <= t
-                (and t <= the timeline's last tick, or its fray tick)
+P_t(item)   = probability that a requirement item holds at t in the current timeline
+              (a fact set in the lantern makes it 1 000 000; otherwise the fog's odds, 03 §16)
+progress(t) = Σ weight of requirement items with P_t(item) >= tuning.frontier.countAtPpm
+reach       = the first tick of the current lantern with progress(t) >= frontier.story,
+              or none if the current timeline never gets there
 ```
 
+**The frontier** changes only in playback. After each playback advance to tick `t`:
+
+```
+if progress(t) > story:          story = progress(t); pastTicks = 0     (reach becomes t)
+else if reach exists, t >= reach: pastTicks = max(pastTicks, t - reach)
+storylets ∪= every storylet with a state in the watched fact's summary (03 §15.2)
+```
+
+Re-runs and scrubbing never change it. It is measured from the last beat, not the
+clock: an edit that delays the beat that reached the story limit moves `reach` later,
+and the player can still go `pastTicks` beyond it.
+
+**The frontier limit** is where a re-run stops (`03` §17): the last tick `t` such that
+every tick `t'` from the edit up to `t`
+
+- shows Marti no main storylet (`03` §12.2) outside `frontier.storylets`: no state of
+  one would appear in a watched fact at `t'`;
+- has `progress(t') <= story`;
+- has `t' - reach <= pastTicks`, when `reach` exists;
+
+and never past the fray or the chapter's end. Side storylets never stop a re-run: they
+are shown, and pay only in playback. A timeline that never reaches the story limit runs
+on to the fray or the end.
+
+**The lantern edge** (`03` §13.1) is where the current timeline's lantern ends. A re-run
+puts it at the frontier limit; live playback at the edge moves it one tick at a time and
+moves the frontier with it, so the edge and the frontier limit stay the same tick. It is
+not saved: loading a save re-runs from tick 0 to the frontier limit.
+
 - **Scrubbing** (dragging the playhead, stepping, jumping) is clamped to
-  `0..frontierLimit`.
-- **Playback** may advance one tick past the limit at a time. After each advance,
-  `frontier = max(frontier, progress(playhead))`.
-- An edit that makes progress happen earlier moves the limit earlier in clock time.
+  `0..lanternEdge`.
+- **Playback** behind the edge watches what the lantern holds; at the edge it is live and
+  extends the edge (`03` §15.2).
+- An edit that makes new story happen earlier moves the edge earlier in clock time.
   That is intended.
 - When playback watches the anchor (§7), `anchorWatched = true`.
 
-The player can drag freely through everything already earned; new story progress
-has to be watched as it happens.
+The player can drag freely through everything already played; new story has to be
+watched as it happens.
 
 ## 7. Playback, observing and rewards
 
 When the playhead advances in **playback** from `t` to `t + 1`, the UI asks the
 worker to `observe(t, cat)` for each followed cat, unless `watched` already has a fact
-for `(t, cat)`. Scrubbing observes nothing. The worker returns the watched fact; the
+for `(t, cat)`. Scrubbing observes nothing, and a re-run records and pays nothing:
+playback over its ticks does. The worker returns the watched fact; the
 player layer appends it and applies `reward(fact)`:
 
 | Watched | Key | First time only |
@@ -199,8 +240,8 @@ again pays nothing new.
 Observation returns the new player state plus a list of `Reward` records
 (`{ key, charge?, cards?, revealed?, hook? }`) for the UI to animate.
 
-**Repeat by default.** Pins stay on the timeline and fire again on every recompute;
-watched facts are imposed on every recompute. Scrolling back and pressing play shows
+**Repeat by default.** Pins stay on the timeline and fire again on every re-run;
+watched facts are imposed on every re-run. Scrolling back and pressing play shows
 the same day unless the player changes something.
 
 ## 8. Inspecting objects
@@ -232,7 +273,9 @@ map, frontier, payouts already paid.
   re-watched.
 - Charge only goes down when a power is placed or moved; it never goes up from a
   withdrawal.
-- Scrubbing never changes `charge`, `paid`, `watched`, `revealed`, `journal` or
-  `frontier`.
-- `frontier` never decreases.
+- Scrubbing and re-runs never change `charge`, `paid`, `watched`, `revealed`, `journal`
+  or `frontier`.
+- `frontier.story` never decreases; `frontier.storylets` only grows.
+- The playhead never passes the lantern edge; after every action the lantern edge equals
+  the frontier limit.
 - Save, load, continue: deep-equal state; a corrupted string loads as null.

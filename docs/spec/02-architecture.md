@@ -82,12 +82,14 @@ main thread                                         worker
 ───────────                                         ──────
 PlayerState (pins, watched, seed, …)
    │ edit (play, withdraw, move, power)
-   ├──────── recompute {pins, watched, preview} ──▶ replay from the last checkpoint ≤ edit tick,
-   │                                                 then the projection (03 §17)
-   │◀─────── result {frames, end, reopened, …} ───┘  (03 §17)
+   ├── recompute {pins, watched, frontier, preview} ▶ re-run from the last checkpoint ≤ edit tick
+   │                                                 to the frontier limit (03 §17)
+   │◀─────── rerun {upTo, frames} … ──────────────┤  streamed while it runs
+   │◀─────── result {frames, edge, end, reopened, …} ┘ (03 §17)
    │ break alert if a paid fact would reopen; then commit
    │ playback tick t → t+1
-   ├──────── observe {t, cat} ────────────────────▶ advance the lantern, place cats, apply evidence
+   ├──────── observe {t, cat} ────────────────────▶ at the lantern edge: advance the lantern one
+   │                                                 tick, place cats, apply evidence
    │◀─────── {watchedFact, frames} ───────────────┘  (03 §15.2)
    ▼
 rewards (player/rewards.ts) → PlayerState
@@ -102,8 +104,10 @@ Rules:
 - The UI drives time: playback runs on `requestAnimationFrame` in `src/ui` with a
   real-time accumulator; the worker never runs a clock. (The scaffold's fixed-step
   worker loop is removed in M0.)
-- Every request carries a `reqId`. The UI keeps showing the previous result until the
-  new one arrives and drops results older than the latest request.
+- Every request carries a `reqId`. The UI drops results older than the latest request.
+  While a re-run streams, the timeline shows the new frames up to `upTo` and nothing
+  past it, and the playhead cannot pass `upTo`. The break alert waits for the final
+  `result`; Cancel restores the previous result.
 - Observation requests are queued in tick order; playback waits (stays on the last
   tick) if an observation has not returned.
 
@@ -113,13 +117,15 @@ Rules:
 type MainToWorker =
   | { kind: 'init'; reqId: number; tuning?: Partial<Tuning> }
   | { kind: 'vet'; reqId: number; requestedSeed: number }
-  | { kind: 'recompute'; reqId: number; seed: number; pins: Pin[]; watched: WatchedFact[]; preview: boolean }
+  | { kind: 'recompute'; reqId: number; seed: number; pins: Pin[]; watched: WatchedFact[];
+      frontier: PlayerState['frontier']; preview: boolean }   // a re-run (03 §17)
   | { kind: 'commit'; reqId: number }                      // make a preview the current wave
   | { kind: 'observe'; reqId: number; tick: number; cat: CatId }
   | { kind: 'debugHistory'; reqId: number; tick: number; index: number }; // index 0: the lantern state; i > 0: reference histories (stream i)
 type WorkerToMain =
   | { kind: 'ready'; reqId: number }
   | { kind: 'vetted'; reqId: number; seed: number }
+  | { kind: 'rerun'; reqId: number; upTo: number; frames: FramesPatch }   // streamed progress
   | { kind: 'result'; reqId: number; result: RecomputeResult }
   | { kind: 'observed'; reqId: number; fact: WatchedFact; frames: FramesPatch }
   | { kind: 'history'; reqId: number; state: SimState; events: SimEvent[] }

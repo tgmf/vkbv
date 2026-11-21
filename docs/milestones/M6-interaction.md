@@ -19,7 +19,7 @@ guidance yet.
    radius ring under the pointer.
 7. The special confirm step and the break alert bar (`06` §6). Every edit goes through
    a preview first.
-8. Edit feedback, all four parts.
+8. Edit feedback, all five parts, and pins past the new edge (`04` §4).
 9. Rule `discard` display: draw and discard counts.
 
 ## Acceptance
@@ -30,8 +30,8 @@ guidance yet.
       places a power, using only keys.
 - [ ] Touch emulation in Playwright: the same flows work.
 - [ ] After watching Marti through the morning, pinning `tea_break` on
-      `town.roadworks` at 07:40 shows changed story dots pulsing, the ripple, Marti's
-      previous path, and the end of the bar changing.
+      `town.roadworks` at 07:40 shows changed story dots pulsing, the re-run refilling
+      the bar as a ripple, Marti's previous path, and the end of the bar changing.
 - [ ] An edit that would undo a watched paid fact shows the break alert first;
       Cancel leaves everything as it was; Confirm lands the edit.
 - [ ] Holding a card over `town.roadworks` at 15:00 shows on the timeline when the

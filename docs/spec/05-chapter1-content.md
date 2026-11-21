@@ -68,8 +68,8 @@ have **not** been checked against a model of this content; M4 measures them.
 | Key | Start | Meaning |
 | --- | --- | --- |
 | `content.castMode` | `"full"` | `"full"` or `"core"` (§3) |
-| `waves.checkpointEvery` | 30 | ticks between checkpoints of the played stretch (`03` §17) |
-| `waves.anchorConditioning` | true | the anchor treated as already seen (`03` §14) |
+| `waves.checkpointEvery` | 30 | ticks between checkpoints of the lantern (`03` §17) |
+| `waves.anchorConditioning` | true | the anchor treated as already seen, in projections (`03` §14; open, `docs/questions.md` M2-2) |
 | `fog.stepTicks` | 5 | ticks per fog step (`03` §13.2) |
 | `fog.minStatePpm` | 100 | chain states below this are dropped |
 | `fog.bands` | 4 | bands per changing gauge |
@@ -78,7 +78,7 @@ have **not** been checked against a model of this content; M4 measures them.
 | `fog.maxLinks` | 2 | links besides the weather (`03` §13.5) |
 | `fog.linkFloorPpm` | 50000 | a lasting meeting effect becomes a link above this, about 5% |
 | `fog.contributors` | 4 | contributor heap size per fact, flag and `heard` |
-| `fog.frayBelowPpm` | 1000 | the projection frays below this chance of reaching the anchor (`03` §16) |
+| `fog.frayBelowPpm` | 1000 | a projection frays below this chance of reaching the anchor (`03` §16) |
 | `fog.exactTolerancePpm` | 20000 | tiny-world exactness test (`03` §18) |
 | `lantern.releaseAfterTicks` | 30 | ticks unperceived before a live cat returns to the fog (`03` §13.4) |
 | `lantern.dwellTicks` | 5 | ticks a placed cat keeps its activity before deciding (`03` §15.1) |
@@ -96,11 +96,13 @@ have **not** been checked against a model of this content; M4 measures them.
 | `vetting.maxCandidates` | 20 | |
 | `player.playedCardRule` | `"pinned"` | `pinned`, `spent` or `discard` (`04` §3) |
 | `player.playSpeedsTps` | `[4, 16]` | ticks per real second |
+| `timeline.minSpanTicks` | 36 | the bar spans at least this many ticks; past it, it rescales to keep the lantern edge on the right (`06` §3) |
 | `end.afterAnchorTicks` | 15 | ticks shown after the meeting |
 | `render.focusLayerHz` | 3 | `06` §2; at most 3 |
 | `render.focusSamples` | 8 | coherent trajectories offered to the focus layer (`03` §16) |
 | `render.displayBudget` | 24 | most cat markers drawn at rest (`06` §2) |
-| `budgets.recomputeMs` | 100 | `07` §4 |
+| `budgets.recomputeMs` | 100 | from an edit to the re-run's first streamed frames (`07` §4) |
+| `budgets.rerunTps` | 120 | ticks per second a re-run streams at, at least (`07` §4) |
 | `flags.telemetry` | true | |
 | `flags.assist` | false | assist-mode highlights default |
 
@@ -141,7 +143,7 @@ off) unless stated.
 
 | Id | Property | Kind |
 | --- | --- | --- |
-| B1 | `untouched`: Marti is in region `flat` at every tick: live on the played stretch, with all his chain's mass there in the projection | structural, a test from M2 |
+| B1 | `untouched`: Marti is in region `flat` at every tick: live in a headless playback to the end, with all his chain's mass there in the whole-day projection | structural, a test from M2 |
 | B2 | `lure_unprimed`: P(`martiOut` by 14:30) ≤ 15% | balance |
 | B3 | `lure_one_prime`: P(`martiOut` by 14:30) ≤ 35% | balance |
 | B4 | `lure_primed`: P(`martiOut` by 14:30) ≥ 60% | balance |

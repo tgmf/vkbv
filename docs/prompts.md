@@ -51,7 +51,7 @@ citing the test. Then list, most serious first:
 - any randomness, time, floats, Math.exp/log/sqrt/pow, or unordered iteration in
   src/sim or src/player;
 - random numbers keyed by anything other than the scopes in spec 03 §1 (in particular,
-  draws at the lantern's edge keyed by anything but the purposes in spec 03 §15);
+  placement draws keyed by anything but the purposes in spec 03 §15);
 - a second copy of the decision function, place selectors or score terms for the fog
   (spec 03 §13.3: one function, conditions return ppm);
 - anything in src/ui or src/render that turns fog into fact or applies evidence (the

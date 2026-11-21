@@ -3,13 +3,19 @@
 **Goal:** the wave of `03` §13–§18 in the worker: the readers index, cat chains and
 cases in the fog, the one decision function with conditions in ppm, the lantern
 (live cats, placement, release, dwell), forward and backward passes, Gaze, imposed
-facts on replay, fray, frames, recompute from checkpoints, seed vetting. Calibrated
-against the reference simulation and within budget.
+facts on re-run, fray, frames, the re-run from checkpoints to the frontier limit, seed
+vetting. Calibrated against the reference simulation and within budget.
 
 Changed 2026-11-21: the weighted histories of the earlier M2 (splitting, merging,
 trimming, rejuvenation, lineage) are retired. See the design doc, World model › Fog
 and lantern, and the glossary's Waves section. M1's single-history engine stays as it
 is: it is the lantern's `step` and the reference simulation.
+
+Changed 2026-11-22: the lantern edge. Marti is simulated directly at every tick the
+player can reach; nothing past the lantern edge is drawn. An edit re-runs the lantern
+from the edit tick to the frontier limit, streamed (`03` §13.1, §17; `04` §6). The
+projection is now internal: the whole-day projection for vetting, calibration and
+balance, and strain.
 
 **Read first:** `03` §1, §12–§18 (and §4, §8–§10, which the fog reuses), `07` §3, §4,
 `02` §3, `04` §2.
@@ -33,19 +39,23 @@ is: it is the lantern's `step` and the reference simulation.
    storylets moving between fog and lantern (`03` §13.4, §15.1).
 7. The backward pass (`03` §14): case Bayes, chain conditioning, smoothing (may be
    deferred to frame requests), forward again; anchor conditioning and strain.
-8. `observe.ts` for Gaze and imposed facts on replay (`03` §15.4, §15.5). Playback
+8. `observe.ts` for Gaze and imposed facts on re-run (`03` §15.4, §15.5). Playback
    observation comes in M3.
 9. `frames.ts` (`03` §16, including `samples` by backward sampling) and
-   `recompute.ts` (checkpoints, projection, results with `reopened`, `gazeFacts`,
-   `stats`), `vet.ts` (`04` §2).
-10. The worker: `init`, `vet`, `recompute` (preview and committed), `commit`,
-    `debugHistory`, per `02` §3. A headless entry point running the same code in Node
-    for tests and scripts.
-11. `npm run sim -- --fog`: prints, per hour, the number of cases, live cats and fog
-    states; the probability of each storylet state and requirement item; the strain;
-    and the end.
+   `recompute.ts`: checkpoints; the re-run from the edit tick to the frontier limit,
+   the fray or the end, with the frontier as an input (`03` §17, `04` §6), streaming
+   its frames; results with `edge`, `end`, `reopened`, `gazeFacts`, `stats`;
+   projections (whole-day, and from the edge for strain). `vet.ts` (`04` §2). The
+   main storylets derived at load (`03` §12.2).
+10. The worker: `init`, `vet`, `recompute` (preview and committed, streaming `rerun`
+    messages), `commit`, `debugHistory`, per `02` §3. A headless entry point running
+    the same code in Node for tests and scripts.
+11. `npm run sim -- --fog`: runs the lantern from tick 0 to the end with no frontier
+    limit (a headless playback) and prints, per hour, the number of cases, live cats
+    and fog states; the probability of each storylet state and requirement item; the
+    strain; and the end. `--projection` prints the same for the whole-day projection.
 12. The quick calibration test and `npm run calibrate` (`07` §3).
-13. A recompute benchmark test (`07` §4).
+13. A re-run benchmark test (`07` §4).
 
 ## Acceptance
 
@@ -71,23 +81,29 @@ is: it is the lantern's `step` and the reference simulation.
       is the same for the same seed and tick whatever unrelated pins change; negative
       evidence removes the perceivable states; release returns a live cat to the fog
       after `lantern.releaseAfterTicks` unperceived ticks; dwell holds its activity.
-- [ ] Imposed facts: replaying after an edit inside the played stretch forces watched
-      cats back into place when their chain allows it; a fact that cannot hold is
-      reported in `reopened`.
+- [ ] Imposed facts: re-running after an edit forces watched cats back into place
+      when their chain allows it; a fact that cannot hold is reported in `reopened`.
 - [ ] Gaze: a power pin with `collapse` fixes, at each of its ticks, what the circle
       holds; the same pins give the same pick; the facts are in `gazeFacts`.
-- [ ] Anchor: with conditioning on, case weights lean toward cases that reach the
-      anchor; strain is the unconditioned probability; the projection frays below
-      `fog.frayBelowPpm`, and the played stretch frays when `fraysIf` holds live.
-- [ ] Recompute from a checkpoint gives byte-identical results to a recompute from
-      tick 0 (property test over 20 random pin sets).
+- [ ] Anchor: with conditioning on, a projection's case weights lean toward cases
+      that reach the anchor; strain is the unconditioned probability; a projection
+      frays below `fog.frayBelowPpm`, and the lantern frays when `fraysIf` holds in it.
+- [ ] Re-run: on the tiny world it stops just before a never-watched main storylet
+      would reach Marti, just before progress passes `frontier.story`, and after
+      `frontier.pastTicks` ticks past `reach` (one test each); a side storylet does not
+      stop it; it never passes the fray or the end; a timeline that never reaches the
+      story limit runs to the fray or the end. The main storylets of Chapter 1 are the
+      list in `03` §12.2.
+- [ ] A re-run from a checkpoint gives byte-identical results to one from tick 0, and
+      a re-run in one go gives the same lantern as one advanced a tick at a time
+      (property tests over 20 random pin sets).
 - [ ] Vetting is deterministic and stores the vetted seed; two seeds with different
       seeded stats can get different verdicts (test on the tiny world).
 - [ ] Quick calibration passes. `npm run calibrate` passes; its table is in the
       handoff note. If it does not, the handoff note shows which events and buckets
       miss, with numbers, and the question is in `docs/questions.md`.
-- [ ] The recompute budget holds, or the handoff note says where the time goes and
-      which fog knob values meet it (calibration still passing).
+- [ ] The re-run budget holds (`07` §4), or the handoff note says where the time goes
+      and which fog knob values meet it (calibration still passing).
 - [ ] Every invariant in `03` §18 has a test.
 
 ## Out of scope

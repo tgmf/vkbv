@@ -60,6 +60,9 @@
       16
     ]
   },
+  "timeline": {
+    "minSpanTicks": 36
+  },
   "end": {
     "afterAnchorTicks": 15
   },
@@ -69,7 +72,8 @@
     "displayBudget": 24
   },
   "budgets": {
-    "recomputeMs": 100
+    "recomputeMs": 100,
+    "rerunTps": 120
   },
   "calibration": {
     "seeds": 400,

@@ -14,7 +14,7 @@ export const TuningSchema = z.strictObject({
       .describe('"full" = all 12 cats; "core" = only cats marked core: true (05 §3)'),
   }),
   waves: z.strictObject({
-    checkpointEvery: int('Ticks between checkpoints of the played stretch (03 §17)').min(1),
+    checkpointEvery: int('Ticks between checkpoints of the lantern (03 §17)').min(1),
     anchorConditioning: bool(
       'Treat the anchor as already seen: case weights lean toward reaching it (03 §14)',
     ),
@@ -28,7 +28,7 @@ export const TuningSchema = z.strictObject({
     maxLinks: int('Links besides the weather (03 §13.5)').min(0),
     linkFloorPpm: ppm('A lasting meeting effect becomes a link above this, about 5%'),
     contributors: int('Contributor heap size per fact, flag and heard (03 §13.5)').min(1),
-    frayBelowPpm: ppm('The projection frays below this chance of reaching the anchor (03 §16)'),
+    frayBelowPpm: ppm('A projection frays below this chance of reaching the anchor (03 §16)'),
     exactTolerancePpm: ppm('Tiny-world exactness test tolerance (03 §18)'),
   }),
   lantern: z.strictObject({
@@ -74,6 +74,11 @@ export const TuningSchema = z.strictObject({
       .min(1)
       .describe('Playback speeds, ticks per real second'),
   }),
+  timeline: z.strictObject({
+    minSpanTicks: int(
+      'The bar spans at least this many ticks, then rescales to keep the lantern edge on the right (06 §3)',
+    ).min(1),
+  }),
   end: z.strictObject({
     afterAnchorTicks: int('Ticks shown after the meeting').min(0),
   }),
@@ -83,7 +88,8 @@ export const TuningSchema = z.strictObject({
     displayBudget: int('Most cat markers drawn at rest (06 §2)').min(1),
   }),
   budgets: z.strictObject({
-    recomputeMs: int('Median recompute time budget after an edit (07 §4)').min(1),
+    recomputeMs: int('Median time from an edit to the re-run’s first streamed frames (07 §4)').min(1),
+    rerunTps: int('Ticks per second a re-run streams at, at least (07 §4)').min(1),
   }),
   calibration: z.strictObject({
     seeds: int('Seeds in the full calibration run (07 §3)').min(1),

@@ -21,8 +21,9 @@ A single-page browser game, playable in 15 to 25 minutes on first try. Chapter 1
 - **Player:** the Filter's programming, not a character. The player watches,
   inspects objects in the flat to find cards, pins cards on cats, objects and places,
   uses two powers (the lure, which projects a glowing cat, and Gaze, which fixes a
-  small circle of the world into fact), and scrolls the day back and forth. Every pin
-  sits on the one timeline; the wave is recomputed from the pins.
+  small circle of the world into fact), and scrolls back and forth through the part of
+  the day already played. Every pin sits on the one timeline; after an edit the day is
+  re-run from the pins up to where the story was played (the frontier limit).
 
 There are two builds from the same code:
 
@@ -63,11 +64,12 @@ everything below must emerge from the rules in `03` to `05`.
    arrives.
 3. The player inspects the five objects in the flat and gets five cards, tries some on
    Marti. Little happens, but the charge payouts start to grow.
-4. The player scrolls ahead. Some time between 11:00 and 13:00 it rains; when the rain
-   stops, Rokko leaves the beach and the timeline frays.
-5. The rain's start makes the lure affordable. The player places it at the front door.
-   Marti goes to the door and turns back. The player learns to prime him (an empty
-   kettle, light pockets, a strong question itch) and tries again. Marti steps out.
+4. The player plays on, faster. Some time between 11:00 and 13:00 it rains; when the
+   rain stops, Rokko leaves the beach and the timeline frays.
+5. The rain's start made the lure affordable. The player scrolls back and places it at
+   the front door; the day re-runs up to the new story and stops. Playing on, Marti goes
+   to the door and turns back. The player learns to prime him (an empty kettle, light
+   pockets, a strong question itch) and tries again. Marti steps out.
 6. He walks his usual way toward the tea shop and the town is revealed. The road is
    open: either the shop is open and he settles in with tea, or it closed early and he
    may wander to the sea. Usually the timeline still frays.
@@ -126,4 +128,6 @@ Code names that differ from the prose words:
 | the Filter dial | `temperatureTenths` |
 | a noise stream (0 in the lantern; others in single-history mode) | `stream` |
 | frontier limit | `frontierLimit` |
+| lantern edge | `lanternEdge` (a re-run result's `edge`) |
+| re-run | `rerun` |
 | fray | `end.kind === 'fray'` |

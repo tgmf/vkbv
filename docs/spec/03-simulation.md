@@ -7,9 +7,10 @@ probabilities). It knows nothing about the hand, charge, the journal or the scre
 
 This file has two halves. §1–§11 define **one history**: state, one step, and every
 condition, score and effect in the content language; the lantern runs exactly this.
-§12–§18 define **the wave**: the fog's cat chains and cases, the lantern's edge where
-fog becomes fact, observation, and recompute (decided 2026-11-21; it replaces the
-weighted histories of the 2026-11-21 pack). The content format is the one in `src/content/data/ch1/` (see `05`); every
+§12–§18 define **the wave**: the fog's cat chains and cases, placement where fog
+becomes fact, observation, and the re-run after an edit (decided 2026-11-21; it
+replaces the weighted histories of the 2026-11-21 pack; the lantern edge and re-runs
+decided 2026-11-22). The content format is the one in `src/content/data/ch1/` (see `05`); every
 key named here appears there.
 
 Words follow the glossary (`docs/glossary.md`). In code, a place is a `node`.
@@ -67,7 +68,7 @@ Scopes used by the simulation:
 | `s<stream>:<catId>` | a cat's sampled noise: activity choices, durations, places. Stream 0 in the lantern; other streams only in single-history mode (§12.4). Initial gauges always use `s0:<catId>` (§5) |
 | `s<stream>:world` | sampled world noise: `chance` effects, `randomNode`. Stream 0 in the lantern |
 | `s<stream>:branch` | branch outcomes in single-history mode and in the lantern (§12.4) |
-| `obs` | placement at the lantern's edge, observation and Gaze (§15) |
+| `obs` | placement, observation and Gaze (§15) |
 | `render` | focus samples for the renderer (§16); never read by the simulation |
 
 `hashState(state)`: FNV-1a 32-bit (the first loop of `hash32`, no finalizer) over the
@@ -144,7 +145,7 @@ cat's current region unless the selector names a `node`, a `region` or is
 
 One function, `perceives(state, catId, source, sense, world)`, answers whether a cat
 can sense something this tick. It is used by the simulation (`heard`, hook `onEvent`,
-`factIfPerceivedBy`, object `onPerceived`) and by observation and the lantern's edge (§15). It is the only
+`factIfPerceivedBy`, object `onPerceived`) and by observation and placement (§15). It is the only
 place where sight and hearing are computed.
 
 ```
@@ -608,6 +609,13 @@ until `tuning.end.afterAnchorTicks` ticks after `anchor.reachedAt`.
 anchor when the anchor fact is set; it is **dead** from the tick `fraysIf` first holds
 without the anchor fact, or at the last tick of the chapter if it never reached it.
 
+A **main storylet** is one with an effect (`fact`, or `factIfPerceivedBy` on an
+`emit`) that sets a fact named in the requirement tree, the anchor fact included; every
+other storylet is a **side storylet**. The list is derived at load, never authored
+(Chapter 1: `door_lure`, `blocked_road`, `usual_route`, `chain_on_beach`,
+`tideline_wander`, `rokko_morning`, `under_the_boat`). Only main storylets stop a
+re-run (`04` §6).
+
 ### 12.3 Requirement progress
 
 `progressOf(state)` = Σ weights of requirement items satisfied in that state (an `any`
@@ -639,17 +647,23 @@ from them, so they are honest by construction. Where the fog is an approximation
 this section says so. Calibration (`07` §3) measures how far it drifts from the
 reference simulation.
 
-### 13.1 Played stretch and projection
+### 13.1 The lantern edge and the projection
 
-- The **played stretch** is ticks `0 .. playedTo`, the ticks watched in playback on the
-  current timeline (`04` §6). On it the lantern exists: Marti is live, the weather is
-  concrete (sampled as in §12.4 with stream 0), and placed cats are live (§15).
-- The **projection** is ticks `playedTo + 1 .. world.ticks`. Everything there is fog,
-  protagonists included: each protagonist's chain starts as a point mass at his live
-  state at `playedTo`. Ghosts ahead of the playhead, the anchor's odds and the fray come
-  from the projection.
-
-Before anything is played, `playedTo = 0` and the projection covers the whole day.
+- The **lantern edge** (glossary) is the last tick of the current timeline's lantern.
+  On ticks `0 .. lanternEdge` the lantern exists: Marti is live and simulated
+  directly from tick 0, the weather is concrete (sampled as in §12.4 with stream 0),
+  and placed cats are live (§15). The fog holds every other cat. The playhead never
+  passes the lantern edge, and nothing past it is drawn, placed or observed.
+- The edge moves in two ways only: **live playback** at the edge advances the lantern
+  one tick at a time (§15.2), and a **re-run** after an edit simulates the lantern again
+  from the edit tick to the frontier limit (§17, `04` §6). A new game starts with
+  `lanternEdge = 0`.
+- A **projection from tick `t`** advances the fog alone from `t` to the chapter's end:
+  every cat live at `t` becomes a point mass at its live state. It is computed, never
+  drawn. The **whole-day projection** starts at tick 0 with no cat live (Marti in the
+  fog like everyone else) and serves seed vetting (`04` §2), calibration (`07` §3) and
+  the balance measures (`05` §5.2). Nothing in play needs a projection, except `strain`
+  in the debug panel (§14).
 
 ### 13.2 Cat chains
 
@@ -725,9 +739,9 @@ terms: it calls the same code with fog inputs.
 
 ### 13.4 Live and fogged cats
 
-On the played stretch each cat is either **live** (part of the lantern) or **fogged**:
+Up to the lantern edge each cat is either **live** (part of the lantern) or **fogged**:
 
-- Marti, and every followed protagonist, is live on the whole played stretch.
+- Marti, and every followed protagonist, is live at every tick up to the lantern edge.
 - A fogged cat becomes live when it is **placed** (§15.1).
 - A live cat that no protagonist has perceived for `tuning.lantern.releaseAfterTicks`
   ticks is **released**: at the next step boundary it returns to the fog as a point
@@ -755,8 +769,8 @@ that case, every fogged cat's chain and every fog quantity. Cats are independent
 the case; correlation between cats comes only through cases. (This is a factored
 forward pass in the style of Boyen and Koller.)
 
-- **Weather.** On the played stretch the weather is concrete and there is one weather
-  case. In the projection the weather case moves by the hazards of §7, using the exact
+- **Weather.** Up to the lantern edge the weather is concrete and there is one weather
+  case. In a projection the weather case moves by the hazards of §7, using the exact
   start-time distribution for `minDurationTicks` (the weather alone is tracked tick by
   tick with its start tick; cats only see the three states).
 - **Links** are boolean facts or storylet states read by several cats, so that the
@@ -851,7 +865,7 @@ with live cats and lantern storylets; the fog step (weather case, links, storyle
 chains, quantities, events, perception between fogged cats); then the lantern edge
 (§15.1). Lantern effects on the fog (an event emitted, a fact set, a cat spooked) are
 applied to the fog in the same tick; fog quantities read by live cats are read as ppm
-(§13.3). In the projection there is no lantern: only fog steps.
+(§13.3). In a projection there is no lantern: only fog steps.
 
 **Backward pass.** When evidence arrives at tick `t` (a placement, a negative
 observation, a watched fact, a Gaze sample, or the anchor treated as already seen):
@@ -868,18 +882,23 @@ observation, a watched fact, a Gaze sample, or the anchor treated as already see
    defer it until those frames are requested.
 4. **Forward again.** The fog is re-advanced from `t` with the new weights.
 
-**Anchor treated as already seen.** With `tuning.waves.anchorConditioning` on, the
+**Anchor treated as already seen.** With `tuning.waves.anchorConditioning` on, a
 projection's case weights are multiplied by P(anchor reached | case) at the chapter's
 end, so unwatched odds lean toward the anchor. Chains inside a case are not
 re-weighted (an approximation). With the knob off, or when no case reaches the anchor,
-raw weights are used. **Strain** (debug panel only) is the unconditioned P(anchor).
+raw weights are used. **Strain** (debug panel only) is the unconditioned P(anchor) of a
+projection from the lantern edge, computed only while the debug panel is open.
+
+Open (`docs/questions.md` M2-2): nothing past the lantern edge is drawn, so
+conditioning a projection no longer changes anything the player sees. Until Tagir
+settles it, the knob stays and acts on projections only.
 
 ## 15. Observation and Gaze
 
-### 15.1 The lantern's edge: placement
+### 15.1 Placement
 
-Every tick on the played stretch, after `step`, for each followed protagonist `P` and
-each fogged cat `c`, in cast order:
+Every tick the lantern advances (in live playback or in a re-run), after `step`, for
+each followed protagonist `P` and each fogged cat `c`, in cast order:
 
 1. `q` = the probability, over `c`'s chain in the current case mixture, that `P`
    perceives `c` by sight (§4, from `c`'s state position).
@@ -910,9 +929,11 @@ else, and `stats.localCauses` counts it.
 
 ### 15.2 Watching (playback)
 
-During playback the player layer calls `observe(t, P)` (`04` §6) once per tick that
-passes. The worker advances the lantern and the fog to `t` (§14, §15.1) and returns a
-**watched fact** `{ tick, cat: P, digest, summary }`. The perceived view and its
+During playback the player layer calls `observe(t, P)` (`04` §7) once per tick that
+passes. If `t` is the lantern edge, the worker first advances the lantern and the fog
+one tick (§14, placement §15.1) and the edge moves to `t + 1`; otherwise the lantern at
+`t` already exists (from earlier playback or a re-run) and nothing is recomputed. It
+returns a **watched fact** `{ tick, cat: P, digest, summary }`. The perceived view and its
 `digest` are as before: `P`'s own position, activity, interrupt and storylet states;
 every cat `P` perceives by sight with its position and activity; every event of tick
 `t` `P` perceives, with the fields that sense reveals; the weather. `summary` lists
@@ -922,10 +943,12 @@ other events by name, cats seen, `nodesSeen` (nodes `P` perceives by sight, each
 sight source at its position), and for each storylet state or detector its `paidBy`:
 the `touchedBy` pins of the live cats bound to its roles (or involved in the
 detector). It also carries `totalPressure`: the summed pressure of all live cats plus
-the expected pressure of the fogged ones. Then `playedTo = t` and the projection is
-recomputed from `t + 1`.
+the expected pressure of the fogged ones.
 
-The same seed, pins and tick give the same watched fact.
+The same seed, pins and tick give the same watched fact. A re-run places cats exactly
+as playback would (the draws of §15.1 do not depend on whether anyone watches), so
+playing over re-run ticks watches what the re-run showed; only playback records watched
+facts and pays (`04` §7).
 
 ### 15.3 Links on demand
 
@@ -948,10 +971,10 @@ paid (`04` §7) and earn no payouts.
 
 ### 15.5 Imposed facts (replay)
 
-Watched facts are passed into every recompute. When an edit at tick `e` lies inside
-the played stretch, the worker replays from the checkpoint at or before `e` with the
-new pins and the same draws. At each watched fact's tick it compares the lantern's view
-with the fact:
+Watched facts are passed into every re-run (repeat by default). After an edit at tick
+`e`, the re-run replays from the checkpoint at or before `e` with the new pins and the
+same draws. At each watched fact's tick it reaches, it compares the lantern's view with
+the fact:
 
 - Parts about cats other than `P` that differ: if the cat's chain (or, for a live cat
   that the edit changed, its chain from the tick it diverged) gives the watched
@@ -963,14 +986,18 @@ with the fact:
   together have less than that probability. When a watched fact reopens is an open
   question (glossary, Open conflicts 2): keep the knob, do not change its default.
 
+Watched facts past the tick where the re-run stops are kept and tested the same way
+when live playback reaches them (open: `docs/questions.md` M2-4).
+
 ## 16. Fray and frames
 
-**Fray.** On the played stretch, the timeline frays at the tick `fraysIf` holds live
-without the anchor fact. In the projection it frays at the first tick from which the
-anchor's probability of being reached is below `tuning.fog.frayBelowPpm` (1 000). The
-timeline ends there.
+**Fray.** The lantern frays at the tick `fraysIf` holds in it (a gate, §13.3) without
+the anchor fact. The timeline ends there: neither playback nor a re-run passes it. A
+projection frays at the first tick from which the anchor's probability of being
+reached is below `tuning.fog.frayBelowPpm` (1 000); that fray matters only to vetting,
+calibration and the balance measures.
 
-**Frames.** For each tick the worker aggregates what the renderer and the player layer
+**Frames.** For each tick up to the lantern edge the worker aggregates what the renderer and the player layer
 need (`02` §4): per cat, the distinct `(position, activity, interrupt)` with their
 probabilities in ppm (a live cat has one at 1 000 000); per event kind and storylet
 state, the probability it happens at that tick; the probability it is raining; the
@@ -979,28 +1006,41 @@ coherent trajectories for the renderer's focus layer (`06` §2), made by drawing
 by weight and then backward-sampling each fogged cat's chain in that case (purpose
 `"focus:" + k`, scope `render`, never `obs`). Frames are derived and never saved.
 
-## 17. Recompute
+## 17. Re-run
 
 The worker keeps a **checkpoint** of the lantern state and the fog (cases, chains,
-quantities) every `tuning.waves.checkpointEvery` ticks of the played stretch. After an
-edit at tick `e`:
+quantities) every `tuning.waves.checkpointEvery` ticks of the lantern. Every edit lies
+at or before the lantern edge (pins sit at the playhead, `04` §3). After an edit at tick
+`e`, the **re-run** replays the lantern and the fog from the last checkpoint at or
+before `e` (§14, placement §15.1, imposed facts §15.5) and runs on, tick by tick, until
+the first of:
 
-- `e > playedTo`: only the projection is recomputed, from `e`.
-- `e ≤ playedTo`: replay from the last checkpoint at or before `e` (§15.5), then
-  recompute the projection.
+- the **frontier limit** (`04` §6), which the worker evaluates on the lantern as it
+  goes, from the frontier the request carries (`02` §3);
+- the fray (§16);
+- the chapter's end (§12.1).
 
-After a watched fact is added, only §15.1 and §15.2 run for that tick, then the
-projection is recomputed.
+The lantern edge becomes that tick. The re-run **streams**: it sends frames to the UI
+as it advances (`02` §3), so the scrubber fills from `e` like a video buffering. It
+observes nothing, records nothing and pays nothing (§15.2). Frames before `e` are
+unchanged, except where the backward pass smooths them (§14).
 
-A recompute returns `{ frames, end, reopened, breaks, gazeFacts, stats }` where `end`
-is `{ kind: 'anchor' | 'fray' | 'chapterEnd', tick }` and `stats` holds, per tick, the
-number of cases, live cats and fog states, plus recompute time, strain and
-`localCauses` (debug only).
+Live playback at the edge (§15.2) advances the lantern one tick and runs nothing else.
+
+A re-run returns `{ frames, edge, end, reopened, breaks, gazeFacts, stats }` where `edge`
+is the new lantern edge and `end` is `{ kind: 'anchor' | 'fray' | 'chapterEnd' |
+'limit', tick }`: how the lantern ends (`'limit'` when it stopped at the frontier limit;
+its tick is the edge). `stats` holds, per tick, the number of cases, live cats and fog
+states, plus re-run time, strain and `localCauses` (debug only).
 
 ## 18. What must always hold (tests)
 
-- Same content, seed, pins and watched facts → identical recompute results, on every
-  run and in every browser engine the e2e suite covers.
+- Same content, seed, pins, watched facts and frontier → identical re-run results, on
+  every run and in every browser engine the e2e suite covers.
+- A re-run and live playback over the same ticks give the same lantern (same state
+  hashes, same placements); playback only adds watched facts.
+- A re-run stops at the frontier limit, the fray or the chapter's end, whichever comes
+  first; the lantern edge is that tick, and no frame exists past it.
 - Every number in every state is an integer; every gauge value is within its range;
   every cat's chain sums to 1 000 000 in every case; case weights sum to
   `WAVE_TOTAL`.
@@ -1020,4 +1060,5 @@ number of cases, live cats and fog states, plus recompute time, strain and
 - **Calibration** (`07` §3): over many seeds, a probability shown at one tick matches
   how often the event happens in the reference simulation, bucket by bucket.
 - With an empty log, for seeds 1 to 50, Marti is in region `flat` at every tick: live
-  on the played stretch, and with all his chain's mass there in the projection.
+  in a headless playback to the chapter's end, and with all his chain's mass there in
+  the whole-day projection.
