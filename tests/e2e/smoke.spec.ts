@@ -25,8 +25,8 @@ test('the shell loads, switches language and starts the worker', async ({ page }
 test('?debug=1 lists every tuning knob with its description', async ({ page }) => {
   await page.goto('./?debug=1');
   const debug = page.getByTestId('debug');
-  await expect(debug).toContainText('waves.cap');
-  await expect(debug).toContainText('Most histories kept after trimming');
+  await expect(debug).toContainText('fog.maxLinks');
+  await expect(debug).toContainText('Links besides the weather');
   await page.screenshot({ path: 'test-results/smoke-debug.png' });
   await page.keyboard.press('`');
   await expect(debug).toBeHidden();

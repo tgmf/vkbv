@@ -4,12 +4,24 @@
     "castMode": "full"
   },
   "waves": {
-    "initialHistories": 32,
-    "cap": 128,
-    "floorPpm": 20000,
-    "rejuvenateBelow": 16,
     "checkpointEvery": 30,
     "anchorConditioning": true
+  },
+  "fog": {
+    "stepTicks": 5,
+    "minStatePpm": 100,
+    "bands": 4,
+    "maxBandedGauges": 3,
+    "gateThresholdPpm": 500000,
+    "maxLinks": 2,
+    "linkFloorPpm": 50000,
+    "contributors": 4,
+    "frayBelowPpm": 1000,
+    "exactTolerancePpm": 20000
+  },
+  "lantern": {
+    "releaseAfterTicks": 30,
+    "dwellTicks": 5
   },
   "observation": {
     "reopenBelowPpm": 0

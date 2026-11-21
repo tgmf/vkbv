@@ -14,22 +14,32 @@ export const TuningSchema = z.strictObject({
       .describe('"full" = all 12 cats; "core" = only cats marked core: true (05 §3)'),
   }),
   waves: z.strictObject({
-    initialHistories: int('Histories (streams) at tick 0 (03 §13)').min(1),
-    cap: int('Most histories kept after trimming (03 §14)').min(1),
-    floorPpm: ppm(
-      'Importance floor: a signature group at least this heavy always keeps a slot (03 §14)',
-    ),
-    rejuvenateBelow: int(
-      'Refill the wave with fresh streams when pruning leaves fewer histories (03 §13)',
-    ).min(0),
-    checkpointEvery: int('Ticks between wave checkpoints for recompute (03 §17)').min(1),
+    checkpointEvery: int('Ticks between checkpoints of the played stretch (03 §17)').min(1),
     anchorConditioning: bool(
-      'Treat the anchor as already seen: weights conditioned on reaching it (03 §16)',
+      'Treat the anchor as already seen: case weights lean toward reaching it (03 §14)',
     ),
+  }),
+  fog: z.strictObject({
+    stepTicks: int('Ticks per fog step (03 §13.2)').min(1),
+    minStatePpm: ppm('Chain states below this are dropped and the chain renormalised'),
+    bands: int('Bands per changing gauge (03 §13.2)').min(1),
+    maxBandedGauges: int('Banded gauges per cat; the rest are mean-field').min(0),
+    gateThresholdPpm: ppm('A gate holds in the fog at this probability (03 §13.3)'),
+    maxLinks: int('Links besides the weather (03 §13.5)').min(0),
+    linkFloorPpm: ppm('A lasting meeting effect becomes a link above this, about 5%'),
+    contributors: int('Contributor heap size per fact, flag and heard (03 §13.5)').min(1),
+    frayBelowPpm: ppm('The projection frays below this chance of reaching the anchor (03 §16)'),
+    exactTolerancePpm: ppm('Tiny-world exactness test tolerance (03 §18)'),
+  }),
+  lantern: z.strictObject({
+    releaseAfterTicks: int(
+      'Ticks unperceived before a live cat returns to the fog (03 §13.4)',
+    ).min(1),
+    dwellTicks: int('Ticks a placed cat keeps its activity before deciding (03 §15.1)').min(0),
   }),
   observation: z.strictObject({
     reopenBelowPpm: ppm(
-      'A watched fact reopens if surviving weight falls below this; 0 = only when impossible (open question, keep 0)',
+      'A watched fact reopens if its forced parts fall below this probability; 0 = only when impossible (open question, keep 0)',
     ),
   }),
   sifting: z.strictObject({
@@ -69,7 +79,7 @@ export const TuningSchema = z.strictObject({
   }),
   render: z.strictObject({
     focusLayerHz: int('Focus layer refresh rate, at most 3 (06 §2)').min(1).max(3),
-    focusSamples: int('Histories per tick offered to the focus layer (03 §16)').min(1),
+    focusSamples: int('Coherent trajectories offered to the focus layer (03 §16)').min(1),
     displayBudget: int('Most cat markers drawn at rest (06 §2)').min(1),
   }),
   budgets: z.strictObject({

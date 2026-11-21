@@ -16,14 +16,14 @@ const problemsOf = (fn: () => unknown): string[] => {
 
 describe('tuning.json', () => {
   it('loads', () => {
-    expect(loadTuning(tuningJson).waves.cap).toBe(128);
+    expect(loadTuning(tuningJson).fog.maxLinks).toBe(2);
   });
 
   it.each([1.5, 'many'])('a value of %j fails and names the key', (bad) => {
-    const broken = { ...tuningJson, waves: { ...tuningJson.waves, cap: bad } };
+    const broken = { ...tuningJson, fog: { ...tuningJson.fog, maxLinks: bad } };
     const problems = problemsOf(() => loadTuning(broken));
     expect(problems).toHaveLength(1);
-    expect(problems[0]).toContain('waves.cap');
+    expect(problems[0]).toContain('fog.maxLinks');
     expect(problems[0]).toContain(JSON.stringify(bad));
   });
 
