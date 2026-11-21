@@ -100,4 +100,21 @@ cheaper steps (fewer clones, incremental decisions) will be needed. M2's brief a
 `waves.cap`, not changing `03`.
 Answer:
 
+## M2-1 — The fog is far over the recompute budget            (status: open)
+Where: `07` §4; `03` §13.2; measured in `docs/handoff/M2.md`
+Question: One fog step of one case costs 66 ms with the spec's knobs and 7 ms with the most
+aggressive (`minStatePpm` 20 000, 2 bands); the budget allows about 1 ms (104 steps × up to 12
+cases in 100 ms). `07` §4 says not to change the algorithm in `03` and to ask.
+Options seen:
+(a) keep the algorithm, make each state cheaper: decisions cached across steps and cases by
+    what they read, integer-coded states instead of objects and JSON keys. Perhaps 5–10×; unsure.
+(b) a coarser chain state (spec change): drop `leftSteps` and finish activities at a per-step
+    hazard of 1/mean duration, so a cat has a few states per place instead of one per remaining
+    step. Perhaps 5–10× fewer states; changes `03` §13.2 and what calibration measures.
+(c) progressive recompute (spec change, `02` §3, `03` §17, `07` §4): steps near the edit first,
+    the rest of the day streamed after.
+(d) a larger budget.
+Chosen for now: none; steps 4–8 wait.
+Answer:
+
 <!-- Gate notes and answers go above this line. -->
