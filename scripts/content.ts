@@ -1,60 +1,17 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
-import { contentSchemas } from '../src/content/schemas/index';
+// `npm run content:check`: runs the content loader in Node (spec 02 §5).
+// ch1/ is validated from M1 on (M0 brief, item 6).
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { ContentError, loadAll } from '../src/content/load';
 
-export const CONTENT_DIR = join(import.meta.dirname, '..', 'src', 'content', 'data');
+const DATA = join(import.meta.dirname, '..', 'src', 'content', 'data');
+const read = (file: string): unknown => JSON.parse(readFileSync(join(DATA, file), 'utf8'));
 
-export interface ContentError {
-  readonly file: string;
-  readonly message: string;
-}
-
-export interface ContentReport {
-  readonly checked: number;
-  readonly errors: readonly ContentError[];
-}
-
-/** Validates every src/content/data/<kind>/*.json against the schema registered for <kind>. */
-export function validateContent(root: string = CONTENT_DIR): ContentReport {
-  const errors: ContentError[] = [];
-  let checked = 0;
-
-  for (const kind of readdirSync(root)) {
-    const dir = join(root, kind);
-    const rel = (p: string) => relative(root, p).replaceAll('\\', '/');
-    if (!statSync(dir).isDirectory()) {
-      errors.push({ file: rel(dir), message: 'content files must live in a <kind>/ folder' });
-      continue;
-    }
-    const schema = contentSchemas[kind];
-    if (!schema) {
-      errors.push({ file: rel(dir), message: `no schema registered for kind '${kind}'` });
-      continue;
-    }
-    for (const name of readdirSync(dir)) {
-      const file = join(dir, name);
-      if (!name.endsWith('.json')) {
-        errors.push({ file: rel(file), message: 'only .json files are allowed' });
-        continue;
-      }
-      checked++;
-      let data: unknown;
-      try {
-        data = JSON.parse(readFileSync(file, 'utf8'));
-      } catch (e) {
-        errors.push({ file: rel(file), message: `invalid JSON: ${(e as Error).message}` });
-        continue;
-      }
-      const result = schema.safeParse(data);
-      if (!result.success) {
-        for (const issue of result.error.issues) {
-          errors.push({
-            file: rel(file),
-            message: `${issue.path.join('.') || '<root>'}: ${issue.message}`,
-          });
-        }
-      }
-    }
-  }
-  return { checked, errors };
+try {
+  loadAll({ tuning: read('tuning.json'), uiEn: read('ui/en.json'), uiRu: read('ui/ru.json') });
+  console.log('content OK: tuning.json, ui/en.json, ui/ru.json (ch1/ is checked from M1)');
+} catch (e) {
+  if (!(e instanceof ContentError)) throw e;
+  console.error(e.message);
+  process.exit(1);
 }

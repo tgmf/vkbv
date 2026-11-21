@@ -1,0 +1,47 @@
+# CI from docs/spec/07-quality.md §7.
+name: ci
+
+on: [push]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run content:check
+      - run: npm run check
+      - run: npm run build # includes the gzipped size check (07 §4)
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: test-results/
+
+  # Note for Tagir: deploying is switched off until you enable it.
+  # 1. GitHub Pages on main: enable Pages (source: GitHub Actions) in the repository settings,
+  #    then uncomment this job.
+  # deploy:
+  #   if: github.ref == 'refs/heads/main'
+  #   needs: check
+  #   runs-on: ubuntu-latest
+  #   permissions: { pages: write, id-token: write }
+  #   environment: { name: github-pages }
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with: { node-version-file: .nvmrc, cache: npm }
+  #     - run: npm ci && npm run build
+  #     - uses: actions/upload-pages-artifact@v3
+  #       with: { path: dist }
+  #     - uses: actions/deploy-pages@v4
+  #
+  # 2. itch.io: a separate, manual workflow (workflow_dispatch) that builds and runs
+  #    `butler push dist <user>/<game>:html5` with the BUTLER_API_KEY repository secret.
+  #    Never run it from a coding session.

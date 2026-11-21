@@ -1,12 +1,7 @@
-import type { z } from 'zod';
-import { PaletteSchema } from './palette';
+import { z } from 'zod';
 
-/**
- * Maps each content folder under src/content/data/<kind>/ to the schema its JSON files must satisfy.
- * A folder with no entry here fails validation.
- */
-export const contentSchemas: Readonly<Record<string, z.ZodType>> = {
-  palettes: PaletteSchema,
-};
+export { TuningSchema, tuningRows, type Tuning, type TuningRow } from './tuning';
 
-export { PaletteSchema, type Palette } from './palette';
+/** Text tables: src/content/data/ui/*.json and ch1/text/*.json. */
+export const TextSchema = z.record(z.string(), z.string().min(1));
+export type TextTable = z.infer<typeof TextSchema>;
