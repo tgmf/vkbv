@@ -1,0 +1,21 @@
+{
+  "powers": [
+    {
+      "id": "lure", "nameKey": "power.lure.name", "textKey": "power.lure.text",
+      "cost": 100, "targets": ["place"], "radiusM": 25, "ticks": 30,
+      "affects": { "kinds": ["protagonist"], "orTemperatureTenthsGte": 22 },
+      "effects": [
+        { "prim": "attract", "radiusM": 25, "strength": 3, "ticks": 30, "scale": { "primeCount": "marti", "add": 2 } },
+        { "prim": "triggerStorylet", "storylet": "door_lure", "ifTarget": "marti" }
+      ],
+      "leadTo": { "optional": true, "note": "Player may drag a destination node; the glowing cat walks there at walking pace and attracted cats follow." },
+      "pressure": 120
+    },
+    {
+      "id": "gaze", "nameKey": "power.gaze.name", "textKey": "power.gaze.text", "status": "proposed, in demo for testing",
+      "cost": 40, "targets": ["place"], "radiusM": 6, "ticks": 5,
+      "effects": [{ "prim": "collapse", "radiusM": 6, "ticks": 5, "sample": "currentOdds", "payout": false, "countsAsPaid": true }],
+      "pressure": 0
+    }
+  ]
+}

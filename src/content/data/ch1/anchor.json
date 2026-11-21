@@ -1,0 +1,24 @@
+{
+  "id": "anchor.meeting",
+  "nameKey": "anchor.meeting.name",
+  "teaserKey": "anchor.meeting.teaser",
+  "imposed": true,
+  "requirements": {
+    "all": [
+      { "fact": "martiOut", "weight": 20 },
+      { "fact": "martiOutInRain", "weight": 10 },
+      { "any": [{ "fact": "martiTurnedToSteps" }, { "fact": "martiWanderedToSea" }], "weight": 20 },
+      { "fact": "martiOnBeach", "weight": 15 },
+      { "any": [{ "fact": "followedChain" }, { "fact": "foundBoatByTide" }], "weight": 15 },
+      { "fact": "rokkoUnderBoat", "weight": 0, "note": "Rokko's side; conditioned, not taught" },
+      { "fact": "anchor.meeting", "weight": 20 }
+    ]
+  },
+  "fraysIf": {
+    "all": [
+      { "any": [{ "fact": "rokkoLeft" }, { "fact": "rokkoRanHome" }] },
+      { "not": { "fact": "anchor.meeting" } }
+    ]
+  },
+  "afterAnchor": { "lockedThread": "rokko", "endKey": "ui.end.locked_rokko" }
+}

@@ -1,0 +1,80 @@
+{
+  "range": [0, 1000],
+  "floor": 20,
+  "hooks": [
+    {
+      "id": "fearOfWater", "scope": "shared", "nameKey": "hook.fearOfWater", "driveKey": "drivekey.water",
+      "rise": [
+        { "when": { "all": [{ "weather": "rain" }, { "at": "self", "tag": "outdoor" }, { "not": { "at": "self", "tag": "sheltered" } }] }, "perTicks": 1, "add": 3 },
+        { "when": { "at": "self", "tag": "shore" }, "perTicks": 2, "add": 1 }
+      ],
+      "decay": { "when": { "at": "self", "tag": "indoor" }, "perTicks": 4, "add": -1, "toward": "initial" },
+      "voice": { "over": 650, "lines": ["line.water.1", "line.water.2", "line.water.3"] }
+    },
+    {
+      "id": "boxPull", "scope": "shared", "nameKey": "hook.boxPull", "driveKey": "drivekey.box",
+      "rise": [
+        { "when": { "any": [{ "at": "self", "tag": "box" }, { "flag": "boxHere", "at": "self" }] }, "perTicks": 1, "add": 6 }
+      ],
+      "decay": { "perTicks": 3, "add": -1 },
+      "voice": { "over": 700, "lines": ["line.box.1", "line.box.2"] }
+    },
+    {
+      "id": "sunbeamTax", "scope": "shared", "nameKey": "hook.sunbeamTax", "driveKey": "drivekey.sun",
+      "rise": [
+        { "perTicks": 4, "add": 1 },
+        { "when": { "all": [{ "at": "self", "tag": "sunny" }, { "weather": "dry" }] }, "perTicks": 1, "add": 4 }
+      ],
+      "voice": { "over": 700, "lines": ["line.sun.1", "line.sun.2"] }
+    },
+
+    {
+      "id": "teaCraving", "scope": "marti", "nameKey": "hook.teaCraving", "driveKey": "drivekey.tea",
+      "rise": [
+        { "perTicks": 3, "add": 1 },
+        { "when": { "flag": "kettleEmpty" }, "perTicks": 1, "add": 2 },
+        { "when": { "at": "self", "tag": "kettle" }, "perTicks": 2, "add": 1 }
+      ],
+      "voice": { "over": 600, "lines": ["line.marti.tea.1", "line.marti.tea.2", "line.marti.tea.3", "line.marti.tea.4"] }
+    },
+    {
+      "id": "pocketWeight", "scope": "marti", "nameKey": "hook.pocketWeight", "driveKey": "drivekey.pockets",
+      "rise": [],
+      "voice": { "under": 250, "lines": ["line.marti.pockets.light.1", "line.marti.pockets.light.2"], "over": 800, "linesOver": ["line.marti.pockets.heavy.1", "line.marti.pockets.heavy.2"] },
+      "effects": "light pockets: wander/scavenge scores +1 per 200 below 400; heavy: run score -3 above 750"
+    },
+    {
+      "id": "questionItch", "scope": "marti", "nameKey": "hook.questionItch", "driveKey": "drivekey.question",
+      "rise": [
+        { "onEvent": "curio.noticed", "add": 120 },
+        { "onEvent": "chatter.heard", "add": 80 },
+        { "when": { "at": "self", "tag": "window" }, "perTicks": 2, "add": 1 }
+      ],
+      "decay": { "perTicks": 6, "add": -1 },
+      "voice": { "over": 550, "lines": ["line.marti.itch.1", "line.marti.itch.2", "line.marti.itch.3", "line.marti.itch.4"] }
+    },
+
+    {
+      "id": "pillowStandards", "scope": "rokko", "nameKey": "hook.pillowStandards", "driveKey": "drivekey.pillow",
+      "rise": [
+        { "when": { "all": [{ "at": "self", "tag": "shore" }, { "activity": "self", "is": "doze" }] }, "perTicks": 1, "add": 4 },
+        { "onEvent": "sound.loud", "add": 60 }
+      ],
+      "decay": { "when": { "at": "self", "tag": "home" }, "perTicks": 1, "add": -5 },
+      "voice": { "over": 600, "lines": ["line.rokko.pillow.1", "line.rokko.pillow.2", "line.rokko.pillow.3"] }
+    },
+    {
+      "id": "contradictionItch", "scope": "rokko", "nameKey": "hook.contradictionItch", "driveKey": "drivekey.contrary",
+      "rise": [{ "onEvent": "chatter.agreement", "add": 150 }],
+      "decay": { "perTicks": 5, "add": -1 },
+      "voice": { "over": 600, "lines": ["line.rokko.contrary.1", "line.rokko.contrary.2"] }
+    },
+    {
+      "id": "swoonMeter", "scope": "rokko", "nameKey": "hook.swoonMeter", "driveKey": "drivekey.swoon",
+      "rise": [],
+      "decay": { "perTicks": 10, "add": -1 },
+      "voice": { "over": 500, "lines": ["line.rokko.swoon.1"] },
+      "note": "No one in chapter 1 to admire. Present so the engine carries a dormant hook."
+    }
+  ]
+}

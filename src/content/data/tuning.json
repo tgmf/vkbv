@@ -1,0 +1,72 @@
+{
+  "version": "ch1-0.2",
+  "content": {
+    "castMode": "full"
+  },
+  "waves": {
+    "initialHistories": 32,
+    "cap": 128,
+    "floorPpm": 20000,
+    "rejuvenateBelow": 16,
+    "checkpointEvery": 30,
+    "anchorConditioning": true
+  },
+  "observation": {
+    "reopenBelowPpm": 0
+  },
+  "sifting": {
+    "maxMatchesPerPattern": 8
+  },
+  "pressure": {
+    "decayPerTick": 2,
+    "cap": 2000
+  },
+  "voice": {
+    "cooldownTicks": 60,
+    "radiusM": 10
+  },
+  "charge": {
+    "floorOn": true,
+    "multCapPm": 3000
+  },
+  "frontier": {
+    "countAtPpm": 500000
+  },
+  "vetting": {
+    "requireFacts": [
+      "crewArrived",
+      "rainStarted",
+      "rokkoUnderBoat"
+    ],
+    "minPpm": 300000,
+    "maxCandidates": 20
+  },
+  "player": {
+    "playedCardRule": "pinned",
+    "playSpeedsTps": [
+      4,
+      16
+    ]
+  },
+  "end": {
+    "afterAnchorTicks": 15
+  },
+  "render": {
+    "focusLayerHz": 3,
+    "focusSamples": 8,
+    "displayBudget": 24
+  },
+  "budgets": {
+    "recomputeMs": 100
+  },
+  "calibration": {
+    "seeds": 400,
+    "seedsQuick": 60,
+    "minPerBucket": 20,
+    "tolerancePpm": 100000
+  },
+  "flags": {
+    "telemetry": true,
+    "assist": false
+  }
+}

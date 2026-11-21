@@ -1,0 +1,40 @@
+{
+  "note": "Event detectors: patterns over sim state/events. kernel clauses run in order; 'holds' + forTicks = a condition true for that many consecutive ticks; withinTicks = must follow the previous clause within that window. unless clauses kill the match. Each emits a fact.",
+  "detectors": [
+    {
+      "id": "marti_out_in_rain", "emits": "martiOutInRain",
+      "kernel": [{ "holds": { "all": [{ "fact": "martiOut" }, { "weather": "rain" }, { "at": "marti", "tag": "outdoor" }] }, "forTicks": 1 }]
+    },
+    {
+      "id": "marti_on_beach", "emits": "martiOnBeach",
+      "kernel": [{ "holds": { "at": "marti", "region": "beach" }, "forTicks": 1 }]
+    },
+    {
+      "id": "marti_soaked", "emits": "martiSoaked",
+      "kernel": [{ "holds": { "all": [{ "weather": "rain" }, { "at": "marti", "tag": "outdoor" }, { "not": { "at": "marti", "tag": "sheltered" } }] }, "forTicks": 10 }]
+    },
+    {
+      "id": "near_miss", "emits": "nearMiss",
+      "kernel": [
+        { "event": "barrier.fell", "at": "town.roadworks" },
+        { "holds": { "at": "marti", "node": "town.roadworks" }, "forTicks": 1, "withinTicks": 15 }
+      ]
+    },
+    {
+      "id": "waited_under_awning", "emits": "waitedUnderAwning",
+      "kernel": [{ "holds": { "all": [{ "weather": "rain" }, { "at": "marti", "node": "town.awning" }] }, "forTicks": 15 }]
+    },
+    {
+      "id": "streets_empty", "emits": "streetsEmpty",
+      "kernel": [
+        { "event": "rainStarted" },
+        { "holds": { "countCats": { "tag": "outdoor", "notTag": "sheltered", "except": ["marti"] }, "eq": 0 }, "forTicks": 1, "withinTicks": 30 }
+      ],
+      "unless": [{ "fact": "laundryRescued", "between": [0, 1], "note": "a rescue means someone was out helping; chaos test of unless" }]
+    },
+    {
+      "id": "rain_started", "emits": "rainStartedSeen",
+      "kernel": [{ "event": "rainStarted" }]
+    }
+  ]
+}

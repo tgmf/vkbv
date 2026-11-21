@@ -1,0 +1,38 @@
+{
+  "chapter": 1,
+  "status": "test-slice: placeholder chaos, not canon",
+  "startClock": "05:40",
+  "ticks": 900,
+  "tickMinutes": 1,
+  "anchor": "anchor.meeting",
+  "engineFacts": ["rainStarted", "rainStopped"],
+  "weather": {
+    "initial": "dry",
+    "rainStart": { "window": ["11:00", "13:00"], "perMille": 25 },
+    "rainStop": { "minDurationTicks": 110, "window": ["13:20", "17:00"], "perMille": 18 }
+  },
+  "perception": {
+    "rainSightPerMille": 400,
+    "rainHearingPerMille": 600,
+    "wallSightPerMille": 0,
+    "wallHearingPerMille": 350,
+    "doorHearingPerMille": 650,
+    "openWindowHearingPerMille": 900,
+    "openWindowSightPerMille": 0,
+    "note": "Effective range = base range x multipliers on the line between listener and source. Nodes tagged 'window' count as an open window while dry."
+  },
+  "primes": {
+    "cat": "marti",
+    "list": [
+      { "id": "itchy", "cond": { "gauge": "marti.questionItch", "gte": 600 } },
+      { "id": "noFreshTea", "cond": { "gauge": "marti.teaCraving", "gte": 450 } },
+      { "id": "lightPockets", "cond": { "gauge": "marti.pocketWeight", "lte": 300 } }
+    ]
+  },
+  "counters": {
+    "roadwork": { "start": 0, "target": 800, "note": "worker-minutes; one per working crew cat per tick" }
+  },
+  "tags": [
+    "indoor", "sheltered", "outdoor", "kettle", "sunny", "box", "shore", "home", "shop", "curio", "chain", "window"
+  ]
+}

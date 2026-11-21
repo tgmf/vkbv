@@ -1,0 +1,22 @@
+{
+  "note": "Inspect = a player action: tells the story (storyKey) and, the first time, grants a card. Objects with no card are flavour or event sources.",
+  "objects": [
+    { "id": "melmans_whistle", "node": "flat.study", "nameKey": "obj.melmans_whistle", "storyKey": "story.melmans_whistle", "grantsCard": "something_shiny" },
+    { "id": "chipped_teacup", "node": "flat.kitchen", "nameKey": "obj.chipped_teacup", "storyKey": "story.chipped_teacup", "grantsCard": "tea_break" },
+    { "id": "odds_jar", "node": "flat.hall", "nameKey": "obj.odds_jar", "storyKey": "story.odds_jar", "grantsCard": "irresistible_junk" },
+    { "id": "flea_comb", "node": "flat.hall", "nameKey": "obj.flea_comb", "storyKey": "story.flea_comb", "grantsCard": "sudden_flea" },
+    { "id": "old_box", "node": "flat.window_nook", "nameKey": "obj.old_box", "storyKey": "story.old_box", "grantsCard": "box", "tags": ["box"] },
+    { "id": "kettle", "node": "flat.kitchen", "nameKey": "obj.kettle", "storyKey": "story.kettle", "tags": ["kettle"] },
+    { "id": "salvage_shelf", "node": "flat.study", "nameKey": "obj.salvage_shelf", "storyKey": "story.salvage_shelf" },
+
+    { "id": "road_barrier", "node": "town.roadworks", "nameKey": "obj.road_barrier", "storyKey": "story.road_barrier", "visibleWhen": { "fact": "crewArrived" } },
+    { "id": "crate_stack", "node": "town.roadworks", "nameKey": "obj.crate_stack", "storyKey": "story.crate_stack", "tags": ["box"] },
+    { "id": "tea_shop_sign", "node": "town.lane_s", "nameKey": "obj.tea_shop_sign", "storyKey": "story.tea_shop_sign" },
+    { "id": "unclaimed_sock", "node": "town.dump_alley", "nameKey": "obj.unclaimed_sock", "storyKey": "story.unclaimed_sock", "tags": ["curio"] },
+    { "id": "laundry_baskets", "node": "town.laundry_yard", "nameKey": "obj.laundry_baskets", "storyKey": "story.laundry_baskets", "tags": ["box"] },
+
+    { "id": "rusty_chain", "node": "beach.chain_start", "nameKey": "obj.rusty_chain", "storyKey": "story.rusty_chain", "tags": ["curio", "chain"], "onPerceived": { "by": "marti", "emit": "curio.noticed", "fact": "chainNoticed" } },
+    { "id": "upturned_boat", "node": "beach.boat", "nameKey": "obj.upturned_boat", "storyKey": "story.upturned_boat", "tags": ["sheltered"] },
+    { "id": "green_bottle", "node": "beach.tideline", "nameKey": "obj.green_bottle", "storyKey": "story.green_bottle", "tags": ["curio"], "onPerceived": { "by": "marti", "emit": "curio.noticed" } }
+  ]
+}

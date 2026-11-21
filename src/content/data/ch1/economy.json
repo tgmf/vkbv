@@ -1,0 +1,38 @@
+{
+  "charge": { "start": 0, "cap": 300, "floorAtRainStart": 100, "variantRainStartPays": false },
+  "pressureScale": { "per": 50, "addPercent": 10, "note": "payout x (1 + 10% per 50 total pressure among cats present)" },
+  "payouts": {
+    "note": "Charge, first time a kind of event is watched. Keyed by kind (storylet state or detector), never by history.",
+    "storyletState": {
+      "door_lure.at_door": 15,
+      "door_lure.out": 60,
+      "roadworks_day.on_break": 10,
+      "roadworks_day.abandoned": 30,
+      "blocked_road.toward_steps": 40,
+      "blocked_road.detour_square": 15,
+      "usual_route.shop_closed": 20,
+      "chain_on_beach.following": 40,
+      "under_the_boat.meeting": 150,
+      "rokko_morning.under_boat": 10,
+      "crew_chatter.overheard": 20,
+      "parcel_drop.dropped": 5,
+      "laundry_panic.rescued": 10,
+      "pelageya_longing.paw_out": 15,
+      "ogryzok_trade.traded": 10,
+      "marti_cuppa.drinking": 5
+    },
+    "detector": {
+      "marti_soaked": 20,
+      "near_miss": 25,
+      "waited_under_awning": 15,
+      "streets_empty": 10,
+      "rain_started": 0
+    },
+    "anchorRequirement": 20
+  },
+  "cardsFromExploring": {
+    "inspectObject": "grantsCard (once)",
+    "discoverHook": { "teaCraving": "empty_teapot" },
+    "revealRegion": { "town": null, "beach": null }
+  }
+}

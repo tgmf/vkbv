@@ -1,0 +1,125 @@
+{
+  "note": "Free behaviour. Each decision point a cat softmaxes over the activities in its list whose gate passes (score / T, plus stickiness for the current one). 'at' says where it happens; the cat walks there first. 'while' runs per tick, 'onFinish' once.",
+  "stickiness": 2,
+  "decisionEveryTicks": 5,
+  "activities": [
+    {
+      "id": "sleep", "at": { "node": "$home" }, "ticks": [30, 90],
+      "score": { "base": -4, "terms": [{ "if": { "clock": ["20:30", "06:15"] }, "add": 9 }] }
+    },
+    {
+      "id": "groom", "at": { "node": "$here" }, "ticks": [3, 8],
+      "score": { "base": -1, "terms": [{ "gauge": "self.N", "per": 300, "add": 1 }] }
+    },
+    {
+      "id": "wander", "at": { "neighbour": true }, "ticks": [5, 15],
+      "gate": { "weather": "dry" },
+      "score": { "base": 0, "terms": [{ "gauge": "self.O", "per": 300, "add": 1 }] }
+    },
+    {
+      "id": "nap_sunbeam", "at": { "tag": "sunny" }, "ticks": [15, 40],
+      "gate": { "all": [{ "weather": "dry" }, { "clock": ["08:00", "17:00"] }] },
+      "score": { "base": -2, "terms": [{ "gauge": "self.sunbeamTax", "per": 200, "add": 1 }] },
+      "while": [{ "gauge": "self.sunbeamTax", "add": -3 }]
+    },
+    {
+      "id": "sit_in_box", "at": { "anyOf": [{ "tag": "box" }, { "flag": "boxHere" }] }, "ticks": [5, 20],
+      "score": { "base": -2, "terms": [{ "gauge": "self.boxPull", "per": 200, "add": 1 }] },
+      "while": [{ "gauge": "self.boxPull", "add": -4 }]
+    },
+    {
+      "id": "make_tea", "at": { "tag": "kettle", "region": "$homeRegion" }, "ticks": [6, 10],
+      "gate": { "not": { "flag": "kettleEmpty" } },
+      "score": { "base": -1, "terms": [{ "gauge": "self.teaCraving", "per": 200, "add": 1 }] },
+      "onFinish": [{ "gauge": "self.teaCraving", "set": 80 }, { "emit": "tea.made" }]
+    },
+    {
+      "id": "read_old_books", "at": { "node": "flat.study" }, "ticks": [20, 45],
+      "score": { "base": 1, "terms": [{ "gauge": "self.questionItch", "per": 400, "add": 1 }] },
+      "while": [{ "gauge": "self.questionItch", "add": 1, "everyTicks": 3 }]
+    },
+    {
+      "id": "look_out_window", "at": { "node": "flat.window_nook" }, "ticks": [8, 20],
+      "score": { "base": 0, "terms": [{ "if": { "weather": "rain" }, "add": 2 }, { "gauge": "self.questionItch", "per": 300, "add": 1 }] },
+      "onFinish": [{ "chance": 300, "emit": "curio.noticed" }]
+    },
+    {
+      "id": "tinker_salvage", "at": { "node": "flat.study" }, "ticks": [15, 30],
+      "score": { "base": 0, "terms": [{ "if": { "gauge": "self.pocketWeight", "lte": 400 }, "add": 2 }] },
+      "while": [{ "gauge": "self.pocketWeight", "add": 2, "everyTicks": 2 }]
+    },
+    {
+      "id": "pace_flat", "at": { "neighbour": true, "region": "flat" }, "ticks": [2, 5],
+      "score": { "base": -2, "terms": [{ "gauge": "self.questionItch", "per": 250, "add": 1 }, { "gauge": "self.teaCraving", "per": 350, "add": 1 }] }
+    },
+    {
+      "id": "flee_rain", "at": { "nearest": ["sheltered", "indoor"] }, "ticks": [1, 1],
+      "gate": { "all": [{ "weather": "rain" }, { "at": "self", "tag": "outdoor" }, { "not": { "at": "self", "tag": "sheltered" } }] },
+      "score": { "base": 2, "terms": [{ "gauge": "self.fearOfWater", "per": 100, "add": 1 }] }
+    },
+    {
+      "id": "shop_tea", "at": { "node": "town.tea_shop" }, "ticks": [15, 30],
+      "gate": { "all": [{ "flag": "shopOpen" }, { "at": "self", "region": "town" }] },
+      "score": { "base": 2, "terms": [{ "gauge": "self.teaCraving", "per": 150, "add": 1 }] },
+      "onFinish": [{ "gauge": "self.teaCraving", "set": 50 }, { "emit": "tea.shop" }]
+    },
+    {
+      "id": "work_road", "at": { "node": "town.roadworks" }, "ticks": [20, 40],
+      "gate": { "all": [{ "weather": "dry" }, { "fact": "crewArrived" }, { "counter": "roadwork", "lt": 800 }] },
+      "score": { "base": 5, "terms": [{ "gauge": "self.C", "per": 300, "add": 1 }] },
+      "while": [{ "counter": "roadwork", "add": 1 }]
+    },
+    {
+      "id": "tea_break", "at": { "anyOf": [{ "node": "town.roadworks" }, { "node": "town.tea_shop" }] }, "ticks": [10, 25],
+      "gate": { "fact": "crewArrived" },
+      "score": { "base": -3, "terms": [{ "if": { "pin": "tea_break", "near": "self", "m": 10 }, "add": 6 }, { "if": { "clock": ["09:00", "09:40"] }, "add": 3 }] },
+      "onFinish": [{ "emit": "chatter.tea" }]
+    },
+    {
+      "id": "chat", "at": { "nearCat": true, "m": 6 }, "ticks": [5, 15],
+      "score": { "base": -2, "terms": [{ "gauge": "self.E", "per": 250, "add": 1 }] },
+      "onFinish": [{ "chance": 400, "emit": "chatter.agreement" }]
+    },
+    {
+      "id": "keep_shop", "at": { "node": "town.tea_shop" }, "ticks": [30, 60],
+      "gate": { "flag": "shopOpen" },
+      "score": { "base": 6 }
+    },
+    {
+      "id": "bake", "at": { "node": "town.bakery" }, "ticks": [30, 60],
+      "gate": { "clock": ["05:40", "11:00"] },
+      "score": { "base": 5 },
+      "onFinish": [{ "emit": "smell.bread" }]
+    },
+    {
+      "id": "hang_laundry", "at": { "node": "town.laundry_yard" }, "ticks": [20, 40],
+      "gate": { "weather": "dry" },
+      "score": { "base": 4 },
+      "onFinish": [{ "flag": "laundryOut", "value": true }]
+    },
+    {
+      "id": "deliver_post", "at": { "randomNode": { "region": "town", "tag": "outdoor" } }, "ticks": [10, 20],
+      "gate": { "all": [{ "weather": "dry" }, { "clock": ["07:00", "12:30"] }] },
+      "score": { "base": 4 },
+      "onFinish": [{ "trigger": "parcel_drop" }]
+    },
+    {
+      "id": "hoard_junk", "at": { "node": "town.dump_alley" }, "ticks": [15, 40],
+      "score": { "base": 3 }
+    },
+    {
+      "id": "watch_rain", "at": { "node": "town.pelageya_window" }, "ticks": [20, 60],
+      "score": { "base": -1, "terms": [{ "if": { "weather": "rain" }, "add": 7 }] }
+    },
+    {
+      "id": "listen_to_sea", "at": { "tag": "shore" }, "ticks": [20, 50],
+      "gate": { "weather": "dry" },
+      "score": { "base": 3, "terms": [{ "gauge": "self.O", "per": 300, "add": 1 }] }
+    },
+    {
+      "id": "doze", "at": { "tag": "sheltered", "region": "beach" }, "ticks": [15, 40],
+      "score": { "base": 2, "terms": [{ "gauge": "self.pillowStandards", "per": 200, "add": -1 }] },
+      "while": [{ "emit": "dream.flicker", "everyTicks": 20 }]
+    }
+  ]
+}

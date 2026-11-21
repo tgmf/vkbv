@@ -1,0 +1,59 @@
+# M5 — Viewer: the world as a wave, and the timeline
+
+**Goal:** watch any pin set in the browser: the three.js world with the lantern and
+ghosts, the timeline, playback that observes, scrubbing that does not. No cards in
+hand yet.
+
+**Read first:** `06-ui.md` §1–§3, §8, §12; `02` §3, §4; `03` §16.
+
+## Build
+
+1. A Solid store holding: content, `PlayerState`, the latest result, playhead and
+   `frac`, playback state and speed, settings. Never copy simulation state into it
+   tick by tick; read frames from the latest result.
+2. `render/SceneRenderer.ts` and `render/three/`: the orthographic scene in the final
+   camera, places as boxes, edges as paths, fog, cats as cut-out billboards with
+   their `look` colours, the lantern, ghosts with additive glow and clustering, the
+   focus layer, the display budget, interpolation, objects, rain, barriers, running
+   lure and Gaze effects, speech bubbles. Pan, zoom, follow toggle. `pick()`.
+3. The accessible target list mirrored from the scene, with `data-testid`,
+   `data-node` and `data-activity` (`02` §4).
+4. The timeline: ruler, weather band, story dots, pins (read only), playhead,
+   frontier fog, fray, changed-unwatched marks, play/pause, speeds, jump, keyboard.
+5. The playback loop on `requestAnimationFrame` with a real-time accumulator; each
+   tick passed in playback calls `observe` (M3) and applies rewards; scrubbing only
+   moves the playhead.
+6. For this milestone only, a dev mode behind `?dev=1`: everything revealed and a
+   dropdown that loads any pin set from `05` §5.1. It moves into the debug panel in
+   M8.
+7. The layout of `06` §1 with empty hand and side-panel areas.
+
+## Acceptance
+
+- [ ] Loading `road_both` and pressing play shows, legibly: Marti at home with the town
+      as ghosts, the rain arriving, the lure, Marti's walk with the lantern revealing
+      places, the barrier, the chain, the meeting.
+- [ ] Before anything is watched, the crew at the roadworks are ghosts whose
+      likeliest copies read strongest; after Marti watches them they are solid.
+- [ ] Panning the camera across the whole map changes nothing in `watched` (a
+      Playwright test asserts it).
+- [ ] Dragging the playhead anywhere within the limit updates the scene within one
+      frame and observes nothing; playback observes every tick it passes.
+- [ ] `untouched` shows the fray when Rokko leaves; playback stops there.
+- [ ] Keyboard: Space, arrows, Home, End work.
+- [ ] A Playwright test loads `road_both`, plays to five ticks, and checks Marti's
+      `data-node` against the headless playback.
+- [ ] Reduced motion turns off the focus layer and pulsing; ghosts stay, with static
+      opacity.
+- [ ] 60 fps while scrubbing with all 12 cats (noted in the handoff with the machine);
+      no console errors; layout holds at 1280×720 and 1024×640.
+
+## Out of scope
+
+Hand, cards, powers, inspect, journal, hints, teaser, end screen, debug panel.
+
+## Pitfalls
+
+- The camera and the renderer never call `observe`.
+- Floats stay in `render` and `ui`.
+- Frames can be large: render from them, do not copy them per tick.

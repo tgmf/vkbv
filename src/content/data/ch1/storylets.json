@@ -1,0 +1,564 @@
+{
+  "note": "Small state machines. A storylet activates when 'trigger' first holds (once: true = never re-activates). Exits: choice (actor softmaxes score/T over exits plus staying, stayScore default 0), hazard (perMille per tick, plus terms), auto (fires as soon as its gate holds). onEnter runs consequences. Roles bind at activation.",
+  "storylets": [
+    {
+      "id": "door_lure", "required": true, "once": true,
+      "roles": { "marti": { "cat": "marti" } },
+      "trigger": { "at": "@marti", "region": "flat" },
+      "start": "home",
+      "states": {
+        "home": {
+          "exits": [
+            { "to": "at_door", "kind": "choice", "actor": "@marti",
+              "gate": { "power": "lure", "near": "@marti", "m": 25 },
+              "score": { "base": 1, "terms": [{ "primeCount": "marti", "add": 2 }, { "gauge": "@marti.questionItch", "per": 300, "add": 1 }] } }
+          ]
+        },
+        "at_door": {
+          "textKey": "sl.door_lure.at_door",
+          "onEnter": [{ "goTo": ["@marti", "flat.door"] }, { "fact": "martiAtDoor" }],
+          "stayScore": 1,
+          "exits": [
+            { "to": "out", "kind": "choice", "actor": "@marti",
+              "score": { "base": -3, "terms": [
+                { "primeCount": "marti", "add": 2 },
+                { "if": { "power": "lure", "near": "@marti", "m": 25 }, "add": 3 },
+                { "if": { "weather": "rain" }, "add": -1 },
+                { "gauge": "@marti.fearOfWater", "per": 250, "add": -1, "if": { "weather": "rain" } }
+              ] } },
+            { "to": "back_inside", "kind": "choice", "actor": "@marti",
+              "score": { "base": 0, "terms": [
+                { "gauge": "@marti.fearOfWater", "per": 300, "add": 1 },
+                { "if": { "not": { "power": "lure", "near": "@marti", "m": 25 } }, "add": 2 }
+              ] } }
+          ]
+        },
+        "back_inside": {
+          "textKey": "sl.door_lure.back_inside",
+          "onEnter": [{ "fact": "martiTurnedBack" }, { "goTo": ["@marti", "flat.study"] }],
+          "exits": [{ "to": "home", "kind": "hazard", "perMille": 100 }]
+        },
+        "out": {
+          "textKey": "sl.door_lure.out",
+          "onEnter": [{ "fact": "martiOut" }, { "goTo": ["@marti", "town.tea_shop"], "route": "shortest", "note": "his usual way: down the lane, through the roadworks" }],
+          "exits": []
+        }
+      }
+    },
+
+    {
+      "id": "roadworks_day", "required": true, "once": true,
+      "roles": { "crew": { "roleTag": "crew", "bind": "all" }, "foreman": { "roleTag": "foreman" } },
+      "trigger": { "clock": ["05:40", "23:59"] },
+      "start": "not_started",
+      "states": {
+        "not_started": {
+          "exits": [{ "to": "working", "kind": "hazard", "perMille": 40, "gate": { "clock": ["06:00", "08:00"] } }]
+        },
+        "working": {
+          "textKey": "sl.roadworks_day.working",
+          "onEnter": [{ "fact": "crewArrived" }, { "goTo": ["@crew", "town.roadworks"] }],
+          "exits": [
+            { "to": "on_break", "kind": "choice", "actor": "@foreman",
+              "score": { "base": -5, "terms": [
+                { "if": { "flag": "teaBreakCalled", "at": "@foreman" }, "add": 8 },
+                { "if": { "clock": ["09:00", "09:40"] }, "add": 4 },
+                { "gauge": "@foreman.sunbeamTax", "per": 300, "add": 1 }
+              ] } },
+            { "to": "finished", "kind": "auto", "gate": { "counter": "roadwork", "gte": 800 } },
+            { "to": "abandoned", "kind": "auto", "gate": { "all": [{ "weather": "rain" }, { "counter": "roadwork", "lt": 800 }] } }
+          ]
+        },
+        "on_break": {
+          "textKey": "sl.roadworks_day.on_break",
+          "onEnter": [{ "startActivity": ["@crew", "tea_break"] }],
+          "exits": [
+            { "to": "working", "kind": "hazard", "perMille": 60 },
+            { "to": "abandoned", "kind": "auto", "gate": { "all": [{ "weather": "rain" }, { "counter": "roadwork", "lt": 800 }] } }
+          ]
+        },
+        "finished": {
+          "textKey": "sl.roadworks_day.finished",
+          "onEnter": [{ "fact": "roadDone" }, { "goTo": ["@crew", "town.crew_shed"] }],
+          "exits": []
+        },
+        "abandoned": {
+          "textKey": "sl.roadworks_day.abandoned",
+          "onEnter": [{ "fact": "roadBlocked" }, { "emit": "barrier.fell", "at": "town.roadworks" }, { "goTo": ["@crew", "town.crew_shed"] }],
+          "exits": []
+        }
+      }
+    },
+
+    {
+      "id": "blocked_road", "required": true, "once": true,
+      "roles": { "marti": { "cat": "marti" } },
+      "trigger": { "all": [{ "at": "@marti", "node": "town.roadworks" }, { "fact": "roadBlocked" }, { "fact": "martiOut" }] },
+      "start": "facing",
+      "states": {
+        "facing": {
+          "textKey": "sl.blocked_road.facing",
+          "onEnter": [{ "fact": "martiFacedBarrier" }, { "stop": "@marti" }],
+          "stayScore": -1,
+          "exits": [
+            { "to": "toward_steps", "kind": "choice", "actor": "@marti",
+              "score": { "base": 0, "terms": [
+                { "gauge": "@marti.questionItch", "per": 250, "add": 1 },
+                { "gauge": "@marti.fearOfWater", "per": 300, "add": 1, "if": { "weather": "rain" }, "note": "the awning by the steps is the nearest roof" }
+              ] } },
+            { "to": "detour_square", "kind": "choice", "actor": "@marti",
+              "score": { "base": -2, "terms": [
+                { "gauge": "@marti.teaCraving", "per": 200, "add": 1 },
+                { "gauge": "@marti.fearOfWater", "per": 250, "add": -1, "if": { "weather": "rain" } }
+              ] } },
+            { "to": "turn_home", "kind": "choice", "actor": "@marti",
+              "score": { "base": -1, "terms": [
+                { "gauge": "@marti.fearOfWater", "per": 250, "add": 1 },
+                { "if": { "gauge": "@marti.questionItch", "lt": 400 }, "add": 1 }
+              ] } }
+          ]
+        },
+        "toward_steps": {
+          "textKey": "sl.blocked_road.toward_steps",
+          "onEnter": [{ "fact": "martiTurnedToSteps" }, { "goTo": ["@marti", "beach.steps_bottom"], "route": "via", "via": ["town.awning", "town.steps_top"] }],
+          "exits": []
+        },
+        "detour_square": {
+          "textKey": "sl.blocked_road.detour_square",
+          "onEnter": [{ "fact": "martiDetoured" }, { "goTo": ["@marti", "town.tea_shop"], "route": "shortest" }],
+          "exits": []
+        },
+        "turn_home": {
+          "textKey": "sl.blocked_road.turn_home",
+          "onEnter": [{ "fact": "martiWentHome" }, { "goTo": ["@marti", "flat.study"] }],
+          "exits": []
+        }
+      }
+    },
+
+    {
+      "id": "keeper_hours", "required": true, "once": true,
+      "roles": { "keeper": { "roleTag": "teaKeeper" } },
+      "trigger": { "clock": ["05:40", "23:59"] },
+      "start": "closed_morning",
+      "states": {
+        "closed_morning": {
+          "exits": [{ "to": "open", "kind": "hazard", "perMille": 40, "gate": { "clock": ["07:30", "09:00"] } }]
+        },
+        "open": {
+          "textKey": "sl.keeper_hours.open",
+          "onEnter": [{ "flag": "shopOpen", "value": true }],
+          "exits": [
+            { "to": "closed_early", "kind": "hazard", "perMille": 15, "gate": { "weather": "rain" },
+              "terms": [{ "if": { "heard": "rumour.shopClosingEarly", "by": "@keeper" }, "addPerMille": 40 }] },
+            { "to": "closed_evening", "kind": "auto", "gate": { "clock": ["19:00", "23:59"] } }
+          ]
+        },
+        "closed_early": {
+          "textKey": "sl.keeper_hours.closed_early",
+          "onEnter": [{ "flag": "shopOpen", "value": false }, { "fact": "shopClosedEarly" }],
+          "exits": []
+        },
+        "closed_evening": {
+          "onEnter": [{ "flag": "shopOpen", "value": false }],
+          "exits": []
+        }
+      }
+    },
+
+    {
+      "id": "usual_route", "required": true, "once": true,
+      "roles": { "marti": { "cat": "marti" }, "keeper": { "roleTag": "teaKeeper" } },
+      "trigger": { "all": [{ "at": "@marti", "node": "town.lane_s" }, { "fact": "martiOut" }] },
+      "start": "arriving",
+      "states": {
+        "arriving": {
+          "exits": [
+            { "to": "shop_open", "kind": "auto", "gate": { "flag": "shopOpen" } },
+            { "to": "shop_closed", "kind": "auto", "gate": { "not": { "flag": "shopOpen" } } }
+          ]
+        },
+        "shop_open": {
+          "textKey": "sl.usual_route.shop_open",
+          "onEnter": [{ "fact": "martiAtTeaShop" }, { "startActivity": ["@marti", "shop_tea"] }],
+          "exits": [{ "to": "settled", "kind": "hazard", "perMille": 50 }]
+        },
+        "settled": {
+          "textKey": "sl.usual_route.settled",
+          "onEnter": [{ "fact": "martiSettledAtShop" }, { "gauge": "@marti.fearOfWater", "add": 100 }],
+          "exits": []
+        },
+        "shop_closed": {
+          "textKey": "sl.usual_route.shop_closed",
+          "onEnter": [{ "fact": "shopClosedOnMarti" }],
+          "stayScore": -1,
+          "exits": [
+            { "to": "toward_sea", "kind": "choice", "actor": "@marti",
+              "score": { "base": -1, "terms": [
+                { "gauge": "@marti.questionItch", "per": 250, "add": 1 },
+                { "if": { "gauge": "@marti.pocketWeight", "lte": 300 }, "add": 1 }
+              ] } },
+            { "to": "go_home", "kind": "choice", "actor": "@marti",
+              "score": { "base": 0, "terms": [{ "gauge": "@marti.fearOfWater", "per": 250, "add": 1 }] } }
+          ]
+        },
+        "toward_sea": {
+          "textKey": "sl.usual_route.toward_sea",
+          "onEnter": [{ "fact": "martiWanderedToSea" }, { "goTo": ["@marti", "beach.pier_stub"] }],
+          "exits": []
+        },
+        "go_home": {
+          "textKey": "sl.usual_route.go_home",
+          "onEnter": [{ "fact": "martiWentHome" }, { "goTo": ["@marti", "flat.study"] }],
+          "exits": []
+        }
+      }
+    },
+
+    {
+      "id": "chain_on_beach", "required": true, "once": true,
+      "roles": { "marti": { "cat": "marti" } },
+      "trigger": { "all": [{ "fact": "chainNoticed" }, { "at": "@marti", "region": "beach" }] },
+      "start": "noticed",
+      "states": {
+        "noticed": {
+          "textKey": "sl.chain_on_beach.noticed",
+          "onEnter": [{ "stop": "@marti" }],
+          "stayScore": -1,
+          "exits": [
+            { "to": "following", "kind": "choice", "actor": "@marti",
+              "score": { "base": 1, "terms": [
+                { "gauge": "@marti.questionItch", "per": 200, "add": 1 },
+                { "gauge": "@marti.fearOfWater", "per": 300, "add": -1, "if": { "weather": "rain" } }
+              ] } },
+            { "to": "retreat", "kind": "choice", "actor": "@marti",
+              "score": { "base": -1, "terms": [{ "gauge": "@marti.fearOfWater", "per": 250, "add": 1 }] } }
+          ]
+        },
+        "following": {
+          "textKey": "sl.chain_on_beach.following",
+          "onEnter": [{ "fact": "followedChain" }, { "goTo": ["@marti", "beach.boat"], "route": "edgesTagged", "tag": "chain" }],
+          "exits": []
+        },
+        "retreat": {
+          "textKey": "sl.chain_on_beach.retreat",
+          "onEnter": [{ "fact": "martiRetreated" }, { "goTo": ["@marti", "town.awning"] }],
+          "exits": [{ "to": "noticed", "kind": "hazard", "perMille": 0, "terms": [{ "if": { "gauge": "@marti.questionItch", "gte": 600 }, "addPerMille": 40 }] }]
+        }
+      }
+    },
+
+    {
+      "id": "tideline_wander", "required": false, "once": true,
+      "roles": { "marti": { "cat": "marti" } },
+      "trigger": { "at": "@marti", "node": "beach.pier_stub" },
+      "start": "wandering",
+      "states": {
+        "wandering": {
+          "textKey": "sl.tideline_wander.wandering",
+          "exits": [
+            { "to": "found_boat", "kind": "choice", "actor": "@marti",
+              "score": { "base": 0, "terms": [{ "gauge": "@marti.questionItch", "per": 250, "add": 1 }] } },
+            { "to": "under_pier", "kind": "choice", "actor": "@marti",
+              "score": { "base": 0, "terms": [{ "gauge": "@marti.fearOfWater", "per": 250, "add": 1 }] } }
+          ]
+        },
+        "found_boat": {
+          "textKey": "sl.tideline_wander.found_boat",
+          "onEnter": [{ "fact": "foundBoatByTide" }, { "goTo": ["@marti", "beach.boat"], "route": "via", "via": ["beach.tideline"] }],
+          "exits": []
+        },
+        "under_pier": {
+          "textKey": "sl.tideline_wander.under_pier",
+          "onEnter": [{ "stop": "@marti" }],
+          "exits": [{ "to": "wandering", "kind": "hazard", "perMille": 25 }]
+        }
+      }
+    },
+
+    {
+      "id": "rokko_morning", "required": true, "once": true,
+      "roles": { "rokko": { "cat": "rokko" } },
+      "trigger": { "clock": ["05:40", "23:59"] },
+      "start": "asleep",
+      "states": {
+        "asleep": {
+          "exits": [{ "to": "awake", "kind": "hazard", "perMille": 50, "gate": { "clock": ["05:40", "06:40"] } }]
+        },
+        "awake": {
+          "textKey": "sl.rokko_morning.awake",
+          "onEnter": [{ "fact": "rokkoAwake" }],
+          "exits": [
+            { "to": "to_beach", "kind": "choice", "actor": "@rokko",
+              "score": { "base": 2, "terms": [{ "gauge": "@rokko.O", "per": 300, "add": 1 }] } },
+            { "to": "back_to_bed", "kind": "choice", "actor": "@rokko",
+              "score": { "base": 0, "terms": [{ "gauge": "@rokko.N", "per": 300, "add": 1 }] } }
+          ]
+        },
+        "back_to_bed": {
+          "textKey": "sl.rokko_morning.back_to_bed",
+          "onEnter": [{ "startActivity": ["@rokko", "sleep"] }],
+          "exits": [{ "to": "awake", "kind": "hazard", "perMille": 20 }]
+        },
+        "to_beach": {
+          "textKey": "sl.rokko_morning.to_beach",
+          "onEnter": [{ "fact": "rokkoOnBeach" }, { "goTo": ["@rokko", "beach.north"] }, { "startActivity": ["@rokko", "listen_to_sea"] }],
+          "exits": [
+            { "to": "under_boat", "kind": "choice", "actor": "@rokko", "gate": { "weather": "rain" },
+              "score": { "base": 2, "terms": [{ "gauge": "@rokko.fearOfWater", "per": 300, "add": 1 }] } },
+            { "to": "runs_home", "kind": "choice", "actor": "@rokko", "gate": { "weather": "rain" },
+              "score": { "base": -2, "terms": [{ "gauge": "@rokko.fearOfWater", "per": 200, "add": 1 }, { "gauge": "@rokko.pillowStandards", "per": 300, "add": 1 }] } },
+            { "to": "runs_home", "kind": "hazard", "perMille": 3, "gate": { "all": [{ "weather": "dry" }, { "clock": ["09:00", "11:00"] }] } }
+          ]
+        },
+        "under_boat": {
+          "textKey": "sl.rokko_morning.under_boat",
+          "onEnter": [{ "fact": "rokkoUnderBoat" }, { "goTo": ["@rokko", "beach.boat"] }, { "startActivity": ["@rokko", "doze"] }],
+          "exits": [
+            { "to": "left", "kind": "auto", "gate": { "all": [{ "weather": "dry" }, { "fact": "rainStarted" }] } },
+            { "to": "left", "kind": "hazard", "perMille": 0, "terms": [{ "if": { "gauge": "@rokko.pillowStandards", "gte": 900 }, "addPerMille": 10 }] }
+          ]
+        },
+        "runs_home": {
+          "textKey": "sl.rokko_morning.runs_home",
+          "onEnter": [{ "fact": "rokkoRanHome" }, { "goTo": ["@rokko", "town.netmaker_attic"] }],
+          "exits": []
+        },
+        "left": {
+          "textKey": "sl.rokko_morning.left",
+          "onEnter": [{ "fact": "rokkoLeft" }, { "goTo": ["@rokko", "town.netmaker_attic"] }],
+          "exits": []
+        }
+      }
+    },
+
+    {
+      "id": "under_the_boat", "required": true, "once": true, "anchor": true,
+      "roles": { "marti": { "cat": "marti" }, "rokko": { "cat": "rokko" } },
+      "trigger": { "all": [{ "near": ["@marti", "beach.boat"], "m": 8 }, { "state": ["rokko_morning", "under_boat"] }] },
+      "start": "hidden",
+      "states": {
+        "hidden": {
+          "textKey": "sl.under_the_boat.hidden",
+          "exits": [
+            { "to": "tail_spotted", "kind": "hazard", "perMille": 80, "terms": [{ "if": { "gauge": "@marti.questionItch", "gte": 600 }, "addPerMille": 40 }] },
+            { "to": "peek_out", "kind": "hazard", "perMille": 30, "terms": [{ "if": { "fact": "whistleHeard" }, "addPerMille": 200 }] }
+          ]
+        },
+        "tail_spotted": {
+          "textKey": "sl.under_the_boat.tail_spotted",
+          "exits": [
+            { "to": "meeting", "kind": "choice", "actor": "@marti",
+              "score": { "base": 3, "terms": [{ "gauge": "@marti.questionItch", "per": 250, "add": 1 }] } },
+            { "to": "walks_past", "kind": "choice", "actor": "@marti",
+              "score": { "base": -2, "terms": [{ "gauge": "@marti.fearOfWater", "per": 250, "add": 1 }] } }
+          ]
+        },
+        "peek_out": {
+          "textKey": "sl.under_the_boat.peek_out",
+          "exits": [{ "to": "meeting", "kind": "hazard", "perMille": 200 }]
+        },
+        "walks_past": {
+          "textKey": "sl.under_the_boat.walks_past",
+          "exits": [{ "to": "hidden", "kind": "hazard", "perMille": 30 }]
+        },
+        "meeting": {
+          "textKey": "sl.under_the_boat.meeting",
+          "onEnter": [{ "fact": "anchor.meeting" }],
+          "exits": []
+        }
+      }
+    },
+
+    {
+      "id": "whistle_blown", "required": false, "once": false, "special": true,
+      "roles": { "marti": { "cat": "marti" } },
+      "trigger": { "card": "something_shiny", "special": true },
+      "start": "blowing",
+      "states": {
+        "blowing": {
+          "textKey": "sl.whistle_blown.blowing",
+          "onEnter": [{ "interrupt": ["@marti", "blow_whistle", 3] }, { "emit": "sound.whistle", "radiusM": 300, "factIfPerceivedBy": { "rokko": "whistleHeard" } }],
+          "exits": [{ "to": "done", "kind": "hazard", "perMille": 300 }]
+        },
+        "done": { "exits": [] }
+      }
+    },
+
+    {
+      "id": "marti_cuppa", "required": false, "once": false, "special": true,
+      "roles": { "marti": { "cat": "marti" } },
+      "trigger": { "card": "tea_break", "special": true },
+      "start": "brewing",
+      "states": {
+        "brewing": {
+          "textKey": "sl.marti_cuppa.brewing",
+          "onEnter": [{ "goTo": ["@marti", "flat.kitchen"] }],
+          "exits": [{ "to": "drinking", "kind": "hazard", "perMille": 150 }]
+        },
+        "drinking": {
+          "textKey": "sl.marti_cuppa.drinking",
+          "onEnter": [{ "gauge": "@marti.teaCraving", "set": 0 }],
+          "exits": [{ "to": "cozy", "kind": "hazard", "perMille": 100 }]
+        },
+        "cozy": {
+          "textKey": "sl.marti_cuppa.cozy",
+          "onEnter": [{ "gauge": "@marti.fearOfWater", "add": 100, "holdTicks": 120 }],
+          "exits": []
+        }
+      }
+    },
+
+    {
+      "id": "crew_chatter", "required": false, "once": true,
+      "roles": { "teller": { "roleTag": "storyteller" }, "scoffer": { "roleTag": "foreman" }, "marti": { "cat": "marti" } },
+      "trigger": { "state": ["roadworks_day", "on_break"] },
+      "start": "idle",
+      "states": {
+        "idle": {
+          "exits": [{ "to": "tale", "kind": "hazard", "perMille": 60 }]
+        },
+        "tale": {
+          "textKey": "sl.crew_chatter.tale",
+          "onEnter": [{ "emit": "chatter.catlantis", "from": "@teller", "radiusM": 60, "factIfPerceivedBy": { "marti": "crewChatterHeard" } }],
+          "exits": [
+            { "to": "overheard", "kind": "auto", "gate": { "fact": "crewChatterHeard" } },
+            { "to": "scoffed", "kind": "hazard", "perMille": 100 }
+          ]
+        },
+        "overheard": {
+          "textKey": "sl.crew_chatter.overheard",
+          "onEnter": [{ "gauge": "@marti.questionItch", "add": 200 }, { "emit": "chatter.heard", "to": "@marti" }],
+          "exits": [{ "to": "scoffed", "kind": "hazard", "perMille": 100 }]
+        },
+        "scoffed": {
+          "textKey": "sl.crew_chatter.scoffed",
+          "onEnter": [{ "emit": "chatter.agreement", "from": "@scoffer", "radiusM": 10 }],
+          "exits": []
+        }
+      }
+    },
+
+    {
+      "id": "parcel_drop", "required": false, "once": false,
+      "roles": { "postcat": { "roleTag": "postcat" } },
+      "trigger": { "activityFinished": ["@postcat", "deliver_post"] },
+      "start": "dropping",
+      "states": {
+        "dropping": {
+          "exits": [
+            { "to": "dropped", "kind": "hazard", "perMille": 500 },
+            { "to": "kept", "kind": "hazard", "perMille": 500 }
+          ]
+        },
+        "dropped": {
+          "textKey": "sl.parcel_drop.dropped",
+          "onEnter": [{ "flag": "boxHere", "at": "@postcat", "ttl": 240 }],
+          "exits": []
+        },
+        "kept": { "exits": [] }
+      }
+    },
+
+    {
+      "id": "laundry_panic", "required": false, "once": true,
+      "roles": { "grisha": { "cat": "grisha" }, "helper": { "nearCat": "@grisha", "m": 15, "bind": "nearest", "optional": true } },
+      "trigger": { "all": [{ "fact": "rainStarted" }, { "flag": "laundryOut" }] },
+      "start": "panic",
+      "states": {
+        "panic": {
+          "textKey": "sl.laundry_panic.panic",
+          "exits": [
+            { "to": "asks_help", "kind": "hazard", "perMille": 0, "terms": [{ "if": { "bound": "@helper" }, "addPerMille": 200 }] },
+            { "to": "soaked_alone", "kind": "hazard", "perMille": 30 }
+          ]
+        },
+        "asks_help": {
+          "textKey": "sl.laundry_panic.asks_help",
+          "exits": [
+            { "to": "rescued", "kind": "choice", "actor": "@helper",
+              "score": { "base": 0, "terms": [{ "gauge": "@helper.A", "per": 250, "add": 1 }, { "gauge": "@helper.fearOfWater", "per": 300, "add": -1 }] } },
+            { "to": "soaked_alone", "kind": "choice", "actor": "@helper",
+              "score": { "base": 0, "terms": [{ "gauge": "@helper.fearOfWater", "per": 250, "add": 1 }] } }
+          ]
+        },
+        "rescued": {
+          "textKey": "sl.laundry_panic.rescued",
+          "onEnter": [{ "fact": "laundryRescued" }, { "flag": "laundryOut", "value": false }],
+          "exits": []
+        },
+        "soaked_alone": {
+          "textKey": "sl.laundry_panic.soaked_alone",
+          "onEnter": [{ "fact": "grishaSoaked" }, { "flag": "laundryOut", "value": false }],
+          "exits": []
+        }
+      }
+    },
+
+    {
+      "id": "pelageya_longing", "required": false, "once": true,
+      "roles": { "pelageya": { "cat": "pelageya" } },
+      "trigger": { "all": [{ "weather": "rain" }, { "at": "@pelageya", "node": "town.pelageya_window" }] },
+      "start": "watching",
+      "states": {
+        "watching": {
+          "textKey": "sl.pelageya_longing.watching",
+          "exits": [
+            { "to": "window_open", "kind": "choice", "actor": "@pelageya",
+              "score": { "base": -1, "terms": [{ "gauge": "@pelageya.O", "per": 300, "add": 1 }] } }
+          ]
+        },
+        "window_open": {
+          "textKey": "sl.pelageya_longing.window_open",
+          "exits": [
+            { "to": "paw_out", "kind": "choice", "actor": "@pelageya",
+              "score": { "base": -3, "terms": [{ "gauge": "@pelageya.O", "per": 250, "add": 1 }, { "gauge": "@pelageya.fearOfWater", "per": 300, "add": -1 }] } },
+            { "to": "shut", "kind": "choice", "actor": "@pelageya",
+              "score": { "base": 0, "terms": [{ "gauge": "@pelageya.fearOfWater", "per": 300, "add": 1 }] } }
+          ]
+        },
+        "paw_out": {
+          "textKey": "sl.pelageya_longing.paw_out",
+          "onEnter": [{ "fact": "pelageyaPawInRain" }],
+          "exits": [{ "to": "shut", "kind": "hazard", "perMille": 100 }]
+        },
+        "shut": {
+          "textKey": "sl.pelageya_longing.shut",
+          "exits": []
+        }
+      }
+    },
+
+    {
+      "id": "ogryzok_trade", "required": false, "once": true,
+      "roles": { "stray": { "cat": "ogryzok" }, "marti": { "cat": "marti" } },
+      "trigger": { "near": ["@marti", "@stray"], "m": 6 },
+      "start": "sizing_up",
+      "states": {
+        "sizing_up": {
+          "textKey": "sl.ogryzok_trade.sizing_up",
+          "exits": [
+            { "to": "offers", "kind": "choice", "actor": "@stray",
+              "score": { "base": 0, "terms": [{ "if": { "gauge": "@marti.pocketWeight", "gte": 600 }, "add": 2 }] } },
+            { "to": "ignores", "kind": "choice", "actor": "@stray", "score": { "base": 0 } }
+          ]
+        },
+        "offers": {
+          "textKey": "sl.ogryzok_trade.offers",
+          "exits": [
+            { "to": "traded", "kind": "choice", "actor": "@marti",
+              "score": { "base": 0, "terms": [{ "if": { "gauge": "@marti.pocketWeight", "lte": 300 }, "add": 2 }, { "gauge": "@marti.questionItch", "per": 300, "add": 1 }] } },
+            { "to": "refused", "kind": "choice", "actor": "@marti", "score": { "base": 1 } }
+          ]
+        },
+        "traded": {
+          "textKey": "sl.ogryzok_trade.traded",
+          "onEnter": [{ "gauge": "@marti.pocketWeight", "add": 150 }, { "gauge": "@marti.questionItch", "add": 120 }, { "fact": "ogryzokTrade" }],
+          "exits": []
+        },
+        "refused": { "textKey": "sl.ogryzok_trade.refused", "exits": [] },
+        "ignores": { "exits": [] }
+      }
+    }
+  ]
+}

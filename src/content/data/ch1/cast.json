@@ -1,0 +1,125 @@
+{
+  "note": "Gauge ranges are per-seed initial spreads [lo, hi], part of the wave. temperatureTenths: Filter dial T x10 (10 = filtered, 40 = awakened). core: true = the minimal 5-cat set the design doc asks for; the rest is chaos for stress tests.",
+  "cats": [
+    {
+      "id": "marti", "nameKey": "cat.marti", "kind": "protagonist", "core": true,
+      "look": { "fur": "#8a8f99", "accent": "#ffffff", "glasses": true, "scarf": "#b5432f" },
+      "home": "flat.study", "start": "flat.study", "startActivity": "sleep",
+      "temperatureTenths": 20, "willpower": 850,
+      "perception": { "sightM": 25, "hearingM": 50, "voices": 1 },
+      "traits": { "O": [750, 900], "C": [200, 350], "E": [350, 550], "A": [650, 800], "N": [400, 600] },
+      "hooks": { "teaCraving": [300, 700], "pocketWeight": [400, 800], "questionItch": [200, 600], "fearOfWater": [700, 850], "boxPull": [300, 500], "sunbeamTax": [200, 500] },
+      "activities": ["sleep", "groom", "nap_sunbeam", "sit_in_box", "make_tea", "read_old_books", "look_out_window", "tinker_salvage", "pace_flat", "flee_rain", "shop_tea"]
+    },
+    {
+      "id": "rokko", "nameKey": "cat.rokko", "kind": "protagonist", "core": true, "lockedThread": true,
+      "look": { "fur": "#d9782d", "accent": "#f3c08a" },
+      "home": "town.netmaker_attic", "start": "town.netmaker_attic", "startActivity": "sleep",
+      "temperatureTenths": 20, "willpower": 800,
+      "perception": { "sightM": 20, "hearingM": 55, "voices": 3 },
+      "traits": { "O": [500, 700], "C": [700, 850], "E": [150, 300], "A": [300, 450], "N": [400, 550] },
+      "hooks": { "pillowStandards": [300, 650], "contradictionItch": [200, 500], "swoonMeter": [0, 80], "fearOfWater": [450, 650], "boxPull": [200, 400], "sunbeamTax": [300, 500] },
+      "activities": ["sleep", "groom", "nap_sunbeam", "sit_in_box", "listen_to_sea", "doze", "flee_rain"]
+    },
+    {
+      "id": "prasha", "nameKey": "cat.prasha", "kind": "townscat", "core": true, "roles": ["teaKeeper"],
+      "look": { "fur": "#5b4636", "accent": "#e8dcc8" },
+      "home": "town.tea_shop", "start": "town.tea_shop", "startActivity": "sleep",
+      "temperatureTenths": 10, "willpower": 400,
+      "perception": { "sightM": 20, "hearingM": 30, "voices": 1 },
+      "traits": { "O": [200, 350], "C": [700, 850], "E": [600, 750], "A": [600, 800], "N": [300, 500] },
+      "hooks": { "fearOfWater": [800, 950], "boxPull": [200, 400], "sunbeamTax": [300, 600] },
+      "activities": ["sleep", "groom", "make_tea", "keep_shop", "chat", "flee_rain"]
+    },
+    {
+      "id": "gavrila", "nameKey": "cat.gavrila", "kind": "townscat", "core": true, "roles": ["crew", "foreman"],
+      "look": { "fur": "#3d3d3d", "accent": "#f2c230", "hat": "hardhat" },
+      "home": "town.crew_shed", "start": "town.crew_shed", "startActivity": "sleep",
+      "temperatureTenths": 10, "willpower": 550,
+      "perception": { "sightM": 20, "hearingM": 30, "voices": 1 },
+      "traits": { "O": [150, 300], "C": [750, 900], "E": [500, 700], "A": [350, 500], "N": [300, 450] },
+      "hooks": { "fearOfWater": [800, 950], "boxPull": [300, 500], "sunbeamTax": [200, 400] },
+      "activities": ["sleep", "groom", "work_road", "tea_break", "chat", "flee_rain", "sit_in_box"]
+    },
+    {
+      "id": "bublik", "nameKey": "cat.bublik", "kind": "townscat", "core": true, "roles": ["crew"],
+      "look": { "fur": "#c9a26b", "accent": "#f2c230" },
+      "home": "town.crew_shed", "start": "town.crew_shed", "startActivity": "sleep",
+      "temperatureTenths": 12, "willpower": 300,
+      "perception": { "sightM": 20, "hearingM": 30, "voices": 1 },
+      "traits": { "O": [400, 600], "C": [250, 400], "E": [700, 900], "A": [650, 800], "N": [350, 550] },
+      "hooks": { "fearOfWater": [750, 900], "boxPull": [550, 750], "sunbeamTax": [450, 650] },
+      "activities": ["sleep", "groom", "work_road", "tea_break", "chat", "flee_rain", "sit_in_box", "nap_sunbeam"]
+    },
+    {
+      "id": "pip", "nameKey": "cat.pip", "kind": "townscat", "core": false, "roles": ["crew"],
+      "look": { "fur": "#ffffff", "accent": "#f2c230" },
+      "home": "town.crew_shed", "start": "town.crew_shed", "startActivity": "sleep",
+      "temperatureTenths": 12, "willpower": 250,
+      "perception": { "sightM": 22, "hearingM": 35, "voices": 1 },
+      "traits": { "O": [500, 700], "C": [300, 500], "E": [300, 500], "A": [500, 700], "N": [600, 800] },
+      "hooks": { "fearOfWater": [850, 980], "boxPull": [400, 600], "sunbeamTax": [300, 500] },
+      "activities": ["sleep", "groom", "work_road", "tea_break", "chat", "flee_rain", "sit_in_box"]
+    },
+    {
+      "id": "semyon", "nameKey": "cat.semyon", "kind": "townscat", "core": false, "roles": ["crew", "storyteller"],
+      "look": { "fur": "#9e9e9e", "accent": "#f2c230", "whiskers": "long" },
+      "home": "town.crew_shed", "start": "town.crew_shed", "startActivity": "sleep",
+      "temperatureTenths": 14, "willpower": 450,
+      "perception": { "sightM": 14, "hearingM": 25, "voices": 1 },
+      "traits": { "O": [550, 750], "C": [450, 600], "E": [550, 700], "A": [600, 750], "N": [250, 400] },
+      "hooks": { "fearOfWater": [700, 850], "boxPull": [250, 400], "sunbeamTax": [600, 800] },
+      "activities": ["sleep", "groom", "work_road", "tea_break", "chat", "flee_rain", "nap_sunbeam"]
+    },
+    {
+      "id": "pelageya", "nameKey": "cat.pelageya", "kind": "townscat", "core": false, "roles": ["rainWatcher"],
+      "look": { "fur": "#e6e1d8", "accent": "#7d6aa8" },
+      "home": "town.pelageya_window", "start": "town.pelageya_window", "startActivity": "sleep",
+      "temperatureTenths": 18, "willpower": 500,
+      "perception": { "sightM": 30, "hearingM": 30, "voices": 1 },
+      "traits": { "O": [650, 850], "C": [400, 550], "E": [150, 300], "A": [500, 700], "N": [500, 700] },
+      "hooks": { "fearOfWater": [550, 700], "boxPull": [200, 350], "sunbeamTax": [400, 600] },
+      "activities": ["sleep", "groom", "watch_rain", "nap_sunbeam"]
+    },
+    {
+      "id": "kuzya", "nameKey": "cat.kuzya", "kind": "townscat", "core": false, "roles": ["postcat"],
+      "look": { "fur": "#2f4b7c", "accent": "#d0d8e8", "bag": true },
+      "home": "town.post_office", "start": "town.post_office", "startActivity": "sleep",
+      "temperatureTenths": 10, "willpower": 450,
+      "perception": { "sightM": 22, "hearingM": 30, "voices": 1 },
+      "traits": { "O": [300, 450], "C": [700, 900], "E": [400, 600], "A": [500, 650], "N": [400, 550] },
+      "hooks": { "fearOfWater": [800, 950], "boxPull": [650, 850], "sunbeamTax": [200, 400] },
+      "activities": ["sleep", "groom", "deliver_post", "chat", "flee_rain", "sit_in_box"]
+    },
+    {
+      "id": "zlata", "nameKey": "cat.zlata", "kind": "townscat", "core": false, "roles": ["baker"],
+      "look": { "fur": "#f0d29a", "accent": "#ffffff", "apron": true },
+      "home": "town.bakery", "start": "town.bakery", "startActivity": "sleep",
+      "temperatureTenths": 10, "willpower": 500,
+      "perception": { "sightM": 15, "hearingM": 25, "voices": 1 },
+      "traits": { "O": [400, 550], "C": [650, 800], "E": [550, 750], "A": [650, 850], "N": [250, 400] },
+      "hooks": { "fearOfWater": [800, 950], "boxPull": [200, 400], "sunbeamTax": [300, 500] },
+      "activities": ["sleep", "groom", "bake", "chat", "flee_rain"]
+    },
+    {
+      "id": "grisha", "nameKey": "cat.grisha", "kind": "townscat", "core": false, "roles": ["laundry"],
+      "look": { "fur": "#6f8f5e", "accent": "#ffffff" },
+      "home": "town.laundry_yard", "start": "town.laundry_yard", "startActivity": "sleep",
+      "temperatureTenths": 12, "willpower": 300,
+      "perception": { "sightM": 20, "hearingM": 30, "voices": 1 },
+      "traits": { "O": [300, 500], "C": [500, 700], "E": [450, 650], "A": [450, 600], "N": [700, 900] },
+      "hooks": { "fearOfWater": [850, 980], "boxPull": [400, 600], "sunbeamTax": [300, 500] },
+      "activities": ["sleep", "groom", "hang_laundry", "chat", "flee_rain", "sit_in_box"]
+    },
+    {
+      "id": "ogryzok", "nameKey": "cat.ogryzok", "kind": "townscat", "core": false, "roles": ["stray", "hoarder"],
+      "look": { "fur": "#4a3b2a", "accent": "#a88f6a", "ear": "torn" },
+      "home": "town.dump_alley", "start": "town.dump_alley", "startActivity": "hoard_junk",
+      "temperatureTenths": 26, "willpower": 600,
+      "perception": { "sightM": 25, "hearingM": 40, "voices": 1 },
+      "traits": { "O": [600, 800], "C": [100, 250], "E": [200, 400], "A": [150, 350], "N": [400, 600] },
+      "hooks": { "fearOfWater": [500, 700], "boxPull": [700, 900], "sunbeamTax": [400, 600] },
+      "activities": ["sleep", "groom", "hoard_junk", "wander", "flee_rain", "sit_in_box", "nap_sunbeam"]
+    }
+  ]
+}
