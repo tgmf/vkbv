@@ -1,17 +1,27 @@
-// `npm run content:check`: runs the content loader in Node (spec 02 §5).
-// ch1/ is validated from M1 on (M0 brief, item 6).
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { ContentError, loadAll } from '../src/content/load';
+// `npm run content:check`: runs the content loader in Node (spec 02 §5) and prints warnings.
+import { CHAPTER1_FILES, TUNING_FILE } from '../src/content/chapter1';
+import { ContentError, loadChapter, loadText, loadTuning } from '../src/content/load';
+import uiEn from '../src/content/data/ui/en.json';
+import uiRu from '../src/content/data/ui/ru.json';
 
-const DATA = join(import.meta.dirname, '..', 'src', 'content', 'data');
-const read = (file: string): unknown => JSON.parse(readFileSync(join(DATA, file), 'utf8'));
-
+const problems: string[] = [];
+const warnings: string[] = [];
 try {
-  loadAll({ tuning: read('tuning.json'), uiEn: read('ui/en.json'), uiRu: read('ui/ru.json') });
-  console.log('content OK: tuning.json, ui/en.json, ui/ru.json (ch1/ is checked from M1)');
+  const tuning = loadTuning(TUNING_FILE);
+  loadText('ui', uiEn, uiRu);
+  const c = loadChapter(CHAPTER1_FILES, tuning, warnings);
+  console.log(
+    `places ${c.nodes.length}, edges ${c.edges.length}, cats ${c.cats.length}, activities ${c.activities.length}, ` +
+      `objects ${c.objects.length}, cards ${c.cards.length}, storylets ${c.storylets.length}, detectors ${c.detectors.length}`,
+  );
 } catch (e) {
   if (!(e instanceof ContentError)) throw e;
-  console.error(e.message);
+  problems.push(...e.problems);
+}
+for (const w of warnings) console.log(`warn  ${w}`);
+for (const p of problems) console.error(`ERROR ${p}`);
+if (problems.length > 0) {
+  console.error(`\n${problems.length} error(s)`);
   process.exit(1);
 }
+console.log('content OK');
