@@ -20,7 +20,7 @@
     "sim": "tsx src/cli/sim.ts",
     "balance": "tsx scripts/not-yet.ts balance M4",
     "calibrate": "tsx scripts/not-yet.ts calibrate M2",
-    "golden:update": "tsx scripts/not-yet.ts golden:update M2",
+    "golden:update": "vitest run tests/golden --update",
     "gen:exp-table": "tsx scripts/gen-exp-table.ts"
   },
   "dependencies": {
