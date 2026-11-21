@@ -32,6 +32,8 @@ while (fog.tick < c.world.ticks) {
       `tick ${fog.tick}: cases ${fog.cases.length}, states ${states}, ${Math.round(performance.now() - t1)} ms`,
     );
 }
+const { calls, hits } = setup.decisions;
 console.log(
-  `setup ${Math.round(t1 - t0)} ms; ${steps} steps in ${Math.round(performance.now() - t1)} ms; max states ${maxStates}`,
+  `setup ${Math.round(t1 - t0)} ms; ${steps} steps in ${Math.round(performance.now() - t1)} ms; max states ${maxStates}; ` +
+    `decisions ${calls} computed, ${hits} from the cache (hit rate ${Math.round((hits * 100) / Math.max(1, calls + hits))}%)`,
 );
