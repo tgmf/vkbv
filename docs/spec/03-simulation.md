@@ -1,13 +1,15 @@
 # 03 — Simulation
 
-The simulation turns `(content, seed, log, watched facts)` into a **wave**: a set of
-weighted candidate histories of the chapter, recorded tick by tick. It knows nothing
-about the hand, charge, the journal or the screen.
+The simulation turns `(content, seed, log, watched facts)` into a **wave**: everything
+not yet watched, held as a **lantern** (Marti and the cats he perceives, simulated
+tick by tick) inside a **fog** (everyone and everything else, computed as
+probabilities). It knows nothing about the hand, charge, the journal or the screen.
 
 This file has two halves. §1–§11 define **one history**: state, one step, and every
-condition, score and effect in the content language. §12–§17 define **the wave**:
-how histories split, merge, are trimmed, are observed and are conditioned on the
-anchor. The content format is the one in `src/content/data/ch1/` (see `05`); every
+condition, score and effect in the content language; the lantern runs exactly this.
+§12–§18 define **the wave**: the fog's cat chains and cases, the lantern's edge where
+fog becomes fact, observation, and recompute (decided 2026-11-21; it replaces the
+weighted histories of the 2026-11-21 pack). The content format is the one in `src/content/data/ch1/` (see `05`); every
 key named here appears there.
 
 Words follow the glossary (`docs/glossary.md`). In code, a place is a `node`.
@@ -62,11 +64,11 @@ Scopes used by the simulation:
 
 | Scope | Used for |
 | --- | --- |
-| `s<stream>:<catId>` | a cat's sampled noise, with that cat's stream in the history (§13): initial gauges, activity choices, durations, places |
-| `s<stream>:world` | sampled world noise, with the history's world stream: `chance` effects, `randomNode` |
-| `s<stream>:branch` | branch outcomes when running a single history (§12.4) |
-| `wave` | resampling (§14) |
-| `obs` | observation and Gaze sampling (§15) |
+| `s<stream>:<catId>` | a cat's sampled noise: initial gauges, activity choices, durations, places. Stream 0 in the lantern; other streams only in single-history mode (§12.4) |
+| `s<stream>:world` | sampled world noise: `chance` effects, `randomNode`. Stream 0 in the lantern |
+| `s<stream>:branch` | branch outcomes in single-history mode and in the lantern (§12.4) |
+| `obs` | placement at the lantern's edge, observation and Gaze (§15) |
+| `render` | focus samples for the renderer (§16); never read by the simulation |
 
 `hashState(state)`: FNV-1a 32-bit (the first loop of `hash32`, no finalizer) over the
 canonical JSON of the state (object keys sorted recursively, no whitespace), as 8
@@ -76,8 +78,8 @@ this definition on a full Chapter 1 state.
 
 ### 1.1 Probabilities, σ and softmax
 
-Probabilities are integers in **ppm** (parts per million, 0..1 000 000). Weights are
-integers; the whole wave sums to `WAVE_TOTAL = 1 000 000 000`.
+Probabilities are integers in **ppm** (parts per million, 0..1 000 000). The fog's
+case weights are integers summing to `WAVE_TOTAL = 1 000 000 000` (§13.5).
 
 `src/sim/exp-table.ts` holds a constant array `EXP` of 1 201 integers,
 `EXP[k] = round(65536 · e^(−k/100))` for `k = 0..1200`. It is generated once by
@@ -142,7 +144,7 @@ cat's current region unless the selector names a `node`, a `region` or is
 
 One function, `perceives(state, catId, source, sense, world)`, answers whether a cat
 can sense something this tick. It is used by the simulation (`heard`, hook `onEvent`,
-`factIfPerceivedBy`, object `onPerceived`) and by observation (§15). It is the only
+`factIfPerceivedBy`, object `onPerceived`) and by observation and the lantern's edge (§15). It is the only
 place where sight and hearing are computed.
 
 ```
@@ -185,7 +187,7 @@ activity, hook or storylet role produced it (for a storylet: its first bound rol
 
 Objects with `onPerceived: { by, emit, fact? }`: in phase 7, the first tick that cat
 perceives the object by sight, emit the event from the object's node and set the
-fact (if given). This happens once per history; the state records it as the fact
+fact (if given). This happens once per history (once per chapter in the lantern); the state records it as the fact
 `perceived:<objectId>`.
 
 `voices` (cast.json): how many separate sound events a cat can follow in one tick.
@@ -239,7 +241,7 @@ interface StoryletRun {
 The **value** of a gauge is `clamp(base + Σ mods.add, floor, 1000)` where `floor` is
 `hooks.json → floor` for hooks and 0 for traits. Traits never change in the demo.
 
-The initial state of a history whose streams are all `s` (§13):
+The initial state of a history whose streams are all `s` (the lantern uses `s = 0`):
 
 - weather `dry`; no facts; flags from `world.initialFlags` (absent = none); counters
   from `world.counters[*].start`;
@@ -249,8 +251,9 @@ The initial state of a history whose streams are all `s` (§13):
   cast.json, then clamped to the gauge's range (hooks start at least at `hooks.floor`); everything else empty or zero;
 - every storylet inactive; every pool empty; `anchor` both null.
 
-Initial stats are therefore **part of the wave**: each starting history has its own
-draw, and watching the cats narrows which survive.
+In the fog, initial stats are **part of the wave**: a fogged cat's banded gauges start
+spread over the bands its ranges cover, and watching narrows them (§13.2). Protagonists
+are live from tick 0, so their stats are drawn once per seed.
 
 ## 6. One step
 
@@ -301,7 +304,7 @@ never `states[t]`.
 decided for this tick, in the order the branch points are met. When `step` meets a
 branch point beyond the end of that list, it stops and returns `branchPoint: { key,
 options: { label, ppm }[] }` without a state. The caller decides how to resolve it:
-the wave splits (§13); a single history samples (§12.4). `step` must be a pure
+a single history and the lantern sample (§12.4); the fog carries the probabilities instead (§13). `step` must be a pure
 function of its arguments, so re-running it with a longer `branch` list reproduces
 everything before that point exactly. An implementation may clone state at branch
 points instead of re-running, if tests show the results are identical.
@@ -342,8 +345,8 @@ p          = softmax(scores, cat.temperatureTenths)
 choice     = sample(p, rand(seed, "s<stream>:<cat>", t, "act", 1_000_000))
 ```
 
-This is **sampled noise**, not a branch: each history rolls its own, with that cat's
-stream. If the
+This is **sampled noise**, not a branch: a live cat rolls it with its stream; the fog
+splits the mass over the choices instead (§13.3). If the
 choice is the current, unfinished activity, nothing changes. Otherwise the cat
 switches: `activity = choice`, `activityLeft = lo + rand(…, "dur:<a>", hi − lo + 1)`
 from the activity's `ticks: [lo, hi]`, `activityPlace` = the place selector's pick,
@@ -476,7 +479,7 @@ it fires.
 | `move { to }` | `goTo` for the target cat |
 | `triggerStorylet { storylet }` | activates it (`ifTarget: cat` = only if that cat is among the affected) |
 | `setFlag { flag, at?, ticks?, onlyObjects? }` | sets the flag (scoped to the target place or object's node when `at: "$target"`) for `ticks` |
-| `collapse { radiusM, ticks }` | Gaze. Not a state change: it schedules observation samples (§15.3) |
+| `collapse { radiusM, ticks }` | Gaze. Not a state change: it schedules observation samples (§15.4) |
 
 Running effects (`attract`, `repel`, timed flags from cards) are listed in
 `state.effects` with `left` ticks; phase 1 counts them down and removes them at 0.
@@ -557,10 +560,9 @@ holds and resets when it does not; at `forTicks` the match advances. Matches pas
 their `withinTicks` window, or killed by `unless`, are dropped. A pool keeps at most
 `tuning.sifting.maxMatchesPerPattern` matches, dropping the oldest `stageTick` first.
 
-The **pattern signature** of a history is the highest stage reached in each pool.
-
 A detector **involves** the cats named in its clauses (`at`, `near`, `except`). With
-no cat named, it involves everyone (used for perception in §15).
+no cat named, it involves everyone (used for perception in §15). In the fog,
+detectors are estimated (§13.6).
 
 ## 11. Pins in the simulation
 
@@ -588,15 +590,14 @@ and it emits `pinFired { pin }`. An invalid pin becomes `pending` and emits
 `fizzle { pin, reason }` (`noBranch`, `wrongCat`, `hidden`); a pending pin is
 re-checked every tick and fires the first tick it is valid. Pending pins expire at
 the chapter's end. Validity is per history, so a pin can fire in one history and
-fizzle in another.
+fizzle in another; in the fog it is evaluated per chain state (§13.6).
 
 ## 12. One history, end to end
 
 ### 12.1 The chapter
 
 `runHistory` starts from the initial state and steps until tick `world.ticks`, or
-until `tuning.end.afterAnchorTicks` ticks after `anchor.reachedAt`, or the tick
-`anchor.deadAt` is set when early cut is on (§16).
+until `tuning.end.afterAnchorTicks` ticks after `anchor.reachedAt`.
 
 ### 12.2 The anchor
 
@@ -612,208 +613,410 @@ group counts once, when any member holds).
 
 ### 12.4 Single-history mode
 
-For tests, the CLI and calibration, `runHistory(content, seed, stream, pins)` gives
-every cat and the world that one stream, and resolves every branch point by sampling: `sample(options, rand(seed,
-"s<stream>:branch", t, key, 1_000_000))`. It returns the per-tick states and events.
-The wave (§13) never uses this; it splits instead.
+For tests, the CLI, calibration and the lantern, `runHistory(content, seed, stream,
+pins)` gives every cat and the world that one stream, and resolves every branch point
+by sampling: `sample(options, rand(seed, "s<stream>:branch", t, key, 1_000_000))`. It
+returns the per-tick states and events. Every cat is live (§13.4). Single-history
+mode is the **reference simulation**: calibration (`07` §3) compares the fog's odds
+against it.
 
-## 13. The wave
+## 13. The wave: fog and lantern
 
-A **history** is `{ id, streams, weight, state }`. `streams` maps every cat, and
-`world`, to an integer stream: the key of its sampled noise (§1). The wave at tick `t`
-is the list of histories alive at `t`, in canonical order (§14). Weights are integers
-summing to `WAVE_TOTAL` after every renormalisation. `streamsKey` is the canonical
-JSON of `streams`.
+Decided 2026-11-21 (design doc, World model › Fog and lantern). It replaces the
+weighted histories of the 2026-11-21 pack.
 
-**Start.** `tuning.waves.initialHistories` = `N` histories; history `i` has every
-stream set to `i`, id `i` as 8 hex digits, and weight `WAVE_TOTAL / N` (the remainder to
-history 0).
+The wave is everything not yet watched. It has two parts:
 
-**Each tick**, for every history:
+- the **lantern**: Marti and the cats he perceives, simulated by `step` (§6) on one
+  concrete state, as in single-history mode;
+- the **fog**: every other cat and every world quantity nobody live has fixed, held as
+  probabilities and **computed**, never simulated.
 
-1. run `step` with an empty branch list; while it returns a branch point, expand
-   every option with probability > 0 (depth first, in option order), extending the
-   branch list. Each finished leaf is a **child** with weight
-   `trunc(parent.weight × Π ppm / 1_000_000^k)`, computed one factor at a time with
-   truncation, the rounding remainder given to the first leaf;
-2. children keep the parent's `streams`; a child's `id` is
-   `hash32(parent.id + "|" + t + "|" + branchLabels.join(","))` as 8 hex digits.
+Displayed odds only need to be plausible, not exact: every collapse draws its outcome
+from them, so they are honest by construction. Where the fog is an approximation,
+this section says so. Calibration (`07` §3) measures how far it drifts from the
+reference simulation.
 
-Then, over all children of all histories:
+### 13.1 Played stretch and projection
 
-3. **merge**: children with the same `hashState(state)` and the same `streamsKey`
-   become one; weights add; it keeps the smallest `id`;
-4. **imposed facts**: apply watched facts and Gaze samples for this tick (§15);
-5. **rejuvenate**: if step 4 dropped histories and fewer than
-   `tuning.waves.rejuvenateBelow` remain, copy each survivor into
-   `ceil(initialHistories / count)` copies. Copy 0 is the original; copy `j > 0` gets,
-   for every cat that is not followed and for `world`, the stream
-   `hash32(oldStream + "|" + t + "|" + j) % 2^31`, and the id
-   `hash32(parent.id + "|" + t + "|copy" + j)`. Weights are split equally (remainder to
-   copy 0). This only changes rolls after `t`, whose distribution is the same for any
-   stream, so it is a valid move: it restores variety among unwatched cats after
-   watching Marti has narrowed the wave to his own behaviour;
-6. **trim**: if more than `tuning.waves.cap` remain, resample (§14);
-7. renormalise to `WAVE_TOTAL` (scale every weight with `trunc`, remainder to the
-   first history in canonical order).
+- The **played stretch** is ticks `0 .. playedTo`, the ticks watched in playback on the
+  current timeline (`04` §6). On it the lantern exists: Marti is live, the weather is
+  concrete (sampled as in §12.4 with stream 0), and placed cats are live (§15).
+- The **projection** is ticks `playedTo + 1 .. world.ticks`. Everything there is fog,
+  protagonists included: each protagonist's chain starts as a point mass at his live
+  state at `playedTo`. Ghosts ahead of the playhead, the anchor's odds and the fray come
+  from the projection.
 
-**Lineage.** For every history at `t + 1` record its parents at `t` with the share of
-each parent's weight it received. A child of a split has one parent; a merged history
-has several; a resampled history has the one it was copied from. This DAG drives
-conditioning (§16) and fast pruning (§15.2).
+Before anything is played, `playedTo = 0` and the projection covers the whole day.
 
-Sampled noise uses the **streams**, never the id. So a split does not change a cat's
-later rolls, and an edit that does not touch a cat's inputs leaves its behaviour
-unchanged in every history. Followed protagonists never get new streams. This is what
-makes "repeat by default" hold.
+### 13.2 Cat chains
 
-## 14. Trimming
+A **cat chain** is a probability distribution over **chain states** for one cat, held
+per case (§13.5) and advanced in **fog steps** of `tuning.fog.stepTicks` ticks (5, the
+decision interval). Frames for the ticks inside a step use that step's distribution.
 
-When the wave exceeds `cap` after merging:
+A chain state is:
 
-1. **Group** histories by pattern signature plus the state of every storylet
-   (inactive or its state name) plus the weather.
-2. Order groups by total weight, descending (ties by the group key).
-3. Every group of weight ≥ `tuning.waves.floorPpm` × `WAVE_TOTAL` / 1 000 000 (the
-   importance floor, about 2%) gets one slot. Then smaller groups get one slot each in
-   order while slots remain. Groups left without a slot are dropped.
-4. The remaining slots go to the kept groups in proportion to their weight (largest
-   remainder, ties by group order).
-5. Within a group of `n` histories with `k < n` slots, **systematic resampling**:
-   sort by `(stateHash, streamsKey)`; positions `u_j = offset + j × W / k` with
-   `offset = rand(seed, "wave", t, "resample:" + groupKey, W / k)`; each position
-   keeps the history whose cumulative weight range contains it; kept copies get weight
-   `W / k` (remainder to the first). A history picked twice is kept once with double
-   weight.
+```ts
+interface ChainState {
+  activity: ActivityId;          // includes 'none' and the built-ins of §8.2
+  place: NodeId;                 // where the activity happens (the place selector's pick)
+  walk: null | { from: NodeId; path: NodeId[]; leftSteps: number; ofSteps: number };
+  leftSteps: number;             // fog steps left at the place; 0 = finished
+  bands: Record<GaugeId, number>;// band index of each banded gauge (below)
+  interrupt: null | { action: string; leftSteps: number };
+  control: 'free' | 'storylet' | 'forced';
+}
+```
 
-Canonical order of a wave: by `(stateHash, streamsKey, id)`.
+- **Probabilities** are integers in ppm per case; each cat's chain sums to 1 000 000 in
+  every case. Products truncate; the remainder of a renormalisation goes to the first
+  state in canonical order (the canonical JSON of the state, sorted).
+- **Sparse.** Only states with mass are stored. After every step, states below
+  `tuning.fog.minStatePpm` are dropped and the cat's chain renormalised.
+- **Durations** in steps: `ceil(ticks / stepTicks)`. An activity's duration
+  `[lo, hi]` becomes a uniform distribution over `leftSteps` values. Walking uses the
+  path of §3; its position at a tick is interpolated along the path as in §3.
+- **Bands.** A gauge that changes during the day (hooks, pressure) is banded:
+  its range is cut into `tuning.fog.bands` equal bands; its value in conditions is the
+  band's midpoint. At most `tuning.fog.maxBandedGauges` gauges per cat are banded:
+  those read by the scores or gates of the cat's activities and of storylets it can
+  hold a role in, in hooks.json order. The cat's other changing gauges and all traits
+  are **mean-field**: one expected value per cat and case, updated by the same rules.
+- **Initial distribution.** At tick 0 each cat is at its `start` with
+  `startActivity`. Each banded gauge's mass is spread over the bands its cast.json range
+  overlaps, in proportion to the overlap. Mean-field gauges start at the range's middle.
+  Protagonists are the exception: they are live from tick 0 with stats drawn as in §5,
+  stream 0.
+- **Rise and decay.** A hook rule that would add `add` to a gauge over a step moves
+  `trunc(add × 1 000 000 / bandWidth)` ppm of each state's mass to the next band (or
+  the previous one for a negative add), scaled by the ppm of the rule's `when`
+  condition. Temporary mods from effects shift bands the same way when applied and
+  shift back at their expiry (a decaying mod shifts back in equal parts each step).
+
+### 13.3 The decision function
+
+There is **one** decision function, used by the lantern and the fog. Every condition
+of §10.1 returns a probability in ppm instead of a boolean:
+
+- in the lantern, about live things, it returns 0 or 1 000 000, so the arithmetic is
+  exactly the boolean arithmetic of §8 to §10;
+- about anything in the fog (a fogged cat, a fog fact, flag, counter or storylet
+  state), it returns that quantity's probability at this tick in the current case
+  (§13.6).
+
+Score terms use the ppm: `{ if, add }` adds `trunc(add × ppm / 1 000 000)`; a
+`gauge` term reads the gauge's value (live) or band midpoint (banded) or expected value
+(mean-field). A **gate** holds when its ppm is at least `tuning.fog.gateThresholdPpm`
+(500 000). `all` multiplies ppm (independence assumed), `any` is `1 − Π(1 − p)`, `not`
+is `1 − p`.
+
+At a fog decision (a decision step, an activity finished, or arrived with an empty
+route), a chain state's mass is split over the candidate activities by the same
+softmax as §8.2, with stickiness and offers. A candidate's place is the place
+selector's pick from the state's place; a selector that samples (`neighbour`,
+`randomNode`) splits the mass evenly over its candidates. `nearCat` picks the node
+where the nearest other cat most likely stands.
+
+The fog never reimplements the decision function, the place selectors or the score
+terms: it calls the same code with fog inputs.
+
+### 13.4 Live and fogged cats
+
+On the played stretch each cat is either **live** (part of the lantern) or **fogged**:
+
+- Marti, and every followed protagonist, is live on the whole played stretch.
+- A fogged cat becomes live when it is **placed** (§15.1).
+- A live cat that no protagonist has perceived for `tuning.lantern.releaseAfterTicks`
+  ticks is **released**: at the next step boundary it returns to the fog as a point
+  mass at its live state (bands from its exact gauges).
+
+The lantern state is `{ sim: SimState, live: CatId[], dwell: Record<CatId, number>,
+heldStorylets: StoryletId[] }`. `step` gets `live` and `heldStorylets` as arguments:
+phases 3 and 6 skip cats that are not live, and phase 4 skips storylets held by the
+fog. In single-history mode every cat is live and no storylet is held, so `step`
+behaves exactly as in M1 (the M1 golden hashes must not change).
+
+A storylet is **held by the fog** while any of its bound roles (or, before
+activation, any role it would bind) is a fogged cat. It runs in the lantern once every
+role is live, or once a protagonist perceives one of its events; then its state is
+drawn from its fog distribution (purpose `"storylet:" + id`, §15.1) and it continues
+live. When a role's cat is released, the storylet returns to the fog as a point mass at
+its current state.
+
+### 13.5 Cases and links
+
+A **case** is an assignment of values to the shared causes: the **weather** state
+(`dry`, `rain`, `stopped`) and each **link**. The fog holds a list of cases, each with
+an integer weight (all cases sum to `WAVE_TOTAL = 1 000 000 000`) and, conditioned on
+that case, every fogged cat's chain and every fog quantity. Cats are independent given
+the case; correlation between cats comes only through cases. (This is a factored
+forward pass in the style of Boyen and Koller.)
+
+- **Weather.** On the played stretch the weather is concrete and there is one weather
+  case. In the projection the weather case moves by the hazards of §7, using the exact
+  start-time distribution for `minDurationTicks` (the weather alone is tracked tick by
+  tick with its start tick; cats only see the three states).
+- **Links** are boolean facts or storylet states read by several cats, so that the
+  readers agree on them. At load, the **readers index** lists, for every fact, flag and
+  storylet state, which conditions read it (activity scores and gates, storylet gates
+  and exits, hook rules, detectors, the anchor's requirement tree). The links are the
+  facts and storylet states read by at least two different cats or by the anchor's
+  requirement tree, ranked by the number of readers (ties by file order), at most
+  `tuning.fog.maxLinks`.
+- **Splitting.** In a case where a link is false, let `m` (ppm) be the probability
+  that its causes set it during this step, computed in that case. The case splits: a
+  new case where it is true takes `trunc(weight × m / 1 000 000)`, the false case
+  keeps the rest; both inherit the same chains and quantities. From then
+  on every reader evaluates the link as 0 or 1 000 000 in that case. Cases with the
+  same assignment merge: weights add, chains mix by weight.
+- **Meetings.** Two fogged cats meet through **expected company**: the chance both
+  are at a place is the product of their masses there. A storylet or effect that needs
+  them together fires with that probability. Its effect on a banded gauge is an
+  average nudge (`p × add`). A lasting effect (a fact, flag or `heard`) that something
+  reads, once its probability passes `tuning.fog.linkFloorPpm` (about 5%), is promoted
+  to a link if a slot is free. Otherwise each fact, flag and `heard` keeps a
+  **contributor heap**: its top `tuning.fog.contributors` sources (storylet or effect,
+  cats, place, window, ppm added). §15.3 builds links from the heap on demand.
+- **Pressure** in the fog sums the expected number of cats present.
+
+The number of cases is at most 3 × 2^`maxLinks`.
+
+### 13.6 Fog quantities
+
+Every world quantity the lantern has not fixed is a probability per case:
+
+| Quantity | In the fog |
+| --- | --- |
+| a fact | P(set by this tick); never decreases |
+| a flag (scoped or not) | P(set now), with its `until` handled per contributing effect |
+| a counter | expected value and variance (integers); `{ counter, gte }` uses the committed `PHI` table on the standardised distance (§13.7) |
+| a storylet's state | a distribution over `inactive`, its states and `ended`; roles bound as below |
+| an event | P(emitted at each place this step) |
+| `heard` for a cat | P(the cat has perceived the event); never decreases |
+| a detector | P(completed by this tick), estimated (below) |
+| the anchor | P(reached by this tick) and P(dead by this tick) |
+
+- **Storylets in the fog.** Activation: the cumulative activation probability is the
+  running maximum of the trigger's ppm. Roles bind as in §9.1; a dynamic role
+  (`nearCat`) binds the cat most likely to satisfy it at activation (ties in cast
+  order); an optional role binds only if that likelihood passes the gate threshold.
+  Auto exits move the mass of the state times the gate's ppm when the gate passes the
+  threshold; hazard exits use §9.2's rates with terms scaled by ppm; choice exits use the
+  decision function on decision steps, times the probability that the actor is
+  available (standing at a node, no interrupt). Entering a state applies its effects
+  with that state's entering mass `m`: a fact or flag gains `m`; a cat-directed effect
+  (`goTo`, `startActivity`, `interrupt`, `gauge`, `stop`) moves `m` of that cat's chain
+  mass (independence assumed); an emitted event gains `m` at its place.
+- **Detectors in the fog** are estimated as the product, over the kernel's clauses in
+  order, of the highest probability each clause's condition or event reaches inside its
+  window. `unless` clauses are ignored. Only detectors that something reads, or that a
+  requirement item names, are estimated.
+- **Perception between fogged cats** (`heard`, hook `onEvent`, `factIfPerceivedBy`,
+  `socialSpread`) uses the **place perception table**: for every pair of nodes, each
+  sense and each of `dry` and `rain`, whether §4 `perceives` would hold between cats
+  standing there. It is built once at load. A walking cat counts as standing at the
+  nearer end of its current edge.
+- **Pins on fogged targets** apply their primitives as mass moves: `interrupt` and
+  `delay` move the targeted mass into an interrupted state for the sampled duration
+  (a uniform split over the range); `gaugeShift` shifts bands; `attract` and `repel`
+  add offers to the decision function; `setFlag` and `triggerStorylet` act on fog
+  quantities. Willpower (§8.4) reduces direct effects as in the lantern. A pin on a cat
+  acts on the whole chain wherever the cat is; validity (§11) is evaluated per state and
+  the invalid share produces `fizzle` with that probability.
+
+### 13.7 Numbers
+
+`src/sim/phi-table.ts` holds `PHI[k] = round(1 000 000 · Φ(k / 100))` for
+`k = 0..400`, Φ the standard normal CDF, generated by `scripts/gen-phi-table.ts` and
+committed. `P(X ≥ x)` for a counter with mean `μ` and variance `v` is
+`z = trunc((μ − x + ½) × 100 / isqrt(v))` (scaled to integers), `PHI[min(|z|, 400)]`
+mirrored for negative `z`; with `v = 0` it is 0 or 1 000 000. Everything else in the fog
+uses the integer rules of §1.
+
+### 13.8 Randomness
+
+Randomness in the lantern is §1's with stream 0 for every live cat and the world.
+The fog has no randomness of its own: it carries probabilities. Draws that turn fog
+into fact use scope `obs` (§15). The scopes `s<stream>:*` with other streams are used
+only by single-history mode.
+
+## 14. Forward and backward passes
+
+**Forward pass.** From a checkpoint, advance the lantern one tick and the fog one step
+whenever a step boundary passes, in this order per tick: the lantern's `step` (§6)
+with live cats and lantern storylets; the fog step (weather case, links, storylets,
+chains, quantities, events, perception between fogged cats); then the lantern edge
+(§15.1). Lantern effects on the fog (an event emitted, a fact set, a cat spooked) are
+applied to the fog in the same tick; fog quantities read by live cats are read as ppm
+(§13.3). In the projection there is no lantern: only fog steps.
+
+**Backward pass.** When evidence arrives at tick `t` (a placement, a negative
+observation, a watched fact, a Gaze sample, or the anchor treated as already seen):
+
+1. **Cases.** Each case's weight is multiplied by the likelihood of the evidence in
+   that case, then all weights are renormalised to `WAVE_TOTAL`. This is exact Bayes
+   over cases: seeing Ogryzok at the pier raises the cases in which the cart did not
+   come, and with them the cats that read that link.
+2. **Chains.** In each case, the observed cat's chain at `t` is conditioned on the
+   evidence (the states that disagree get 0, the rest renormalised).
+3. **Smoothing.** The same cat's earlier fog steps, back to where it was last live or
+   to tick 0, are re-weighted by the forward–backward rule so earlier ghosts agree
+   with what was seen. This only changes frames of past ticks, so an implementation may
+   defer it until those frames are requested.
+4. **Forward again.** The fog is re-advanced from `t` with the new weights.
+
+**Anchor treated as already seen.** With `tuning.waves.anchorConditioning` on, the
+projection's case weights are multiplied by P(anchor reached | case) at the chapter's
+end, so unwatched odds lean toward the anchor. Chains inside a case are not
+re-weighted (an approximation). With the knob off, or when no case reaches the anchor,
+raw weights are used. **Strain** (debug panel only) is the unconditioned P(anchor).
 
 ## 15. Observation and Gaze
 
-### 15.1 What a protagonist perceives
+### 15.1 The lantern's edge: placement
 
-For a followed protagonist `P` in history `h` at tick `t`, the **perceived view**
-`view(h, P, t)` is the canonical JSON of:
+Every tick on the played stretch, after `step`, for each followed protagonist `P` and
+each fogged cat `c`, in cast order:
 
-- `P`'s own position, activity, interrupt action, and the storylet states it holds a
-  role in;
-- every other cat `P` perceives by sight (§4): its id, position and activity;
-- every event of tick `t` that `P` perceives, with the fields that sense reveals
-  (sight: everything; hearing only: the event name and, for `voice`, the hook);
-- the weather.
+1. `q` = the probability, over `c`'s chain in the current case mixture, that `P`
+   perceives `c` by sight (§4, from `c`'s state position).
+2. Draw `r = rand(seed, "obs", t, "place:" + P + ":" + c, 1 000 000)`. No log hash:
+   unrelated edits keep the same draw where the odds allow it.
+3. If `r < q`, **place** `c`: pick a state among those `P` would perceive, in
+   proportion to mass, with a second draw (purpose `"pick:" + P + ":" + c`). Make `c`
+   live: position and activity from that state; `activityLeft` drawn uniformly within
+   the state's remaining steps (purpose `"left:" + c`); each banded gauge drawn
+   uniformly within its band, and mean-field gauges set to their expected value
+   (purpose `"gauge:" + c + ":" + g`); traits drawn from cast.json as in §5 with
+   stream 0; flags and `heard` set where their probability is at least 500 000.
+   `c` gets `dwell = tuning.lantern.dwellTicks`: while it is above 0, phase 6 makes no
+   free decision for `c` (it keeps its activity) and it counts down each tick. Then
+   apply the evidence "`c` is in that state at `t`" by the backward pass (§14).
+4. Otherwise apply the **negative evidence** "`P` does not see `c` at `t`" by the
+   backward pass: the states `P` would perceive get 0.
 
-Gauges, flags and counters are never part of a view: initial stats narrow only
-through behaviour. `digest(view)` is `hash32` of that JSON.
+Storylets held by the fog collapse the same way when they become live (§13.4): a
+state is drawn from their distribution, purpose `"storylet:" + id`, then evidence is
+applied. Events emitted in the fog that `P` would perceive are drawn per place with
+purpose `"event:" + name + ":" + node`; drawn ones are emitted into the lantern as if
+live, the rest are negative evidence.
+
+If no state is consistent with what is already fixed (every candidate has 0 mass), try
+the next state in canonical order; if none exists, the placement uses a **local
+cause**: the cat is placed in the activity it is seen doing with no change to anything
+else, and `stats.localCauses` counts it.
 
 ### 15.2 Watching (playback)
 
 During playback the player layer calls `observe(t, P)` (`04` §6) once per tick that
-passes. The worker:
+passes. The worker advances the lantern and the fog to `t` (§14, §15.1) and returns a
+**watched fact** `{ tick, cat: P, digest, summary }`. The perceived view and its
+`digest` are as before: `P`'s own position, activity, interrupt and storylet states;
+every cat `P` perceives by sight with its position and activity; every event of tick
+`t` `P` perceives, with the fields that sense reveals; the weather. `summary` lists
+what the view shows that the UI and payouts need: storylet states entered
+(`"storyletId.state"`), detectors completed, the facts those set at `t` (`factsSet`),
+other events by name, cats seen, `nodesSeen` (nodes `P` perceives by sight, each node a
+sight source at its position), and for each storylet state or detector its `paidBy`:
+the `touchedBy` pins of the live cats bound to its roles (or involved in the
+detector). It also carries `totalPressure`: the summed pressure of all live cats plus
+the expected pressure of the fogged ones. Then `playedTo = t` and the projection is
+recomputed from `t + 1`.
 
-1. groups the histories at `t` by `digest`; each group's weight is its conditioned
-   weight (§16) or, when the timeline is frayed, its raw weight;
-2. samples a group: `sample(groupPpm, rand(seed, "obs", t, "watch:" + P + ":" +
-   logHash, 1_000_000))`, groups in ascending digest order. `logHash` = `hash32` of
-   the canonical JSON of the pins with `tick <= t`;
-3. drops every history at `t` not in that group, and through the lineage DAG every
-   weight at `t' > t` that flowed only from dropped histories (weights flowing from
-   several parents shrink by the dropped parents' shares);
-4. rejuvenates the survivors as in §13 step 5, then recomputes reach (§16) and the
-   frames, so earlier ticks narrow too (backward conditioning). The copies' futures
-   are simulated from `t` on: this is the one case where observation re-simulates;
-   it costs at most one recompute from `t` with the current histories;
-5. returns a **watched fact** `{ tick, cat: P, digest, summary }`. `summary` lists
-   what the view shows that the UI and payouts need: storylet states entered
-   (`"storyletId.state"`), detectors completed, the facts those set at `t`
-   (`factsSet`), other events by name, cats seen, `nodesSeen` (nodes `P` perceives
-   by sight, each node a sight source at its position), and for each storylet state
-   or detector its `paidBy`: the union over the group's
-   histories of the `touchedBy` pins of the cats bound to its roles (or involved in
-   the detector). It also carries `totalPressure`: the weighted mean, over the group,
-   of the summed pressure of all cats.
+The same seed, pins and tick give the same watched fact.
 
-Sampling can never empty the wave. Same seed, pins and tick give the same pick.
+### 15.3 Links on demand
 
-### 15.3 Gaze
+When a placement or a watched event shows a lasting effect (a fact, flag or `heard`)
+whose cause is in the fog and is not a link, the worker builds links from that
+quantity's contributor heap: each listed source becomes a link (while slots allow),
+the fog is recomputed from the earliest source's window, and the evidence is applied
+again. Seeing that Grisha knows the tale then makes Semyon more likely to have been at
+the bakery around 10:00. Sources that are not listed are explained by a local cause.
 
-A power pin with the `collapse` primitive (Gaze) samples during the computation
-itself, at each of its ticks `pin.tick .. pin.tick + ticks − 1`, with a view made of
-everything within `radiusM` metres of the place, ignoring walls and weather: cats
-(id, position, activity) and events. Sampling purpose `"gaze:" + pin.id + ":" + t`
-(no log hash, so unrelated edits keep the pick when the odds allow it). The facts it
-fixes are recorded in the timeline as `gazeFacts` and count as paid (`04` §7). They
-earn no payouts.
+### 15.4 Gaze
 
-### 15.4 Imposed facts (testing)
+A power pin with the `collapse` primitive (Gaze) draws, at each of its ticks
+`pin.tick .. pin.tick + ticks − 1`, everything within `radiusM` metres of the place,
+ignoring walls and weather: each fogged cat is placed or not by §15.1's rule with that
+circle instead of `P`'s perception (purpose `"gaze:" + pin.id + ":" + t + ":" + c`).
+Gazed cats are fixed at those ticks as evidence; they do not become live unless a
+protagonist perceives them. The facts it fixes are recorded as `gazeFacts`, count as
+paid (`04` §7) and earn no payouts.
 
-Watched facts are passed into every recompute. At a watched fact's tick, histories
-whose digest differs are dropped (step 4 of §13). If that would drop every history,
-the fact is **impossible**: it is skipped and reported as `reopened` in the result.
-If what survives has less than `tuning.observation.reopenBelowPpm` of the weight
-before testing, the fact is also reopened and nothing is dropped. The default is 0
-(reopen only when impossible). When a watched fact reopens is an open question
-(glossary, Open conflicts 2): keep the knob, do not change its default.
+### 15.5 Imposed facts (replay)
 
-## 16. Anchor conditioning, fray and frames
+Watched facts are passed into every recompute. When an edit at tick `e` lies inside
+the played stretch, the worker replays from the checkpoint at or before `e` with the
+new pins and the same draws. At each watched fact's tick it compares the lantern's view
+with the fact:
 
-**Reach.** Walking the lineage DAG backward from the last tick:
-`reach(h) = 1 000 000` for a history that reached the anchor, 0 for a dead one, and
-for every other history the share-weighted mean of its children's `reach` (in ppm,
-`trunc`).
+- Parts about cats other than `P` that differ: if the cat's chain (or, for a live cat
+  that the edit changed, its chain from the tick it diverged) gives the watched
+  position and activity a probability above 0, the cat is **forced** into that state
+  (placed with that state instead of a draw) and the evidence is applied.
+- Parts about `P` itself, or forced parts with probability 0, make the fact
+  **impossible**: it is skipped and reported as `reopened`.
+- `tuning.observation.reopenBelowPpm` (default 0) reopens a fact whose forced parts
+  together have less than that probability. When a watched fact reopens is an open
+  question (glossary, Open conflicts 2): keep the knob, do not change its default.
 
-**Conditioning.** With `tuning.waves.anchorConditioning` on (the anchor treated as
-already seen) and at least one history reaching the anchor, a history's
-**conditioned weight** is `mulPpm(weight, reach)`. Everything the player sees and
-every probability shown is computed from conditioned weights. With the knob off, or
-when no history reaches the anchor, raw weights are used.
+## 16. Fray and frames
 
-**Early cut.** With conditioning on, a history stops being simulated the tick it dies
-(its reach is 0 anyway). Its frames up to that tick are kept.
+**Fray.** On the played stretch, the timeline frays at the tick `fraysIf` holds live
+without the anchor fact. In the projection it frays at the first tick from which the
+anchor's probability of being reached is below `tuning.fog.frayBelowPpm` (1 000). The
+timeline ends there.
 
-**Fray.** If no history reaches the anchor, the timeline is **frayed** at the last
-tick at which any history was still alive. The timeline ends there.
-
-**Strain** (for the debug panel only): the raw weight share of histories that reach
-the anchor. Whether it feeds the frontier is an open question; do not use it anywhere
-else.
-
-**Frames.** For each tick the worker aggregates what the renderer and the player
-layer need (`02` §4): per cat, the distinct `(position, activity, interrupt)` with
-their summed conditioned weights in ppm; per event kind and storylet state, the
-probability it happens at that tick; the probability it is raining; the probability
-each requirement item holds; and `samples`: up to `tuning.render.focusSamples`
-histories with the highest conditioned weight (ties by canonical order), each with its
-cats' position and activity and its weight, for the renderer's focus layer (`06` §2).
-Frames are recomputed from stored per-history views
-whenever weights change (an observation, a recompute); they never hold history state.
+**Frames.** For each tick the worker aggregates what the renderer and the player layer
+need (`02` §4): per cat, the distinct `(position, activity, interrupt)` with their
+probabilities in ppm (a live cat has one at 1 000 000); per event kind and storylet
+state, the probability it happens at that tick; the probability it is raining; the
+probability each requirement item holds; and `samples`: `tuning.render.focusSamples`
+coherent trajectories for the renderer's focus layer (`06` §2), made by drawing a case
+by weight and then backward-sampling each fogged cat's chain in that case (purpose
+`"focus:" + k`, scope `render`, never `obs`). Frames are derived and never saved.
 
 ## 17. Recompute
 
-The wave keeps a **checkpoint** (the full list of histories) every
-`tuning.waves.checkpointEvery` ticks. After an edit at tick `e` (a pin added, moved
-or withdrawn), the worker resumes from the last checkpoint at or before `e`, replays
-with the new pins and every watched fact, and recomputes to the end. Ticks before the
-checkpoint are untouched. After a watched fact is added, only §15.2 runs: pruning,
-and a re-simulation from that tick only when it rejuvenates.
+The worker keeps a **checkpoint** of the lantern state and the fog (cases, chains,
+quantities) every `tuning.waves.checkpointEvery` ticks of the played stretch. After an
+edit at tick `e`:
+
+- `e > playedTo`: only the projection is recomputed, from `e`.
+- `e ≤ playedTo`: replay from the last checkpoint at or before `e` (§15.5), then
+  recompute the projection.
+
+After a watched fact is added, only §15.1 and §15.2 run for that tick, then the
+projection is recomputed.
 
 A recompute returns `{ frames, end, reopened, breaks, gazeFacts, stats }` where `end`
-is `{ kind: 'anchor' | 'fray' | 'chapterEnd', tick }` and `stats` holds history
-counts per tick, recompute time and strain (debug only).
+is `{ kind: 'anchor' | 'fray' | 'chapterEnd', tick }` and `stats` holds, per tick, the
+number of cases, live cats and fog states, plus recompute time, strain and
+`localCauses` (debug only).
 
 ## 18. What must always hold (tests)
 
 - Same content, seed, pins and watched facts → identical recompute results, on every
   run and in every browser engine the e2e suite covers.
 - Every number in every state is an integer; every gauge value is within its range;
-  weights sum to `WAVE_TOTAL` after every tick.
+  every cat's chain sums to 1 000 000 in every case; case weights sum to
+  `WAVE_TOTAL`.
+- Single-history mode is unchanged by this section: M1's golden hashes hold.
 - Adding a pin at tick `t` leaves every frame before `t` unchanged when no watched
   fact after `t` reopens.
-- A pin that is invalid in every history leaves the wave identical to the wave
-  without it, except for its `fizzle` events.
-- Splitting is exact: for a single storylet transition, the children's weights equal
-  the softmax or hazard probabilities times the parent's weight, up to truncation.
-- Observation never empties the wave; the same inputs pick the same group.
+- A pin that is invalid in every state leaves the wave identical to the wave without
+  it, except for its `fizzle` events.
+- On the tiny world, with one fogged cat and no links, the fog's marginals equal an
+  exact enumeration of that cat's single-history outcomes to within
+  `tuning.fog.exactTolerancePpm`; with one link, the case weights after evidence equal
+  Bayes' rule computed by hand.
+- The fog and the lantern call the same decision function: a test feeds a live state
+  and the matching point-mass chain state and gets the same probabilities.
+- Placement draws come from states with mass above 0, or are counted in
+  `stats.localCauses`.
 - **Calibration** (`07` §3): over many seeds, a probability shown at one tick matches
-  how often the event then happens, bucket by bucket.
-- With an empty log, for seeds 1 to 50, Marti is in region `flat` at every tick in
-  every history.
+  how often the event happens in the reference simulation, bucket by bucket.
+- With an empty log, for seeds 1 to 50, Marti is in region `flat` at every tick: live
+  on the played stretch, and with all his chain's mass there in the projection.

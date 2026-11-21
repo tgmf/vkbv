@@ -17,7 +17,7 @@ recorded, and its balance is measured and reported so Tagir can decide.
    marker; `-- --actions` lists every interrupt action and activity each cat can show
    (for the art brief).
 6. The handoff note includes: the balance table; the full calibration table; recompute
-   times at the chosen cap; history counts per hour for `untouched` and `road_both`;
+   times with the chosen fog knobs; cases, live cats and fog states per hour for `untouched` and `road_both`;
    and, for each failing balance property, what in the content causes it (traces,
    not opinions).
 
@@ -29,7 +29,7 @@ recorded, and its balance is measured and reported so Tagir can decide.
 - [ ] Every failing balance property is a question in `docs/questions.md` with its
       measured value and the trace that explains it. Content and tuning are
       unchanged.
-- [ ] The recompute budget holds for every pin set at the chosen cap.
+- [ ] The recompute budget holds for every pin set with the chosen fog knobs.
 
 ## Out of scope
 

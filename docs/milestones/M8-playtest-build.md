@@ -26,7 +26,8 @@ to judge Gate A.
 - [ ] Changing a tuning value in the panel changes the next recompute; "copy as JSON"
       produces a valid `tuning.json`.
 - [ ] Loading a pin set from the Pin sets tab reproduces its golden playback.
-- [ ] The Wave tab shows history counts, strain and the last recompute time.
+- [ ] The Wave tab shows cases, live cats and fog states per tick, strain, local
+      causes and the last recompute time.
 - [ ] A scripted session produces every telemetry event at least once, and
       `summarizeSession` returns the expected numbers (unit test).
 - [ ] With no `VITE_TELEMETRY_URL`, no network request is made (Playwright).

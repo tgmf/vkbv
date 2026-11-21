@@ -1,14 +1,16 @@
 # M3 — Observation and the player layer, headless
 
-**Goal:** everything in `04-player-layer.md` and playback observation (`03` §15.2) as
+**Goal:** everything in `04-player-layer.md`, playback observation (`03` §15.2) and
+links on demand (`03` §15.3) as
 pure, tested functions, driven headless. No UI.
 
-**Read first:** `04-player-layer.md`, `03` §11, §15–§17, `01` §3.
+**Read first:** `04-player-layer.md`, `03` §11, §13–§17, `01` §3.
 
 ## Build
 
-1. Worker `observe` (`03` §15.2): sample, prune, refresh frames, return the watched
-   fact.
+1. Worker `observe` (`03` §15.2): advance the lantern and the fog to the tick, place
+   or apply negative evidence at the lantern's edge (§15.1), recompute the projection,
+   return the watched fact. Links on demand from contributor heaps (§15.3).
 2. `player/state.ts` (`newGame`), `player/actions.ts` (`inspect`, `playCard`,
    `withdraw`, `movePin`, `usePower`, `follow`, `setPlayhead`, `advance`,
    `applyPreview`), `player/rewards.ts`, `player/frontier.ts`, `player/save.ts`.
@@ -24,11 +26,15 @@ pure, tested functions, driven headless. No UI.
       revealed, object hidden, cat nowhere revealed, wrong bound cat, missing branch,
       beyond the frontier limit, after the end, charge short, unique pin moved or
       withdrawn, special already used).
-- [ ] Observation: the same seed, pins and tick give the same watched fact; the wave
-      is never empty after it; scrubbing calls nothing.
-- [ ] Rejuvenation: after watching 05:40 to 09:00 on seed 1, the wave holds at least
-      `waves.rejuvenateBelow` histories, the crew's positions at 09:00 differ between
-      histories, and every one of Marti's watched facts holds.
+- [ ] Observation: the same seed, pins and tick give the same watched fact; every
+      fogged cat's chain still sums to 1 000 000 after it; scrubbing calls nothing.
+- [ ] The fog stays open: after watching 05:40 to 09:00 on seed 1, the crew's ghosts at
+      09:00 still spread over at least two places (unless Marti has seen them), and
+      every one of Marti's watched facts holds.
+- [ ] Links on demand: on the tiny world, perceiving a fact whose cause is a meeting in
+      the fog raises the probability that the listed contributor was at that place in
+      that window (Bayes worked by hand in the test); an unlisted cause counts in
+      `stats.localCauses`.
 - [ ] Repeat by default: watch the morning to 10:00, scroll back to 07:00, pin
       `tea_break` on `town.roadworks`, play to 10:00 again: every watched fact of
       Marti's morning still holds and nothing reopens.

@@ -33,8 +33,8 @@ No CSS framework. Plain CSS with custom properties from `src/ui/theme.css`.
 src/
   sim/         rng.ts math.ts exp-table.ts hash.ts space.ts perception.ts
                conditions.ts scores.ts effects.ts cats.ts storylets.ts sifting.ts
-               pins.ts step.ts history.ts wave.ts trim.ts observe.ts frames.ts
-               recompute.ts vet.ts types.ts
+               pins.ts step.ts history.ts readers.ts fog.ts lantern.ts observe.ts
+               frames.ts recompute.ts vet.ts phi-table.ts types.ts
   player/      state.ts actions.ts rewards.ts frontier.ts save.ts
   bridge/      protocol.ts sim.worker.ts client.ts
   render/      SceneRenderer.ts three/ (graybox implementation)
@@ -48,7 +48,8 @@ src/
   i18n/        t.ts
   telemetry/   events.ts sinks.ts summary.ts
   cli/         sim.ts
-scripts/       content.ts validate-content.ts gen-exp-table.ts balance.ts calibrate.ts
+scripts/       content.ts validate-content.ts gen-exp-table.ts gen-phi-table.ts balance.ts
+               calibrate.ts
 tests/         *.test.ts, golden/, fixtures/, e2e/
 docs/          glossary, spec, milestones, handoff, questions, decisions
 ```
@@ -81,11 +82,12 @@ main thread                                         worker
 ───────────                                         ──────
 PlayerState (pins, watched, seed, …)
    │ edit (play, withdraw, move, power)
-   ├──────── recompute {pins, watched, preview} ──▶ wave from the last checkpoint ≤ edit tick
+   ├──────── recompute {pins, watched, preview} ──▶ replay from the last checkpoint ≤ edit tick,
+   │                                                 then the projection (03 §17)
    │◀─────── result {frames, end, reopened, …} ───┘  (03 §17)
    │ break alert if a paid fact would reopen; then commit
    │ playback tick t → t+1
-   ├──────── observe {t, cat} ────────────────────▶ sample a group, prune, refresh frames
+   ├──────── observe {t, cat} ────────────────────▶ advance the lantern, place cats, apply evidence
    │◀─────── {watchedFact, frames} ───────────────┘  (03 §15.2)
    ▼
 rewards (player/rewards.ts) → PlayerState
@@ -94,7 +96,7 @@ playhead + frac (UI) → SceneView → SceneRenderer
 
 Rules:
 
-- The wave lives only in the worker. The main thread holds `PlayerState` and the
+- The wave (lantern and fog) lives only in the worker. The main thread holds `PlayerState` and the
   latest **result** (frames, end, gaze facts, stats). Frames are derived and never
   saved.
 - The UI drives time: playback runs on `requestAnimationFrame` in `src/ui` with a
@@ -114,7 +116,7 @@ type MainToWorker =
   | { kind: 'recompute'; reqId: number; seed: number; pins: Pin[]; watched: WatchedFact[]; preview: boolean }
   | { kind: 'commit'; reqId: number }                      // make a preview the current wave
   | { kind: 'observe'; reqId: number; tick: number; cat: CatId }
-  | { kind: 'debugHistory'; reqId: number; tick: number; index: number };
+  | { kind: 'debugHistory'; reqId: number; tick: number; index: number }; // index 0: the lantern state; i > 0: reference histories (stream i)
 type WorkerToMain =
   | { kind: 'ready'; reqId: number }
   | { kind: 'vetted'; reqId: number; seed: number }

@@ -51,9 +51,11 @@ citing the test. Then list, most serious first:
 - any randomness, time, floats, Math.exp/log/sqrt/pow, or unordered iteration in
   src/sim or src/player;
 - random numbers keyed by anything other than the scopes in spec 03 §1 (in particular,
-  noise keyed by history id instead of stream);
-- anything in src/ui or src/render that changes which histories survive (the camera
-  must never collapse anything);
+  draws at the lantern's edge keyed by anything but the purposes in spec 03 §15);
+- a second copy of the decision function, place selectors or score terms for the fog
+  (spec 03 §13.3: one function, conditions return ppm);
+- anything in src/ui or src/render that turns fog into fact or applies evidence (the
+  camera must never collapse anything);
 - any gameplay number or rule in TypeScript instead of content or tuning, or in
   src/ui;
 - edits to src/content/data/ch1/;
@@ -87,7 +89,7 @@ Pins and watched facts (debug panel, Player tab → copy): <paste>
 What happened at tick <t>: <description>
 What the spec says should happen: <file and section, or "unsure">
 
-First reproduce it headless (npm run sim, with --waves if it involves ghosts,
+First reproduce it headless (npm run sim, with --fog if it involves ghosts,
 observation or probabilities) and show me the trace around that tick. Then write a
 failing test, then fix. If the spec is silent or the behaviour matches the spec, stop
 and tell me; do not change the design.

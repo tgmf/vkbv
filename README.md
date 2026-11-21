@@ -34,7 +34,7 @@ gauges, and the running storylets. Pick a seed, a stream and one of the spec's p
 | `npm run content:check`                         | Validates tuning and text files                                                 |
 | `npm run gen:exp-table`                         | Regenerates `src/sim/exp-table.ts` (never needed unless the spec changes)       |
 | `npm run sim -- --seed 1`                       | One headless history: an event trace and the final state hash                   |
-| `npm run balance`, `calibrate`, `golden:update` | Not available yet (M4, M2, M2)                                                  |
+| `npm run balance`, `calibrate`, `golden:update` | Not available yet (M4, M2, M2); the wave is fog and lantern since 2026-11-21     |
 
 ## Where things are
 

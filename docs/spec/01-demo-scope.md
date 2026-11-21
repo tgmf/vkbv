@@ -14,9 +14,10 @@ A single-page browser game, playable in 15 to 25 minutes on first try. Chapter 1
 - **Goal (the anchor):** Marti meets Rokko under the upturned boat on the beach while
   it rains. Left alone, Marti never leaves his flat and the timeline frays when Rokko
   leaves.
-- **The world is a wave.** Everything not yet watched is held as weighted candidate
-  histories and drawn as ghosts. Only what Marti perceives during playback becomes
-  fact. The camera is free and never collapses anything.
+- **The world is a wave.** Everything not yet watched is drawn as ghosts. Marti and
+  the cats he perceives form the **lantern**, simulated tick by tick; everything else
+  is the **fog**, computed as probabilities (`03` §13). Only what Marti perceives
+  during playback becomes fact. The camera is free and never collapses anything.
 - **Player:** the Filter's programming, not a character. The player watches,
   inspects objects in the flat to find cards, pins cards on cats, objects and places,
   uses two powers (the lure, which projects a glowing cat, and Gaze, which fixes a
@@ -96,7 +97,6 @@ it.
 | Powers other than the lure and Gaze (Filter pulse, Listen) | `powers.json` list |
 | The lure's `leadTo` (dragging it to a destination) | the field in `powers.json`, ignored |
 | Background population (aggregate waves for crowds) | none |
-| Forward–backward exact inference | the wave interface in `03` §17 |
 | Other chapters, endings, the final chapter | none |
 | Accounts, backend, multiplayer, cloud saves | none |
 | Mobile-first layout | Pointer Events only; no hover-only actions |
@@ -124,6 +124,6 @@ Code names that differ from the prose words:
 | place | `node` (`NodeId`) |
 | pin | `Pin` (the log entry; "play record" in older notes) |
 | the Filter dial | `temperatureTenths` |
-| a history's noise stream | `stream` |
+| a noise stream (0 in the lantern; others in single-history mode) | `stream` |
 | frontier limit | `frontierLimit` |
 | fray | `end.kind === 'fray'` |

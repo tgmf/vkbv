@@ -73,7 +73,7 @@ always the vetted one, so it always gives the same world.
   the frame at the playhead;
 - cat target: `bound` is null or that cat, and the cat stands at a revealed node with
   probability > 0 in the frame at the playhead. (A character card follows its cat:
-  in each history the pin acts wherever the cat is.)
+  the pin acts wherever the cat is, live or in the fog, `03` §13.6.)
 
 If the target is the card's `special.on` object and the card is not in
 `specialsUsed`, the UI first shows the special's confirm step (`06` §6). On confirm,
@@ -117,7 +117,7 @@ a hook discovered). Under the other rules nothing is drawn.
 
 Every action that changes `pins` is an **edit**. The UI sends the new pins with the
 current watched facts to the worker as a **preview**. The result says which watched
-facts would reopen (`03` §15.4).
+facts would reopen (`03` §15.5).
 
 - A reopened watched fact is **paid** if its `summary` has a non-empty `paidBy` for
   any storylet state or detector, or it is a Gaze fact. If any paid fact would
@@ -139,7 +139,7 @@ and the `follow(cat)` action signature; the action refuses every cat but Marti.
 ## 6. Frontier
 
 ```
-P_t(item)    = conditioned probability (03 §16) that a requirement item holds at t
+P_t(item)    = conditioned probability (03 §14, §16) that a requirement item holds at t
                (watched facts make it 1)
 progress(t)  = Σ weight of requirement items with P_t(item) >= tuning.frontier.countAtPpm
 frontierLimit = the largest t such that progress(t') <= frontier for every t' <= t

@@ -70,7 +70,7 @@ One English and one Russian form per name, taken from the character and encyclop
 | Anchor | The canon event that ends a chapter (Chapter 1: Marti meets Rokko under the boat). Shown first as a teaser. | Treated as already seen by default (knob), so unwatched waves lean toward it. The final chapter has no anchor. |
 | Teaser | The anchor shown before the chapter is played, like a "three months earlier" opening. | The whole game is a flashback. Not the same as a locked thread. |
 | Locked thread | A protagonist's thread shown but not yet playable, like Rokko's at the end of the demo. |  |
-| Frontier | The highest story progress ever reached, in any timeline: the chapter plus progress on its anchor's requirement tree, from watched facts, otherwise from the share of surviving histories. | Advances only in playback. The player can scroll up to the frontier limit. |
+| Frontier | The highest story progress ever reached, in any timeline: the chapter plus progress on its anchor's requirement tree, from watched facts, otherwise from the fog's odds. | Advances only in playback. The player can scroll up to the frontier limit. |
 | Frontier limit | The tick where the current timeline's progress first passes the frontier. The playhead can't go beyond it. | An edit that speeds the story up stops the player earlier in clock time. Replaces "scrub limit". |
 | Requirement tree | The facts that must happen for the anchor to happen, in their dependencies. | Expressible as a pattern (see Story sifting). |
 | Thread | One protagonist's line through the timeline. | Rokko and Litta add threads to the same timeline, not new runs. |
@@ -86,28 +86,34 @@ One English and one Russian form per name, taken from the character and encyclop
 | Term | Definition | Notes |
 | --- | --- | --- |
 | Wave | Anything not yet watched that could still turn out several ways, held as a probability. | The player sees waves as ghosts. |
-| History | One complete candidate version of the chapter, simulated from seed + log with its own rolls for unwatched choices. | Also "candidate history". The wave is the set of histories. |
-| Weight | A history's share of probability. Fixed-point, never float. |  |
-| Probability | The sum of weights of surviving histories in which something is true. | Must be calibrated. |
-| Split | When an unwatched storylet transition fires, a history becomes one child per exit, each weighted by that exit's exact probability. | Sim noise is sampled, not split. |
-| Merge | Two histories with identical state (state hash, including their pools) become one, weights added. |  |
-| Importance floor | Any branch above about 2% keeps at least one history, with its true small weight. | Keeps rare outcomes visible. |
-| Cap | The maximum number of histories. Over the cap, histories are resampled within groups of the same pattern signature (which includes storylet states), so weights stay honest. | Number is an open knob. |
-| Recompute | After an edit, every history is resimulated from the edited tick on. | Runs in a Web Worker. |
+| Probability | The chance of something, from the fog's forward pass; 1 or 0 for watched facts. | Calibrated by construction: collapses draw from it. |
+| Recompute | After an edit or a lantern write, the forward pass reruns from that tick on. | Runs in a Web Worker. |
 | Observation (watching) | A followed protagonist perceiving an event during playback. The camera never observes. | Scrubbing never observes. |
 | Collapse | An event becoming a fixed fact. |  |
-| Sampling | How observation works: the outcome is drawn from the current weights (keyed by seed, log and event); only the visible facts are recorded; every agreeing history is kept. | Can never empty the set of histories. Same inputs, same outcome; in the full game, awakened cats' free choices replay from the choice log. |
-| Testing | Checking histories against a fact that was imposed rather than drawn now: the anchor, or a fact watched before an edit. | The only place the system can fail (fray, break). |
+| Sampling | How observation works: the outcome is drawn from the current odds (keyed by seed, log and event); only the visible facts are recorded; the backward pass then updates linked unwatched events. | Same inputs, same outcome; in the full game, awakened cats' free choices replay from the choice log. |
+| Testing | Checking that a fact imposed rather than drawn now is still possible: the anchor, or a fact watched before an edit. It fails when its probability reaches zero. | The only place the system can fail (fray, break). |
 | Watched fact | A fact collapsed by observation. Stays fixed unless an edit makes it impossible. |  |
-| Imposed fact | A fact the histories must satisfy without being sampled now: the anchor, earlier watched facts. |  |
+| Imposed fact | A fact the odds must keep possible without drawing it now: the anchor, earlier watched facts. |  |
 | Observation gradient | Three levels: protagonist perception (collapse); causal neighbourhood (narrows by conditioning); everything else (pure wave). | Dreams never collapse. |
 | Protagonist collapse | What a followed protagonist perceives collapses, whether or not the camera is on them. Their future choices stay open. Starts when the player first follows them, and covers only stretches played on their thread. |  |
-| Backward conditioning | Dropping histories that contradict a fact, which narrows unwatched events before and after it. | Observation order is not time order. |
-| Early cut | Stopping a history the tick its anchor pattern dies, since it will get zero weight anyway. |  |
-| Calibration | Shown probabilities match observed frequencies, checked by an automated test over many seeds. |  |
-| Determinism | Same seed + log gives the same result in every browser: counter-based RNG keyed by seed, history, cat, tick, purpose; fixed-point maths; a precomputed σ table, never `Math.exp`. |  |
+| Backward conditioning | Updating unwatched events before and after a fact so they agree with it: Bayes back through cat chains and links (the backward pass). | Observation order is not time order. |
+| Calibration | Shown probabilities match observed frequencies. Holds by construction since 2026-11-21; tests now measure collapses with no consistent past, card direction, and the fog against the reference simulation (single full histories). |  |
+| Determinism | Same seed + log gives the same result in every browser: counter-based RNG keyed by seed, cat, tick, purpose; fixed-point maths; a precomputed σ table, never `Math.exp`. |  |
 | Perception | What a protagonist can sense at a tick: sight and hearing, reduced by rain, walls and distance. Can differ per character (Rokko follows several voices at once). Each event records what was perceivable. | Decided 2026-11-20. The only thing that collapses waves. |
-| Lantern | The look of perception: crisp around each protagonist, ghosts beyond, shrinking in the rain. Two lanterns when protagonists split up. | Signature look. |
+| Lantern | The area around a protagonist where the world is simulated tick by tick and perceived events collapse; the fog lies beyond. Crisp inside, ghosts outside, shrinking in the rain. Two lanterns when protagonists split up. | Signature look. |
+| Fog | Everything outside the lanterns, held as probabilities and computed, never simulated. | Decided 2026-11-21. The player sees it as ghosts. |
+| Cat chain | One unwatched cat's probability over activity states, tick by tick. A state is an activity plus his changing stats in bands. | Code: chain. |
+| Activity | What a cat is doing, tied to a place (fishing at the pier). Walking between places is an activity too. | Defined once in a shared activity catalogue; no routine per cat. |
+| Decision function | The one function that turns drives into odds of choosing each activity. The fog calls it on banded stats, the lantern on exact stats. | Never reimplemented for the fog. |
+| Link | A shared yes/no cause read by several cats or storylets: the weather, the cart, a meeting with a lasting effect. Everything that reads it is computed per case. | Not "node": node is the code name for a place. |
+| Expected company | The expected number of cats at a place at a tick, from the chains. Drives meetings and pressure in the fog. | Exact once perceived. |
+| Contributor heap | For each flag, its top 3–5 sources of probability (pair, place, window, amount). Links are built from it when a consequence is perceived. | Size is a knob. |
+| Readers index | Built at load: for each flag, which storylets, formulas, detectors and decisions read it. | Decides which meetings become links in advance. |
+| Base flag | A flag set directly as a declared effect of a rule (gossip sets knowsTale). | Belongs to a cat, an object or place, or the world. |
+| Derived flag | A flag set by an event detector that matches a combination of events. | Matched for real in the lantern, estimated from its ingredients in the fog. |
+| Forward pass, backward pass | Forward: carrying probability through chains, links and formulas to get the odds. Backward: Bayes from a perceived fact back to its causes, then forward again. | Together: forward–backward. |
+| Placement | Turning a perceived cat from probability into a live cat on an authored spot of his place, then a dwell of a few ticks before his lantern AI decides. | Dwell is a knob. |
+| Local cause | An explanation invented when no consistent past is found, touching nothing else ("he just felt like fishing"). | Fallback; how often it fires is measured. |
 
 ## Characters and storylets
 
@@ -126,7 +132,7 @@ One English and one Russian form per name, taken from the character and encyclop
 | Choice transition | A cat decides: softmax over its scores for each exit, including "do nothing". | Same mechanic as free behaviour. |
 | Hazard transition | The world rolls a per-tick rate (the keeper opens the shop, the crew arrives). | The only place pacing may act. |
 | σ(score / T) | How a score becomes a probability. T comes from the Filter dial. | +2 on a 50/50: 73% at T = 2, 88% at T = 1. |
-| Consequence | What an outcome writes. Immediate: sim state. Seeded: facts and drives that later scores read. Player-facing: charge, card draws. | Consequences are evidence: watching an effect prunes histories that lack its cause. |
+| Consequence | What an outcome writes. Immediate: sim state. Seeded: facts and drives that later scores read. Player-facing: charge, card draws. | Consequences are evidence: watching an effect runs the backward pass to its likely causes. |
 | Pacing | Changing the world's odds (hazard rates, which eligible storylet fires), never a cat's stats, and only on unwatched events. In practice done once, through seed vetting. | "The story must be told": the nature of fiction, not the glowing cats. |
 
 ## Psychology of cats
@@ -160,7 +166,7 @@ From the design doc's Agents and Cast sections. Most of it is out of the demo; t
 
 ## Story sifting
 
-Terms borrowed from research on curated emergent narrative (Ryan; Kreminski's Felt and Winnow), adapted to weighted histories.
+Terms borrowed from research on curated emergent narrative (Ryan; Kreminski's Felt and Winnow), adapted to the fog and lantern.
 
 | Term | Definition | Notes |
 | --- | --- | --- |
@@ -174,9 +180,9 @@ Terms borrowed from research on curated emergent narrative (Ryan; Kreminski's Fe
 | Partial match | A pattern matched up to some stage, with its bindings. A story in progress. |  |
 | Stage | How many kernel clauses a partial match has matched. | Anchor pattern stage = frontier progress. |
 | Fork | When an event fits a match's next clause, a child match takes it while the parent stays, so other readings stay alive. | Once all non-event variables are bound, advance in place instead. |
-| Pool | The set of live partial matches in one history. Part of the history's state and its hash; copied on split, shared until changed. | Pruned of stale matches, matches with a missing cat, and per-pattern overflow. |
-| Pattern signature | The stage reached in each tracked pattern within a history. | Used for story-aware trimming. |
-| Match probability | The sum of weights of surviving histories in which a match is at a given stage. | Drives highlights. |
+| Pool | The set of live partial matches. In the lantern it is part of the logged state and its hash; in the fog each stage carries a probability. | Pruned of stale matches, matches with a missing cat, and per-pattern overflow. |
+| Pattern signature | The stage reached in each tracked pattern: a fact in the lantern, a probability per stage in the fog. | No longer used for trimming (retired 2026-11-21). |
+| Match probability | The chance that a match is at a given stage, estimated in the fog from its ingredients. | Drives highlights. |
 | Highlight (assist) | A marker on a place or cat for a partial match tied to the anchor, a paid event or an unseen authored storylet. Opacity = match probability. | Settings toggle. |
 
 ## Player layer
@@ -238,7 +244,7 @@ Terms borrowed from research on curated emergent narrative (Ryan; Kreminski's Fe
 
 | Term | Definition | Notes |
 | --- | --- | --- |
-| Fray | The first tick from which no surviving history can still reach the anchor. The playhead stops there. | Anchor-level failure. Chapter 1: Rokko leaves when the rain stops. |
+| Fray | The first tick from which the anchor's probability is zero. The playhead stops there. | Anchor-level failure. Chapter 1: Rokko leaves when the rain stops. |
 | Break | A watched, paid event that no longer happens after an edit. | Event-level. Costs only the frontier progress it gave. |
 | Break alert | Warning, shown before an edit lands, that it would break a paid event. Information only, no penalty. |  |
 | Changed, unwatched | A quiet mark on a thread for a watched but unpaid event that shifted after an edit. | No alert. |
@@ -303,7 +309,7 @@ Terms borrowed from research on curated emergent narrative (Ryan; Kreminski's Fe
 | Build pack | The instructions for coding models: CLAUDE.md, specs 01–07, milestone briefs, prompts, tuning file. | Out of date since 2026-11-19. |
 | Knob | A tunable number in `content/tuning.json`, shown in the debug panel. | Balance changes never need code. |
 | Recorded solution | A saved log that must reach the anchor; replayed in tests with expected state hashes. | Replaces "solution run". |
-| State hash | A fingerprint of simulation state. Used to merge histories and to check replays. | A changed hash needs a written reason. |
+| State hash | A fingerprint of simulation state. Used to check replays. | A changed hash needs a written reason. |
 | Handoff note | `docs/handoff/M<n>.md`: what a milestone built, how it was checked, deviations, open questions. |  |
 | Writer marker | A placeholder on an unwritten line. Release fails while any remain. |  |
 | Extension point | A seam left clean for a full-game feature that the demo doesn't build. | Build nothing behind it. |
@@ -321,7 +327,7 @@ Words that came up and were dropped. Don't use them; use the replacement.
 | Staking, gambling a card | (none) | Cards are free; charge is the only cost of experimenting. |
 | Refund of charge | (none) | Charge is never refunded. |
 | Fray (for a single event) | Break | Fray is reserved for the anchor. |
-| 64 histories | Cap (open knob) | An unreviewed default, not a decision. |
+| 64 histories | (none) | Histories retired 2026-11-21. |
 | Once per run | Once per playthrough | "Run" is retired; the build pack's own text already says "once per game". |
 | Shining Cats, SC | glowing cats | One English name for Светящиеся коты. |
 | Marty | Marti | One spelling for the cat. |
@@ -340,3 +346,6 @@ Words that came up and were dropped. Don't use them; use the replacement.
 | Katlants, Maxxy, Son-Marty-Klekot | Catlants, Maxi, Son-Marta-Klekot | Settled 2026-11-20. |
 | Viewport collapse | Perception | Panning would collapse the whole map for free. |
 | Not looking is a tactic | Keeping protagonists away is a tactic | Looking costs nothing; moving a protagonist costs cards and story. |
+| History, candidate history | Fog (computed) and lantern (simulated) | Retired 2026-11-21: 128 simulated days cost about 70 s per edit. |
+| Weight, split, merge, importance floor, cap, early cut | (none) | They described histories. |
+| Particles | Forward–backward | Retired 2026-11-21 with histories. |

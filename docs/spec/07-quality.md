@@ -37,13 +37,14 @@ end):
   "watchedHash": "8 hex digits",
   "checkpoints": { "60": "…", "120": "…" },
   "watched": { "door_lure.at_door": 447, "door_lure.out": 452, "blocked_road.facing": 461 },
-  "historyCount": { "60": 40, "120": 87 }
+  "fog": { "60": { "cases": 6, "live": 2, "states": 410 }, "120": { "cases": 12, "live": 3, "states": 655 } }
 }
 ```
 
 `watchedHash` is `hash32` of the canonical JSON of the full watched-facts list.
-`checkpoints[t]` is `hash32` of the canonical JSON of the wave at `t` as a sorted list
-of `[stateHash, weight]`. `watched` lists the first watched tick of every storylet
+`checkpoints[t]` is `hash32` of the canonical JSON of the checkpoint at `t`: the
+lantern's `hashState` and the fog's cases with their weights and chains (canonical
+order). `watched` lists the first watched tick of every storylet
 state and detector. The readable parts exist so a changed hash shows what moved.
 
 `npm run golden:update` rewrites the expected files. The handoff note must say which
@@ -51,15 +52,18 @@ files changed and why. Never edit an expected file by hand.
 
 ## 3. Calibration
 
-The wave is only worth showing if its probabilities are honest.
+The wave is only worth showing if its probabilities are honest. The fog's odds hold by
+construction for what is watched (every collapse draws from them); calibration checks
+that the fog, an approximation, stays close to the reference simulation.
 
 `calibrate(seeds, pinSet, atTick, events)`: for each seed,
 
-1. compute the wave with the pin set, conditioning **off**, and read the predicted
-   probability `p` that each event in `events` has happened by the chapter's end, as
-   seen from tick `atTick` (the frame's requirement and fact probabilities);
-2. run one **reality**: a single history (`03` §12.4) in stream `100000 + seed`,
-   which is not among the wave's streams, and record whether each event happened.
+1. compute the projection with the pin set, conditioning **off**, nothing played and
+   **no cat live** (protagonists start in the fog like everyone else), and read the
+   predicted probability `p` that each event in `events` has happened by the chapter's
+   end, as seen from tick `atTick` (the frame's requirement and fact probabilities);
+2. run one **reality**: the reference simulation, a single history (`03` §12.4) in
+   stream `100000 + seed`, and record whether each event happened.
 
 Group all `(p, outcome)` pairs into ten buckets by `p`. For every bucket with at least
 `calibration.minPerBucket` pairs, the mean of `p` and the share of outcomes that
@@ -74,24 +78,26 @@ happened must differ by at most `calibration.tolerancePpm`.
 
 Pin set `road_both`, `atTick` 140 (08:00), events `crewArrived`, `roadBlocked`,
 `shopClosedEarly`, `rokkoUnderBoat`, `martiOut`, `anchor.meeting`. A second run uses
-`untouched` at tick 20. A calibration failure is a bug in the wave, not in the
-content: never change content or tolerance to make it pass.
+`untouched` at tick 20. A calibration failure is a bug in the fog, or an approximation in `03` §13 that does
+not hold for this content. Report which events and buckets miss, with numbers, in the
+handoff note and `docs/questions.md`; never change content or tolerance to make it
+pass.
 
 ## 4. Budgets
 
 | What | Budget | Checked by |
 | --- | --- | --- |
-| Recompute after an edit at 12:00 with `waves.cap` histories, in a worker | median ≤ `budgets.recomputeMs` (100 ms) on a developer laptop; the test fails above 3× that | Vitest (Node, same code as the worker) and the debug panel |
+| Recompute after an edit at 12:00 (projection from 12:00, nothing played), in a worker | median ≤ `budgets.recomputeMs` (100 ms) on a developer laptop; the test fails above 3× that | Vitest (Node, same code as the worker) and the debug panel |
 | Observe one tick in playback | ≤ 5 ms median | Vitest |
 | Frame time while scrubbing, all 12 cats with ghosts | 60 fps on a mid-range laptop; no long task over 50 ms | manual, noted in the handoff |
 | JavaScript, graybox build | ≤ 400 kB gzipped (three.js included) | build script prints sizes; CI fails above |
 | First load, local production build | interactive ≤ 3 s | Playwright |
 | Console | no errors or warnings during the scripted run | Playwright |
 
-If the recompute budget cannot be met at `waves.cap = 128`, lower the cap in
-`tuning.json`, record the largest cap that meets the budget in the handoff note, and
-check that calibration still passes. Do not change the algorithm in `03` to get
-there; ask.
+If the recompute budget cannot be met, measure where the time goes (cases, states per
+cat, fog steps) and report it in the handoff note with the values of `fog.maxLinks`,
+`fog.minStatePpm` and `fog.bands` that meet it, checking that calibration still passes.
+Do not change the algorithm in `03` to get there; ask.
 
 ## 5. Browser tests
 
@@ -124,7 +130,7 @@ cookies.
 | `scroll_back` | fromTick, toTick (a move back of 30 ticks or more) |
 | `fray_seen` | tick |
 | `hint_shown` | id |
-| `recompute` | ms, histories (every 10th, and every one over budget) |
+| `recompute` | ms, cases, live cats (every 10th, and every one over budget) |
 | `anchor_reached` | realSeconds, pins, withdrawals, scrollBacks, powers, gazes |
 | `cta_click` | which |
 | `session_end` | realSeconds, frontier, anchorWatched |

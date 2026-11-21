@@ -68,12 +68,20 @@ have **not** been checked against a model of this content; M4 measures them.
 | Key | Start | Meaning |
 | --- | --- | --- |
 | `content.castMode` | `"full"` | `"full"` or `"core"` (§3) |
-| `waves.initialHistories` | 32 | streams at tick 0 (`03` §13) |
-| `waves.cap` | 128 | most histories after trimming (`03` §14) |
-| `waves.floorPpm` | 20000 | importance floor, 2% |
-| `waves.rejuvenateBelow` | 16 | refill the wave with fresh streams below this many histories after pruning (`03` §13) |
-| `waves.checkpointEvery` | 30 | ticks between checkpoints (`03` §17) |
-| `waves.anchorConditioning` | true | the anchor treated as already seen (`03` §16) |
+| `waves.checkpointEvery` | 30 | ticks between checkpoints of the played stretch (`03` §17) |
+| `waves.anchorConditioning` | true | the anchor treated as already seen (`03` §14) |
+| `fog.stepTicks` | 5 | ticks per fog step (`03` §13.2) |
+| `fog.minStatePpm` | 100 | chain states below this are dropped |
+| `fog.bands` | 4 | bands per changing gauge |
+| `fog.maxBandedGauges` | 3 | banded gauges per cat; the rest are mean-field |
+| `fog.gateThresholdPpm` | 500000 | a gate holds in the fog at this probability (`03` §13.3) |
+| `fog.maxLinks` | 2 | links besides the weather (`03` §13.5) |
+| `fog.linkFloorPpm` | 50000 | a lasting meeting effect becomes a link above this, about 5% |
+| `fog.contributors` | 4 | contributor heap size per fact, flag and `heard` |
+| `fog.frayBelowPpm` | 1000 | the projection frays below this chance of reaching the anchor (`03` §16) |
+| `fog.exactTolerancePpm` | 20000 | tiny-world exactness test (`03` §18) |
+| `lantern.releaseAfterTicks` | 30 | ticks unperceived before a live cat returns to the fog (`03` §13.4) |
+| `lantern.dwellTicks` | 5 | ticks a placed cat keeps its activity before deciding (`03` §15.1) |
 | `observation.reopenBelowPpm` | 0 | when a watched fact reopens (open question; keep 0) |
 | `sifting.maxMatchesPerPattern` | 8 | pool size per detector |
 | `pressure.decayPerTick` | 2 | |
@@ -90,7 +98,7 @@ have **not** been checked against a model of this content; M4 measures them.
 | `player.playSpeedsTps` | `[4, 16]` | ticks per real second |
 | `end.afterAnchorTicks` | 15 | ticks shown after the meeting |
 | `render.focusLayerHz` | 3 | `06` §2; at most 3 |
-| `render.focusSamples` | 8 | histories per tick offered to the focus layer |
+| `render.focusSamples` | 8 | coherent trajectories offered to the focus layer (`03` §16) |
 | `render.displayBudget` | 24 | most cat markers drawn at rest (`06` §2) |
 | `budgets.recomputeMs` | 100 | `07` §4 |
 | `flags.telemetry` | true | |
@@ -133,7 +141,7 @@ off) unless stated.
 
 | Id | Property | Kind |
 | --- | --- | --- |
-| B1 | `untouched`: Marti is in region `flat` at every tick of every history | structural, a test from M2 |
+| B1 | `untouched`: Marti is in region `flat` at every tick: live on the played stretch, with all his chain's mass there in the projection | structural, a test from M2 |
 | B2 | `lure_unprimed`: P(`martiOut` by 14:30) ≤ 15% | balance |
 | B3 | `lure_one_prime`: P(`martiOut` by 14:30) ≤ 35% | balance |
 | B4 | `lure_primed`: P(`martiOut` by 14:30) ≥ 60% | balance |
