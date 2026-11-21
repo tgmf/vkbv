@@ -1,8 +1,8 @@
 // Conditions (spec 03 §8.1, §10.1) and the reads they need.
 import type { Condition } from '../content/schemas/dsl';
-import { clamp, PPM } from './math';
+import { clamp, PPM, probAtLeast } from './math';
 import { catNode, catPos, inWindow, nodePos, within } from './space';
-import type { CatId, Ctx, NodeId, Pos, Scope } from './types';
+import type { CatId, CatState, Ctx, FogReader, NodeId, Pos, Scope } from './types';
 import { need } from './types';
 
 const TRAITS = ['O', 'C', 'E', 'A', 'N'];
@@ -88,7 +88,6 @@ const cmp = (
   (c.lt === undefined || v < c.lt) &&
   (c.eq === undefined || v === c.eq);
 
-
 const ppmOf = (b: boolean): number => (b ? PPM : 0);
 
 /**
@@ -114,8 +113,132 @@ export function chance(ctx: Ctx, cond: Condition, scope: Scope): number {
     return PPM - q;
   }
   if ('not' in cond) return PPM - chance(ctx, cond.not, scope);
-  return ppmOf(leaf(ctx, cond, scope));
+  return ctx.fog ? fogLeaf(ctx, ctx.fog, cond, scope) : ppmOf(leaf(ctx, cond, scope));
 }
+
+// --- leaves in the fog (03 §13.3, §13.6) ---------------------------------------------------------
+
+/** The cat whose state a leaf reads, if any (the first cat a reference names, as `leaf` reads it). */
+function leafCat(ctx: Ctx, cond: Leaf, scope: Scope): CatId | null {
+  const who = (ref: string) => cat(ctx, scope, ref);
+  if ('flag' in cond) return cond.at === undefined || ctx.c.node[cond.at] ? null : who(cond.at);
+  if ('gauge' in cond) return who(cond.gauge.slice(0, Math.max(0, cond.gauge.indexOf('.'))));
+  if ('power' in cond || 'pin' in cond) return who(cond.near);
+  if ('activity' in cond) return who(cond.activity);
+  if ('activityFinished' in cond) return who(cond.activityFinished[0]);
+  if ('at' in cond) return who(cond.at);
+  return null;
+}
+
+/** P(lo ≤ X ≤ hi) for a counter held as mean and variance. */
+function counterChance(
+  m: { mean: number; variance: number },
+  cnd: {
+    gte?: number | undefined;
+    lte?: number | undefined;
+    lt?: number | undefined;
+    eq?: number | undefined;
+  },
+): number {
+  const lo = cnd.gte ?? cnd.eq;
+  const hi = cnd.lte ?? (cnd.lt === undefined ? cnd.eq : cnd.lt - 1);
+  const atLeast = (x: number | undefined) =>
+    x === undefined ? PPM : probAtLeast(m.mean, m.variance, x);
+  return Math.max(0, atLeast(lo) - (hi === undefined ? 0 : atLeast(hi + 1)));
+}
+
+/**
+ * A leaf's probability in the fog. World quantities come from the fog; a leaf about a fogged cat
+ * is the leaf's own boolean averaged over that cat's chain (each state stands in for the cat).
+ */
+function fogLeaf(ctx: Ctx, fog: FogReader, cond: Leaf, scope: Scope): number {
+  if ('fact' in cond) return fog.quantity(`fact:${cond.fact}`);
+  if ('state' in cond) return fog.quantity(`state:${cond.state[0]}.${cond.state[1]}`);
+  if ('counter' in cond) return counterChance(fog.counter(cond.counter), cond);
+  if ('heard' in cond) {
+    const id = cat(ctx, scope, cond.by);
+    if (id === null) return 0;
+    return fog.chain(id) ? fog.heard(id, cond.heard) : ppmOf(leaf(ctx, cond, scope));
+  }
+  if ('countCats' in cond) return countCatsChance(ctx, fog, cond);
+  if ('near' in cond) {
+    // two references: mix over each fogged one in turn
+    const a = cat(ctx, scope, cond.near[0]);
+    const b = cat(ctx, scope, cond.near[1]);
+    return mixed(ctx, fog, [a, b], () => ppmOf(leaf(ctx, cond, scope)));
+  }
+  const inner = (): number => {
+    if ('flag' in cond) {
+      const node = cond.at === undefined ? null : placeOf(ctx, scope, cond.at);
+      if (cond.at !== undefined && node === null) return 0;
+      return fog.quantity(`flag:${flagKey(cond.flag, node)}`);
+    }
+    return ppmOf(leaf(ctx, cond, scope));
+  };
+  return mixed(ctx, fog, [leafCat(ctx, cond, scope)], inner);
+}
+
+/** `inner` averaged over the chains of the fogged cats among `ids` (independent given the case). */
+function mixed(
+  ctx: Ctx,
+  fog: FogReader,
+  ids: readonly (CatId | null)[],
+  inner: () => number,
+): number {
+  const [first, ...rest] = ids;
+  if (ids.length === 0) return inner();
+  const chain = first === null || first === undefined ? null : fog.chain(first);
+  if (!chain || first === null || first === undefined || rest.includes(first))
+    return mixed(ctx, fog, rest, inner);
+  const saved = need(ctx.s.cats, first, 'cat');
+  let sum = 0;
+  try {
+    for (const x of chain) {
+      ctx.s.cats[first] = x.cat;
+      sum += Math.trunc((x.p * mixed(ctx, fog, rest, inner)) / PPM);
+    }
+  } finally {
+    ctx.s.cats[first] = saved;
+  }
+  return Math.min(PPM, sum);
+}
+
+/** P(exactly `eq` cats stand at matching places): each cat live (0 or 1) or by its chain. */
+function countCatsChance(
+  ctx: Ctx,
+  fog: FogReader,
+  cond: Extract<Leaf, { countCats: unknown }>,
+): number {
+  const { tag, notTag, except = [] } = cond.countCats;
+  const matches = (cs: CatState) => {
+    const tags = need(ctx.c.node, catNode(cs), 'place').tags;
+    return (
+      (tag === undefined || tags.includes(tag)) && (notTag === undefined || !tags.includes(notTag))
+    );
+  };
+  // dist[k] = P(k cats so far match), in ppm
+  let dist = [PPM];
+  for (const def of ctx.c.cats) {
+    if (except.includes(def.id)) continue;
+    const chain = fog.chain(def.id);
+    const p = chain
+      ? chain.reduce((sum, x) => sum + (matches(x.cat) ? x.p : 0), 0)
+      : ppmOf(matches(need(ctx.s.cats, def.id, 'cat')));
+    const next = new Array<number>(dist.length + 1).fill(0);
+    dist.forEach((d, k) => {
+      next[k] = (next[k] ?? 0) + Math.trunc((d * (PPM - p)) / PPM);
+      next[k + 1] = (next[k + 1] ?? 0) + Math.trunc((d * p) / PPM);
+    });
+    dist = next;
+  }
+  return dist[cond.eq] ?? 0;
+}
+
+/** Whether a flag is set: live, non-zero; in the fog, its probability passes the gate (03 §13.3). */
+export const flagHolds = (ctx: Ctx, key: string): boolean =>
+  ctx.fog
+    ? ctx.fog.quantity(`flag:${key}`) >= ctx.c.tuning.fog.gateThresholdPpm
+    : flagValue(ctx, key) !== 0;
 
 /** A gate: holds when its probability reaches `fog.gateThresholdPpm` (03 §13.3). */
 export const test = (ctx: Ctx, cond: Condition, scope: Scope): boolean =>

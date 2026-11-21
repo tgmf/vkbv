@@ -1,6 +1,6 @@
 // Cats: gauges, hooks and voices, bodies, free behaviour and control (spec 03 §5, §6 phase 3/6, §8, §10.3).
 import type { PlaceSelector } from '../content/schemas/chapter';
-import { test } from './conditions';
+import { flagHolds, test } from './conditions';
 import { runEffects } from './effects';
 import { clamp, sample, softmax } from './math';
 import { term, score } from './scores';
@@ -47,6 +47,9 @@ export function setInterrupt(ctx: Ctx, id: CatId, action: string, ticks: number,
   emit(ctx, { tick: ctx.t, type: 'interrupt', cat: id, action, ticks, by });
 }
 
+/** Selectors that sample among several places (03 §8.2); the fog splits mass evenly instead. */
+const samples = (sel: PlaceSelector): boolean => 'neighbour' in sel || 'randomNode' in sel;
+
 /** Resolves a place selector for a cat (03 §8.2), or null when nothing fits. */
 export function selectPlace(
   ctx: Ctx,
@@ -54,7 +57,27 @@ export function selectPlace(
   sel: PlaceSelector,
   activity: string,
 ): NodeId | null {
-  const { c, s } = ctx;
+  const ids = placeOptions(ctx, id, sel);
+  if (ids.length === 0) return null;
+  if (!samples(sel)) return ids[0] ?? null;
+  return ids[rand(ctx.seed, catScope(ctx, id), ctx.t, `place:${activity}`, ids.length)] ?? null;
+}
+
+/** A cat as conditions see it: live, or its most likely chain state in the fog (03 §13.3). */
+function likelyCat(ctx: Ctx, id: CatId): CatState {
+  const chain = ctx.fog?.chain(id);
+  if (!chain) return catState(ctx, id);
+  let best = chain[0];
+  for (const x of chain) if (best === undefined || x.p > best.p) best = x;
+  return best?.cat ?? catState(ctx, id);
+}
+
+/**
+ * The places a selector can pick: one for the deterministic selectors, every candidate for
+ * `neighbour` and `randomNode` (a live cat samples one; the fog splits its mass over all).
+ */
+export function placeOptions(ctx: Ctx, id: CatId, sel: PlaceSelector): NodeId[] {
+  const { c } = ctx;
   const cs = catState(ctx, id);
   const def = need(c.cat, id, 'cat');
   const here = planFrom(cs);
@@ -62,24 +85,20 @@ export function selectPlace(
   const regionOf = (r: string | undefined) =>
     r === '$homeRegion' ? need(c.node, def.home, 'place').region : r;
   const currentRegion = need(c.node, here, 'place').region;
-  const nearest = (ids: NodeId[]): NodeId | null => {
+  const nearest = (ids: NodeId[]): NodeId[] => {
     let best: NodeId | null = null;
     for (const n of ids) {
       const d = dist[n];
       const bd = best === null ? undefined : dist[best];
       if (d !== undefined && (bd === undefined || d < bd)) best = n; // ids come in place order: ties keep the first
     }
-    return best;
+    return best === null ? [] : [best];
   };
   const inRegion = (r: string) => c.nodes.filter((n) => n.region === r);
-  const sampleOne = (ids: NodeId[]): NodeId | null =>
-    ids.length === 0
-      ? null
-      : (ids[rand(ctx.seed, catScope(ctx, id), ctx.t, `place:${activity}`, ids.length)] ?? null);
 
   if ('node' in sel) {
     const n = sel.node === '$home' ? def.home : sel.node === '$here' ? here : sel.node;
-    return dist[n] === undefined ? null : n;
+    return dist[n] === undefined ? [] : [n];
   }
   if ('tag' in sel)
     return nearest(
@@ -88,24 +107,23 @@ export function selectPlace(
         .map((n) => n.id),
     );
   if ('anyOf' in sel) {
-    const picks = sel.anyOf.map((x) => selectPlace(ctx, id, x, activity)).filter((n) => n !== null);
+    // Chapter 1 nests only deterministic selectors here; a sampling one counts all its options.
+    const picks = sel.anyOf.flatMap((x) => placeOptions(ctx, id, x));
     return nearest(c.nodes.map((n) => n.id).filter((n) => picks.includes(n)));
   }
   if ('flag' in sel)
     return nearest(
       inRegion(currentRegion)
-        .filter((n) => (s.flags[`${sel.flag}@${n.id}`]?.value ?? 0) !== 0)
+        .filter((n) => flagHolds(ctx, `${sel.flag}@${n.id}`))
         .map((n) => n.id),
     );
   if ('neighbour' in sel) {
     const region = regionOf(sel.region) ?? currentRegion;
-    return sampleOne(
-      need(c.adj, here, 'place')
-        .filter(
-          (a) => !cs.knowsClosed.includes(a.edge) && need(c.node, a.to, 'place').region === region,
-        )
-        .map((a) => a.to),
-    );
+    return need(c.adj, here, 'place')
+      .filter(
+        (a) => !cs.knowsClosed.includes(a.edge) && need(c.node, a.to, 'place').region === region,
+      )
+      .map((a) => a.to);
   }
   if ('nearest' in sel)
     return nearest(
@@ -114,30 +132,29 @@ export function selectPlace(
         .map((n) => n.id),
     );
   if ('nearCat' in sel) {
+    // In the fog, other cats stand where they most likely are (03 §13.3).
     const me = catPos(c, cs);
-    let best: CatId | null = null;
+    let best: CatState | null = null;
     for (const other of c.cats) {
       if (other.id === id) continue;
-      const op = catPos(c, catState(ctx, other.id));
+      const os = likelyCat(ctx, other.id);
+      const op = catPos(c, os);
       if (!within(me, op, sel.m)) continue;
-      if (best === null || dist2(me, op) < dist2(me, catPos(c, catState(ctx, best))))
-        best = other.id;
+      if (best === null || dist2(me, op) < dist2(me, catPos(c, best))) best = os;
     }
-    if (best === null) return null;
-    const n = catNode(catState(ctx, best));
-    return need(c.node, n, 'place').region === currentRegion && dist[n] !== undefined ? n : null;
+    if (best === null) return [];
+    const n = catNode(best);
+    return need(c.node, n, 'place').region === currentRegion && dist[n] !== undefined ? [n] : [];
   }
   const { region, tag } = sel.randomNode;
-  return sampleOne(
-    c.nodes
-      .filter(
-        (n) =>
-          (region === undefined || n.region === region) &&
-          (tag === undefined || n.tags.includes(tag)),
-      )
-      .filter((n) => dist[n.id] !== undefined)
-      .map((n) => n.id),
-  );
+  return c.nodes
+    .filter(
+      (n) =>
+        (region === undefined || n.region === region) &&
+        (tag === undefined || n.tags.includes(tag)),
+    )
+    .filter((n) => dist[n.id] !== undefined)
+    .map((n) => n.id);
 }
 
 /** Starts an activity as a free choice would; false when it has no place or no path (03 §8.2). */
@@ -343,14 +360,17 @@ export function reaches(ctx: Ctx, e: RunningEffect, id: CatId): boolean {
   return within(catPos(ctx.c, catState(ctx, id)), nodePos(ctx.c, e.place), e.radiusM);
 }
 
-interface Candidate {
+export interface Candidate {
   activity: string;
   score: number;
   effect: RunningEffect | null; // for attracted / repelled offers
 }
 
-/** Phase 6 decision for one cat (03 §8.2). */
-export function decide(ctx: Ctx, id: CatId): void {
+/**
+ * The decision function (03 §8.2, §13.3): the candidates a cat may choose now and their
+ * probabilities in ppm. The lantern samples it; the fog splits mass by it. Changes nothing.
+ */
+export function choices(ctx: Ctx, id: CatId): { cands: Candidate[]; ppm: number[] } {
   const { c } = ctx;
   const cs = catState(ctx, id);
   const def = need(c.cat, id, 'cat');
@@ -360,8 +380,8 @@ export function decide(ctx: Ctx, id: CatId): void {
   for (const a of def.activities) {
     const ad = need(c.activity, a, 'activity');
     if (ad.gate && !test(ctx, ad.gate, scope)) continue;
-    // selectPlace only returns places the cat can reach, so no path check is needed here.
-    if (selectPlace(ctx, id, ad.at, a) === null) continue;
+    // placeOptions only returns places the cat can reach, so no path check is needed here.
+    if (placeOptions(ctx, id, ad.at).length === 0) continue;
     const sticky = a === cs.activity && cs.activityLeft > 0 ? c.stickiness : 0;
     cands.push({ activity: a, score: score(ctx, ad.score, scope) + sticky, effect: null });
   }
@@ -372,13 +392,22 @@ export function decide(ctx: Ctx, id: CatId): void {
     const sticky = activity === cs.activity && cs.activityLeft > 0 ? c.stickiness : 0;
     cands.push({ activity, score: e.strength + extra + sticky, effect: e });
   }
-  if (cands.length === 0) return;
+  if (cands.length === 0) return { cands, ppm: [] };
+  return {
+    cands,
+    ppm: softmax(
+      cands.map((x) => x.score),
+      def.temperatureTenths,
+    ),
+  };
+}
 
-  const p = softmax(
-    cands.map((x) => x.score),
-    def.temperatureTenths,
-  );
-  const chosen = cands[sample(p, rand(ctx.seed, catScope(ctx, id), ctx.t, 'act', 1_000_000))];
+/** Phase 6 decision for one cat (03 §8.2): samples the decision function. */
+export function decide(ctx: Ctx, id: CatId): void {
+  const cs = catState(ctx, id);
+  const { cands, ppm } = choices(ctx, id);
+  if (cands.length === 0) return;
+  const chosen = cands[sample(ppm, rand(ctx.seed, catScope(ctx, id), ctx.t, 'act', 1_000_000))];
   if (!chosen || (chosen.activity === cs.activity && cs.activityLeft > 0)) return;
 
   if (chosen.effect?.kind === 'attract') {

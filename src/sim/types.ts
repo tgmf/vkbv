@@ -184,6 +184,23 @@ export interface Ctx {
   live?: readonly CatId[];
   /** Storylets held by the fog (03 §13.4); phase 4 skips them. */
   held?: readonly string[];
+  /** Set while the fog evaluates content: reads of fogged cats and fog quantities (03 §13.3). */
+  fog?: FogReader;
+}
+
+/** A fogged cat's chain in one case, as stand-in cat states with their probability (ppm). */
+export type StandIns = readonly { cat: CatState; p: number }[];
+
+/** What conditions read from the fog (03 §13.3, §13.6). */
+export interface FogReader {
+  /** The chain of a fogged cat in the current case; null for a live cat or the cat deciding. */
+  chain(id: CatId): StandIns | null;
+  /** P(set) of a fact (`fact:<id>`), flag (`flag:<key>`) or storylet state (`state:<sl>.<st>`). */
+  quantity(key: string): number;
+  /** Expected value and variance of a counter. */
+  counter(name: string): { mean: number; variance: number };
+  /** P(the cat has perceived the event). */
+  heard(cat: CatId, event: string): number;
 }
 
 /** Whether a cat is simulated in this step: live in the lantern, or any cat in a single history. */
