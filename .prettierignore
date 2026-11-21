@@ -5,3 +5,4 @@ src/content/data
 src/sim/exp-table.ts
 docs
 instructions
+tests/golden/*.expected.json
