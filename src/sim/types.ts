@@ -195,6 +195,8 @@ export type StandIns = readonly { cat: CatState; p: number }[];
 export interface FogReader {
   /** The chain of a fogged cat in the current case; null for a live cat or the cat deciding. */
   chain(id: CatId): StandIns | null;
+  /** The most likely state of a fogged cat (for `nearCat`), or null for a live cat. */
+  likely(id: CatId): CatState | null;
   /** P(set) of a fact (`fact:<id>`), flag (`flag:<key>`) or storylet state (`state:<sl>.<st>`). */
   quantity(key: string): number;
   /** Expected value and variance of a counter. */

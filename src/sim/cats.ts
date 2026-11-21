@@ -64,13 +64,7 @@ export function selectPlace(
 }
 
 /** A cat as conditions see it: live, or its most likely chain state in the fog (03 §13.3). */
-function likelyCat(ctx: Ctx, id: CatId): CatState {
-  const chain = ctx.fog?.chain(id);
-  if (!chain) return catState(ctx, id);
-  let best = chain[0];
-  for (const x of chain) if (best === undefined || x.p > best.p) best = x;
-  return best?.cat ?? catState(ctx, id);
-}
+const likelyCat = (ctx: Ctx, id: CatId): CatState => ctx.fog?.likely(id) ?? catState(ctx, id);
 
 /**
  * The places a selector can pick: one for the deterministic selectors, every candidate for
