@@ -88,11 +88,43 @@ const cmp = (
   (c.lt === undefined || v < c.lt) &&
   (c.eq === undefined || v === c.eq);
 
-export function test(ctx: Ctx, cond: Condition, scope: Scope): boolean {
+export const PPM = 1_000_000;
+const ppmOf = (b: boolean): number => (b ? PPM : 0);
+
+/**
+ * A condition's probability in ppm (03 §13.3). `all` multiplies (independence assumed), `any` is
+ * 1 − Π(1 − p), `not` is 1 − p. About live things every leaf is 0 or 1 000 000, so the result is
+ * exactly the boolean of §10.1.
+ */
+export function chance(ctx: Ctx, cond: Condition, scope: Scope): number {
+  if ('all' in cond) {
+    let p = PPM;
+    for (const x of cond.all) {
+      if (p === 0) break;
+      p = Math.trunc((p * chance(ctx, x, scope)) / PPM);
+    }
+    return p;
+  }
+  if ('any' in cond) {
+    let q = PPM; // probability that none holds
+    for (const x of cond.any) {
+      if (q === 0) break;
+      q = Math.trunc((q * (PPM - chance(ctx, x, scope))) / PPM);
+    }
+    return PPM - q;
+  }
+  if ('not' in cond) return PPM - chance(ctx, cond.not, scope);
+  return ppmOf(leaf(ctx, cond, scope));
+}
+
+/** A gate: holds when its probability reaches `fog.gateThresholdPpm` (03 §13.3). */
+export const test = (ctx: Ctx, cond: Condition, scope: Scope): boolean =>
+  chance(ctx, cond, scope) >= ctx.c.tuning.fog.gateThresholdPpm;
+
+type Leaf = Exclude<Condition, { all: unknown } | { any: unknown } | { not: unknown }>;
+
+function leaf(ctx: Ctx, cond: Leaf, scope: Scope): boolean {
   const { c, s } = ctx;
-  if ('all' in cond) return cond.all.every((x) => test(ctx, x, scope));
-  if ('any' in cond) return cond.any.some((x) => test(ctx, x, scope));
-  if ('not' in cond) return !test(ctx, cond.not, scope);
   if ('fact' in cond) return hasFact(ctx, cond.fact);
   if ('flag' in cond) {
     const node = cond.at === undefined ? null : placeOf(ctx, scope, cond.at);

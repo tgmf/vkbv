@@ -160,6 +160,7 @@ function transition(ctx: Ctx, def: StoryletDef): void {
  */
 export function storyletsPhase(ctx: Ctx): void {
   for (const def of ctx.c.storylets) {
+    if (ctx.held?.includes(def.id)) continue; // the fog runs it (03 §13.4)
     if (isActive(ctx, def)) {
       transition(ctx, def);
       continue;

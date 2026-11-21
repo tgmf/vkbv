@@ -180,6 +180,20 @@ export interface Ctx {
   pick: (bp: BranchPoint) => number; // resolves a branch point to an option index
   chanceN: number; // counts `chance` effects this tick (purpose chance:<n>)
   memo: PathMemo; // path results for this map, shared across steps by the caller
+  /** The lantern's live cats (03 §13.4); absent = every cat is live (single-history mode). */
+  live?: readonly CatId[];
+  /** Storylets held by the fog (03 §13.4); phase 4 skips them. */
+  held?: readonly string[];
+}
+
+/** Whether a cat is simulated in this step: live in the lantern, or any cat in a single history. */
+export const isLive = (ctx: Pick<Ctx, 'live'>, id: CatId): boolean =>
+  ctx.live === undefined || ctx.live.includes(id);
+
+/** What the lantern passes to `step` (03 §13.4). */
+export interface LanternArgs {
+  live: readonly CatId[];
+  held: readonly string[];
 }
 
 /** Who `self` and `@role` mean while evaluating content. */

@@ -1,17 +1,46 @@
 // Detectors and their pools of partial matches (spec 03 §10.4).
 import { hasFact, test } from './conditions';
 import { addFact } from './effects';
-import type { Ctx, PartialMatch } from './types';
+import type { Condition } from '../content/schemas/dsl';
+import type { CatId, Content, Ctx, PartialMatch } from './types';
+import { isLive } from './types';
 
 const order = (a: PartialMatch, b: PartialMatch) =>
   a.stage - b.stage || a.stageTick - b.stageTick || a.count - b.count;
 
-/** Phase 5: advance every pool; a completed kernel sets its fact and emits `detector` once. */
+/**
+ * The cats a detector involves: those named in its clauses (`at`, `near`, `except`); with none
+ * named, every cat (03 §10.4).
+ */
+export function detectorCats(c: Content, d: Content['detectors'][number]): CatId[] {
+  const named: CatId[] = [];
+  const add = (id: string) => {
+    if (c.cat[id] && !named.includes(id)) named.push(id);
+  };
+  const walk = (x: Condition): void => {
+    if ('all' in x) x.all.forEach(walk);
+    else if ('any' in x) x.any.forEach(walk);
+    else if ('not' in x) walk(x.not);
+    else if ('at' in x && x.at !== undefined) add(x.at);
+    else if ('near' in x && Array.isArray(x.near)) x.near.forEach(add);
+    else if ('countCats' in x) (x.countCats.except ?? []).forEach(add);
+  };
+  for (const clause of d.kernel) if ('holds' in clause) walk(clause.holds);
+  return named.length > 0
+    ? c.cats.filter((x) => named.includes(x.id)).map((x) => x.id)
+    : c.cats.map((x) => x.id);
+}
+
+/**
+ * Phase 5: advance every pool; a completed kernel sets its fact and emits `detector` once.
+ * In the lantern, a detector that involves a fogged cat is left to the fog (decisions.md, M2).
+ */
 export function siftingPhase(ctx: Ctx): void {
   const { c, s, t } = ctx;
   const factsNow = ctx.events.flatMap((e) => (e.type === 'fact' ? [e.fact] : []));
   for (const d of c.detectors) {
     if (hasFact(ctx, d.emits)) continue;
+    if (ctx.live && !detectorCats(c, d).every((id) => isLive(ctx, id))) continue;
     const pool = s.pools[d.id] ?? [];
     // The stage-0 match is implicit and always present.
     const live = pool.some((m) => m.stage === 0)

@@ -7,7 +7,18 @@ import { pinsPhase } from './pins';
 import { siftingPhase } from './sifting';
 import { catNode, catPos, dist2, inWindow, isWindowEnd, nodePos, type PathMemo } from './space';
 import { openChoiceActors, storyletsPhase } from './storylets';
-import type { BranchPoint, CatId, Content, Ctx, Pin, SimEvent, SimState, Streams } from './types';
+import type {
+  BranchPoint,
+  CatId,
+  Content,
+  Ctx,
+  LanternArgs,
+  Pin,
+  SimEvent,
+  SimState,
+  Streams,
+} from './types';
+import { isLive } from './types';
 
 /** Thrown inside a step when it meets a branch point beyond the decided list. */
 interface NeedBranch {
@@ -26,6 +37,9 @@ export interface StepResult {
  * Advances one tick. `branch` holds the outcomes already decided for this tick, in the order the
  * branch points are met; past its end the step stops and returns the branch point (03 §6).
  * A function instead resolves every branch point as it comes (single-history sampling).
+ * `lantern` names the live cats and the storylets held by the fog (03 §13.4): phases 3, 6 and 7
+ * skip fogged cats, phase 4 skips held storylets, phase 5 skips detectors that involve a fogged
+ * cat. Without it every cat is live and nothing is held, exactly as in single-history mode.
  */
 export function step(
   c: Content,
@@ -35,6 +49,7 @@ export function step(
   pins: readonly Pin[],
   branch: readonly number[] | ((bp: BranchPoint) => number),
   memo: PathMemo = {},
+  lantern: LanternArgs | null = null,
 ): StepResult {
   let used = 0;
   const pick =
@@ -60,11 +75,12 @@ export function step(
     pick,
     chanceN: 0,
     memo,
+    ...(lantern && { live: lantern.live, held: lantern.held }),
   };
   try {
     pinsAndEffects(ctx); // 1
     weather(ctx); // 2
-    for (const def of c.cats) body(ctx, def.id); // 3
+    for (const def of c.cats) if (isLive(ctx, def.id)) body(ctx, def.id); // 3
     storyletsPhase(ctx); // 4
     siftingPhase(ctx); // 5
     decisions(ctx); // 6
@@ -183,6 +199,7 @@ function decisions(ctx: Ctx): void {
   const busy = openChoiceActors(ctx);
   for (const def of c.cats) {
     const id = def.id;
+    if (!isLive(ctx, id)) continue;
     const cs = catState(ctx, id);
     if (cs.control !== 'free' || cs.interrupt || !('at' in cs.pos) || busy.includes(id)) continue;
     const ended = ctx.events.some(
@@ -221,11 +238,13 @@ function perception(ctx: Ctx): void {
   const { c, s } = ctx;
   const heardEvents = (): Heard[] =>
     ctx.events.filter((e): e is Heard => e.type === 'emit' || e.type === 'voice');
+  // Fogged cats perceive only through the fog (decisions.md, M2).
+  const perceivers = c.cats.filter((def) => isLive(ctx, def.id));
 
   // Each cat follows at most `voices` sound events per tick: the nearest ones, ties by emission order.
   const sounds = heardEvents();
   const allowed: Record<CatId, Heard[]> = {};
-  for (const def of c.cats) {
+  for (const def of perceivers) {
     const p = catPos(c, catState(ctx, def.id));
     allowed[def.id] = sounds
       .filter(
@@ -268,7 +287,7 @@ function perception(ctx: Ctx): void {
       i--;
       continue;
     }
-    for (const def of c.cats) {
+    for (const def of perceivers) {
       const ok =
         always(ctx, def.id, e) ||
         (isSound(e)
@@ -284,7 +303,7 @@ function perceiveObjects(ctx: Ctx): void {
   const { c, s } = ctx;
   for (const o of c.objects) {
     const op = o.onPerceived;
-    if (!op || hasFact(ctx, `perceived:${o.id}`) || !s.cats[op.by]) continue;
+    if (!op || hasFact(ctx, `perceived:${o.id}`) || !s.cats[op.by] || !isLive(ctx, op.by)) continue;
     if (o.visibleWhen && !test(ctx, o.visibleWhen, {})) continue;
     const src: Source = { pos: nodePos(c, o.node), node: o.node, radiusM: null };
     if (!perceives(c, s, op.by, src, 'sight')) continue;
