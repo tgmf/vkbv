@@ -1,0 +1,96 @@
+{
+  "range": [
+    0,
+    1000
+  ],
+  "floor": 20,
+  "hooks": [
+    {
+      "id": "fearOfWater",
+      "scope": "shared",
+      "nameKey": "hook.fear",
+      "driveKey": "drive.fear",
+      "rise": [
+        {
+          "when": {
+            "all": [
+              {
+                "weather": "rain"
+              },
+              {
+                "at": "self",
+                "tag": "outdoor"
+              }
+            ]
+          },
+          "perTicks": 1,
+          "add": 5
+        }
+      ],
+      "decay": {
+        "when": {
+          "at": "self",
+          "tag": "indoor"
+        },
+        "perTicks": 2,
+        "add": -1,
+        "toward": "initial"
+      },
+      "voice": {
+        "over": 600,
+        "lines": [
+          "line.fear"
+        ]
+      }
+    },
+    {
+      "id": "boxPull",
+      "scope": "shared",
+      "nameKey": "hook.box",
+      "driveKey": "drive.box",
+      "rise": [
+        {
+          "when": {
+            "at": "self",
+            "tag": "box"
+          },
+          "perTicks": 1,
+          "add": 10
+        }
+      ],
+      "decay": {
+        "perTicks": 3,
+        "add": -1
+      },
+      "voice": {
+        "over": 700,
+        "lines": [
+          "line.box"
+        ]
+      }
+    },
+    {
+      "id": "itch",
+      "scope": "hero",
+      "nameKey": "hook.itch",
+      "driveKey": "drive.itch",
+      "rise": [
+        {
+          "onEvent": "ping",
+          "add": 100
+        }
+      ],
+      "decay": {
+        "perTicks": 4,
+        "add": -1
+      },
+      "voice": {
+        "over": 350,
+        "lines": [
+          "line.itch.1",
+          "line.itch.2"
+        ]
+      }
+    }
+  ]
+}

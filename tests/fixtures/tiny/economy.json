@@ -1,0 +1,30 @@
+{
+  "charge": {
+    "start": 0,
+    "cap": 100,
+    "floorAtRainStart": 10,
+    "variantRainStartPays": false
+  },
+  "pressureScale": {
+    "per": 50,
+    "addPercent": 10
+  },
+  "payouts": {
+    "storyletState": {
+      "lured.out": 10
+    },
+    "detector": {
+      "soak": 5
+    },
+    "anchorRequirement": 5
+  },
+  "cardsFromExploring": {
+    "inspectObject": "grantsCard",
+    "discoverHook": {
+      "itch": "hold"
+    },
+    "revealRegion": {
+      "street": null
+    }
+  }
+}

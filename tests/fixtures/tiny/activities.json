@@ -1,0 +1,97 @@
+{
+  "stickiness": 2,
+  "decisionEveryTicks": 5,
+  "activities": [
+    {
+      "id": "nap",
+      "at": {
+        "node": "$home"
+      },
+      "ticks": [
+        5,
+        5
+      ],
+      "score": {
+        "base": 0
+      }
+    },
+    {
+      "id": "wander",
+      "at": {
+        "neighbour": true
+      },
+      "ticks": [
+        3,
+        3
+      ],
+      "gate": {
+        "weather": "dry"
+      },
+      "score": {
+        "base": 0,
+        "terms": [
+          {
+            "gauge": "self.O",
+            "per": 500,
+            "add": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "fetch",
+      "at": {
+        "tag": "box"
+      },
+      "ticks": [
+        2,
+        2
+      ],
+      "score": {
+        "base": -1,
+        "terms": [
+          {
+            "gauge": "self.boxPull",
+            "per": 100,
+            "add": 1
+          }
+        ]
+      },
+      "onFinish": [
+        {
+          "emit": "ping",
+          "radiusM": 50
+        }
+      ]
+    },
+    {
+      "id": "work",
+      "at": {
+        "node": "street.c"
+      },
+      "ticks": [
+        10,
+        10
+      ],
+      "gate": {
+        "not": {
+          "fact": "workDone"
+        }
+      },
+      "score": {
+        "base": 3
+      },
+      "while": [
+        {
+          "counter": "work",
+          "add": 1
+        }
+      ],
+      "onFinish": [
+        {
+          "fact": "workDone"
+        }
+      ]
+    }
+  ]
+}

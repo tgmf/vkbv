@@ -1,0 +1,256 @@
+{
+  "cards": [
+    {
+      "id": "poke",
+      "demo": true,
+      "nameKey": "card.poke.name",
+      "textKey": "card.poke.text",
+      "source": "bell",
+      "bound": null,
+      "kind": "instant",
+      "unique": false,
+      "pressure": 20,
+      "on": {
+        "cat": [
+          {
+            "prim": "interrupt",
+            "action": "jump",
+            "ticks": [
+              10,
+              10
+            ]
+          },
+          {
+            "prim": "gaugeShift",
+            "gauge": "itch",
+            "add": 300,
+            "decayPerTick": 10,
+            "ifHasGauge": true
+          }
+        ],
+        "place": [
+          {
+            "prim": "interrupt",
+            "action": "jump",
+            "ticks": [
+              4,
+              4
+            ],
+            "radiusM": 5
+          }
+        ]
+      },
+      "special": {
+        "on": "bell",
+        "textKey": "card.poke.special",
+        "effects": [
+          {
+            "prim": "gaugeShift",
+            "gauge": "itch",
+            "set": 900,
+            "target": "hero"
+          },
+          {
+            "prim": "triggerStorylet",
+            "storylet": "rite"
+          }
+        ]
+      }
+    },
+    {
+      "id": "shift",
+      "demo": true,
+      "nameKey": "card.shift.name",
+      "textKey": "card.shift.text",
+      "source": "mat",
+      "bound": null,
+      "kind": "instant",
+      "unique": false,
+      "pressure": 20,
+      "on": {
+        "cat": [
+          {
+            "prim": "gaugeShift",
+            "gauge": "boxPull",
+            "add": 300
+          }
+        ]
+      },
+      "special": {
+        "on": "mat",
+        "textKey": "card.shift.special",
+        "effects": [
+          {
+            "prim": "gaugeShift",
+            "gauge": "boxPull",
+            "add": 300,
+            "target": "hero"
+          }
+        ]
+      }
+    },
+    {
+      "id": "hold",
+      "demo": true,
+      "nameKey": "card.hold.name",
+      "textKey": "card.hold.text",
+      "source": "hook:itch",
+      "bound": null,
+      "kind": "instant",
+      "unique": false,
+      "pressure": 20,
+      "on": {
+        "cat": [
+          {
+            "prim": "gaugeShift",
+            "gauge": "itch",
+            "add": 200,
+            "holdWhileRunning": true,
+            "ticks": 20
+          }
+        ]
+      }
+    },
+    {
+      "id": "magnet",
+      "demo": true,
+      "nameKey": "card.magnet.name",
+      "textKey": "card.magnet.text",
+      "source": "crate",
+      "bound": null,
+      "kind": "instant",
+      "unique": false,
+      "pressure": 20,
+      "on": {
+        "place": [
+          {
+            "prim": "attract",
+            "radiusM": 30,
+            "strength": 5,
+            "ticks": 10,
+            "scale": {
+              "gauge": "O",
+              "per": 500,
+              "add": 1
+            }
+          }
+        ],
+        "object": [
+          {
+            "prim": "setFlag",
+            "flag": "rung",
+            "ticks": 5,
+            "onlyObjects": [
+              "bell"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scare",
+      "demo": true,
+      "nameKey": "card.scare.name",
+      "textKey": "card.scare.text",
+      "source": null,
+      "bound": null,
+      "kind": "instant",
+      "unique": false,
+      "pressure": 20,
+      "on": {
+        "place": [
+          {
+            "prim": "repel",
+            "radiusM": 10,
+            "strength": 5,
+            "ticks": 5
+          }
+        ]
+      }
+    },
+    {
+      "id": "rumour",
+      "demo": true,
+      "nameKey": "card.rumour.name",
+      "textKey": "card.rumour.text",
+      "source": null,
+      "bound": null,
+      "kind": "instant",
+      "unique": false,
+      "pressure": 20,
+      "on": {
+        "place": [
+          {
+            "prim": "socialSpread",
+            "event": "rumour",
+            "radiusM": 30,
+            "hops": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "nap_now",
+      "demo": true,
+      "nameKey": "card.nap_now.name",
+      "textKey": "card.nap_now.text",
+      "source": null,
+      "bound": "pal",
+      "kind": "instant",
+      "unique": false,
+      "pressure": 20,
+      "on": {
+        "cat": [
+          {
+            "prim": "delay",
+            "ticks": [
+              6,
+              6
+            ],
+            "action": "nap"
+          }
+        ]
+      }
+    },
+    {
+      "id": "send",
+      "demo": true,
+      "nameKey": "card.send.name",
+      "textKey": "card.send.text",
+      "source": null,
+      "bound": null,
+      "kind": "instant",
+      "unique": false,
+      "pressure": 20,
+      "on": {
+        "cat": [
+          {
+            "prim": "move",
+            "to": "street.d"
+          }
+        ]
+      }
+    },
+    {
+      "id": "mark",
+      "demo": true,
+      "nameKey": "card.mark.name",
+      "textKey": "card.mark.text",
+      "source": null,
+      "bound": null,
+      "kind": "instant",
+      "unique": false,
+      "pressure": 20,
+      "on": {
+        "place": [
+          {
+            "prim": "setFlag",
+            "flag": "marked",
+            "at": "$target",
+            "ticks": 10
+          }
+        ]
+      }
+    }
+  ]
+}

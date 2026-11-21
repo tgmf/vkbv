@@ -1,0 +1,180 @@
+{
+  "cats": [
+    {
+      "id": "hero",
+      "nameKey": "cat.hero",
+      "kind": "protagonist",
+      "core": true,
+      "look": {
+        "fur": "#888888"
+      },
+      "home": "home.room",
+      "start": "home.room",
+      "startActivity": "nap",
+      "temperatureTenths": 10,
+      "willpower": 850,
+      "perception": {
+        "sightM": 20,
+        "hearingM": 30,
+        "voices": 1
+      },
+      "traits": {
+        "O": [
+          500,
+          500
+        ],
+        "C": [
+          500,
+          500
+        ],
+        "E": [
+          500,
+          500
+        ],
+        "A": [
+          500,
+          500
+        ],
+        "N": [
+          500,
+          500
+        ]
+      },
+      "hooks": {
+        "itch": [
+          300,
+          300
+        ],
+        "fearOfWater": [
+          400,
+          400
+        ],
+        "boxPull": [
+          100,
+          100
+        ]
+      },
+      "activities": [
+        "nap",
+        "wander",
+        "fetch"
+      ]
+    },
+    {
+      "id": "pal",
+      "nameKey": "cat.pal",
+      "kind": "townscat",
+      "core": true,
+      "roles": [
+        "worker"
+      ],
+      "look": {
+        "fur": "#aa6633"
+      },
+      "home": "street.b",
+      "start": "street.b",
+      "startActivity": "work",
+      "temperatureTenths": 10,
+      "willpower": 0,
+      "perception": {
+        "sightM": 20,
+        "hearingM": 30,
+        "voices": 2
+      },
+      "traits": {
+        "O": [
+          800,
+          800
+        ],
+        "C": [
+          500,
+          500
+        ],
+        "E": [
+          500,
+          500
+        ],
+        "A": [
+          500,
+          500
+        ],
+        "N": [
+          500,
+          500
+        ]
+      },
+      "hooks": {
+        "fearOfWater": [
+          200,
+          200
+        ],
+        "boxPull": [
+          100,
+          100
+        ]
+      },
+      "activities": [
+        "work",
+        "nap"
+      ]
+    },
+    {
+      "id": "bystander",
+      "nameKey": "cat.bystander",
+      "kind": "townscat",
+      "core": false,
+      "roles": [
+        "helper"
+      ],
+      "look": {
+        "fur": "#336699"
+      },
+      "home": "street.a",
+      "start": "street.a",
+      "startActivity": "nap",
+      "temperatureTenths": 10,
+      "willpower": 0,
+      "perception": {
+        "sightM": 10,
+        "hearingM": 10,
+        "voices": 1
+      },
+      "traits": {
+        "O": [
+          500,
+          500
+        ],
+        "C": [
+          500,
+          500
+        ],
+        "E": [
+          500,
+          500
+        ],
+        "A": [
+          500,
+          500
+        ],
+        "N": [
+          500,
+          500
+        ]
+      },
+      "hooks": {
+        "fearOfWater": [
+          900,
+          900
+        ],
+        "boxPull": [
+          100,
+          100
+        ]
+      },
+      "activities": [
+        "nap",
+        "fetch"
+      ]
+    }
+  ]
+}

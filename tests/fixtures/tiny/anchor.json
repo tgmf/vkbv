@@ -1,0 +1,36 @@
+{
+  "id": "anchor.met",
+  "nameKey": "anchor.name",
+  "teaserKey": "anchor.teaser",
+  "imposed": true,
+  "requirements": {
+    "all": [
+      {
+        "fact": "heroOut",
+        "weight": 50
+      },
+      {
+        "any": [
+          {
+            "fact": "soaked"
+          },
+          {
+            "fact": "bellNoted"
+          }
+        ],
+        "weight": 0
+      },
+      {
+        "fact": "anchor.met",
+        "weight": 50
+      }
+    ]
+  },
+  "fraysIf": {
+    "fact": "riteDone"
+  },
+  "afterAnchor": {
+    "lockedThread": "pal",
+    "endKey": "end.key"
+  }
+}

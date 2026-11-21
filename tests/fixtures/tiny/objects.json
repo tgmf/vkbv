@@ -1,0 +1,39 @@
+{
+  "objects": [
+    {
+      "id": "bell",
+      "node": "street.c",
+      "nameKey": "obj.bell",
+      "storyKey": "story.bell",
+      "grantsCard": "poke",
+      "tags": [
+        "shore"
+      ],
+      "onPerceived": {
+        "by": "hero",
+        "emit": "ping",
+        "fact": "bellSeen"
+      }
+    },
+    {
+      "id": "mat",
+      "node": "home.room",
+      "nameKey": "obj.mat",
+      "storyKey": "story.mat",
+      "grantsCard": "shift",
+      "tags": [
+        "box"
+      ]
+    },
+    {
+      "id": "crate",
+      "node": "street.b",
+      "nameKey": "obj.crate",
+      "storyKey": "story.crate",
+      "grantsCard": "magnet",
+      "visibleWhen": {
+        "fact": "crateShown"
+      }
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "chapter": 0,
+  "startClock": "06:00",
+  "ticks": 120,
+  "tickMinutes": 1,
+  "anchor": "anchor.met",
+  "engineFacts": [
+    "rainStarted",
+    "rainStopped"
+  ],
+  "weather": {
+    "initial": "dry",
+    "rainStart": {
+      "window": [
+        "07:00",
+        "07:30"
+      ],
+      "perMille": 100
+    },
+    "rainStop": {
+      "minDurationTicks": 10,
+      "window": [
+        "07:40",
+        "08:00"
+      ],
+      "perMille": 100
+    }
+  },
+  "perception": {
+    "rainSightPerMille": 500,
+    "rainHearingPerMille": 500,
+    "wallSightPerMille": 0,
+    "wallHearingPerMille": 300,
+    "doorHearingPerMille": 600,
+    "openWindowHearingPerMille": 900,
+    "openWindowSightPerMille": 0
+  },
+  "primes": {
+    "cat": "hero",
+    "list": [
+      {
+        "id": "itchy",
+        "cond": {
+          "gauge": "hero.itch",
+          "gte": 500
+        }
+      },
+      {
+        "id": "brave",
+        "cond": {
+          "gauge": "hero.fearOfWater",
+          "lte": 300
+        }
+      }
+    ]
+  },
+  "counters": {
+    "work": {
+      "start": 0,
+      "target": 20
+    }
+  },
+  "tags": [
+    "indoor",
+    "outdoor",
+    "window",
+    "home",
+    "box",
+    "shore",
+    "sheltered",
+    "lane"
+  ]
+}

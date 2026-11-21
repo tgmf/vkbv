@@ -1,14 +1,18 @@
-// Simulation types. M0 holds only what the bridge protocol names (spec 02 §3).
-// Pin and WatchedFact follow spec 03 §11 and §15.2. SimState, SimEvent, RecomputeResult and
-// FramesPatch are placeholders here: M1 and M2 complete them from spec 03 §5, §16 and §17.
+// Simulation types (spec 03 §5, §6, §11). Everything here is plain JSON with integer numbers.
+import type { Content } from '../content/schemas/content';
+import type { PathMemo } from './space';
 
+export type { Content };
 export type CatId = string;
 export type NodeId = string;
+export type EdgeId = string;
 export type ObjectId = string;
 export type CardId = string;
 export type PowerId = string;
 export type PinId = string;
+export type Pos = [number, number]; // integer metres [x, z]
 
+// --- pins (03 §11) ------------------------------------------------------------------------------
 export type Pin =
   | {
       id: PinId;
@@ -21,22 +25,177 @@ export type Pin =
     }
   | { id: PinId; seq: number; tick: number; kind: 'power'; power: PowerId; place: NodeId };
 
+// --- state of one history (03 §5) ---------------------------------------------------------------
+export type CatPos =
+  { at: NodeId } | { from: NodeId; to: NodeId; edge: EdgeId; left: number; of: number };
+
+export interface GaugeMod {
+  gauge: string;
+  add: number;
+  left: number;
+  decayPerTick: number;
+  pin: PinId | null;
+}
+
+export interface CatState {
+  pos: CatPos;
+  route: NodeId[]; // places still to visit after the current edge
+  activity: string;
+  activityLeft: number; // ticks left at the place; 0 = finished
+  activityStart: number;
+  activityPlace: NodeId | null; // null = here
+  control: 'free' | 'storylet' | 'forced';
+  interrupt: null | { action: string; left: number; by: string };
+  base: Record<string, number>; // traits O C E A N and hooks
+  initial: Record<string, number>; // base at tick 0
+  mods: GaugeMod[];
+  pressure: number;
+  touchedBy: PinId[]; // sorted
+  knowsClosed: EdgeId[]; // sorted
+  heard: string[]; // sorted event names
+  voiceAt: Record<string, number>; // last tick each hook voiced
+}
+
+export interface Flag {
+  value: number;
+  until: number | null;
+}
+
+export interface StoryletRun {
+  state: string | null; // null = never activated; a terminal state stays here once reached
+  enteredAt: number;
+  roles: Record<string, CatId[]>;
+  ended: boolean; // reached a terminal state at least once
+}
+
+export interface PartialMatch {
+  stage: number;
+  stageTick: number;
+  count: number;
+}
+
+export interface RunningEffect {
+  id: string; // `${pinId}:${index}`
+  kind: 'attract' | 'repel' | 'flag';
+  pin: PinId;
+  source: { card: CardId } | { power: PowerId };
+  place: NodeId;
+  left: number;
+  born: number;
+  radiusM: number;
+  strength: number;
+  scale: { gauge: string; per: number; add: number } | { primeCount: string; add: number } | null;
+  affects: { kinds: string[]; orTemperatureTenthsGte?: number | undefined } | null;
+}
+
+/** A socialSpread hop waiting to be re-emitted next tick (03 §9.3). */
+export interface Echo {
+  name: string;
+  cat: CatId;
+  radiusM: number;
+  hops: number;
+}
+
+export interface SimState {
+  tick: number;
+  weather: { now: 'dry' | 'rain'; startedAt: number | null; stoppedAt: number | null };
+  facts: string[]; // sorted, never removed
+  flags: Record<string, Flag>; // `name` or `name@node`
+  counters: Record<string, number>;
+  cats: Record<CatId, CatState>; // keys in cast order
+  storylets: Record<string, StoryletRun>;
+  pools: Record<string, PartialMatch[]>;
+  effects: RunningEffect[]; // creation order
+  pins: Record<PinId, 'pending' | 'fired' | 'expired'>;
+  echoes: Echo[];
+  anchor: { reachedAt: number | null; deadAt: number | null };
+}
+
+// --- events (03 §6) -----------------------------------------------------------------------------
+export type SimEvent = { tick: number } & (
+  | { type: 'pinFired'; pin: PinId; special: boolean; card: CardId | null }
+  | { type: 'fizzle'; pin: PinId; reason: 'noBranch' | 'wrongCat' | 'hidden' }
+  | {
+      type: 'emit';
+      name: string;
+      pos: Pos;
+      node: NodeId;
+      radiusM: number | null; // a sound when set
+      source: CatId | null; // the cat that emitted it
+      to: CatId | null;
+      storylet: string | null;
+      global: boolean; // weather: everyone perceives it
+      hops: number; // socialSpread hops left
+      factIfPerceivedBy: Record<CatId, string> | null;
+    }
+  | {
+      type: 'voice';
+      cat: CatId;
+      hook: string;
+      line: string;
+      pos: Pos;
+      node: NodeId;
+      radiusM: number;
+    }
+  | { type: 'depart'; cat: CatId; from: NodeId; to: NodeId }
+  | { type: 'arrive'; cat: CatId; node: NodeId }
+  | { type: 'blocked'; cat: CatId; edge: EdgeId }
+  | { type: 'activity'; cat: CatId; activity: string; place: NodeId | null }
+  | { type: 'activityFinished'; cat: CatId; activity: string }
+  | { type: 'interrupt'; cat: CatId; action: string; ticks: number; by: string }
+  | { type: 'storylet'; id: string; state: string; roles: Record<string, CatId[]> }
+  | { type: 'detector'; id: string }
+  | { type: 'fact'; fact: string }
+  | { type: 'anchor'; reached: boolean }
+);
+export type EventOf<T extends SimEvent['type']> = Extract<SimEvent, { type: T }>;
+
+/** An outcome the content leaves to chance (03 §6). */
+export interface BranchPoint {
+  key: string;
+  options: { label: string; ppm: number }[];
+}
+
+/** Each cat and the world draw sampled noise from their own stream (03 §13). */
+export type Streams = Record<string, number>;
+
+/** How one history ends (03 §12.2): it reached the anchor, or died (fray, or the chapter's end). */
+export type End = { kind: 'anchor' | 'dead'; tick: number };
+
+export const catScope = (ctx: { streams: Streams }, cat: CatId): string =>
+  `s${ctx.streams[cat] ?? 0}:${cat}`;
+export const worldScope = (ctx: { streams: Streams }): string =>
+  `s${ctx.streams['world'] ?? 0}:world`;
+
+/** Everything one step works with. `s` is the step's own copy of the state, changed in place. */
+export interface Ctx {
+  c: Content;
+  seed: number;
+  streams: Streams;
+  s: SimState;
+  prev: SimState; // the step's input, untouched (hook voices compare against it)
+  t: number;
+  events: SimEvent[]; // this tick's events so far, in emission order
+  pins: readonly Pin[]; // the whole log, sorted by (tick, seq)
+  pick: (bp: BranchPoint) => number; // resolves a branch point to an option index
+  chanceN: number; // counts `chance` effects this tick (purpose chance:<n>)
+  memo: PathMemo; // path results for this map, shared across steps by the caller
+}
+
+/** Who `self` and `@role` mean while evaluating content. */
+export interface Scope {
+  self?: CatId | undefined;
+  roles?: Readonly<Record<string, CatId[]>> | undefined;
+  storylet?: string | undefined; // the storylet whose effects these are
+  origin?: CatId | undefined; // where an event with no at/from comes from (a storylet's first role)
+}
+
+// --- wave and bridge types (filled in M2) -------------------------------------------------------
 export interface WatchedFact {
   tick: number;
   cat: CatId;
   digest: number;
   summary: Record<string, unknown>; // shape fixed in M2 (spec 03 §15.2 step 5)
-}
-
-/** Placeholder until M1 (spec 03 §5). */
-export interface SimState {
-  tick: number;
-}
-
-/** Placeholder until M1 (spec 03 §5, §6). */
-export interface SimEvent {
-  tick: number;
-  type: string;
 }
 
 /** Placeholder until M2 (spec 03 §16). */
@@ -45,4 +204,11 @@ export type FramesPatch = Record<string, unknown>;
 /** Placeholder until M2 (spec 03 §17). */
 export interface RecomputeResult {
   end: { kind: 'anchor' | 'fray' | 'chapterEnd'; tick: number };
+}
+
+/** Lookup that must succeed because content was cross-checked at load. */
+export function need<T>(record: Readonly<Record<string, T>>, key: string, what: string): T {
+  const v = record[key];
+  if (v === undefined) throw new Error(`unknown ${what} ${key}`);
+  return v;
 }

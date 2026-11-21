@@ -1,0 +1,275 @@
+{
+  "storylets": [
+    {
+      "id": "lured",
+      "required": true,
+      "once": true,
+      "roles": {
+        "hero": {
+          "cat": "hero"
+        }
+      },
+      "trigger": {
+        "power": "glow",
+        "near": "@hero",
+        "m": 10
+      },
+      "start": "tempted",
+      "states": {
+        "tempted": {
+          "textKey": "sl.lured.tempted",
+          "stayScore": 0,
+          "exits": [
+            {
+              "to": "out",
+              "kind": "choice",
+              "actor": "@hero",
+              "score": {
+                "base": 0,
+                "terms": [
+                  {
+                    "primeCount": "hero",
+                    "add": 3
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "out": {
+          "textKey": "sl.lured.out",
+          "onEnter": [
+            {
+              "fact": "heroOut"
+            },
+            {
+              "goTo": [
+                "@hero",
+                "street.b"
+              ]
+            }
+          ],
+          "exits": []
+        }
+      }
+    },
+    {
+      "id": "shift",
+      "required": false,
+      "once": true,
+      "roles": {
+        "boss": {
+          "roleTag": "worker"
+        },
+        "helper": {
+          "nearCat": "@boss",
+          "m": 30,
+          "bind": "nearest",
+          "optional": true
+        },
+        "all": {
+          "roleTag": "helper",
+          "bind": "all"
+        }
+      },
+      "trigger": {
+        "clock": [
+          "06:05",
+          "23:59"
+        ]
+      },
+      "start": "idle",
+      "states": {
+        "idle": {
+          "stayScore": 0,
+          "exits": [
+            {
+              "to": "done",
+              "kind": "auto",
+              "gate": {
+                "fact": "workDone"
+              }
+            },
+            {
+              "to": "hz",
+              "kind": "hazard",
+              "perMille": 0,
+              "terms": [
+                {
+                  "if": {
+                    "bound": "@helper"
+                  },
+                  "addPerMille": 200
+                }
+              ]
+            },
+            {
+              "to": "chosen",
+              "kind": "choice",
+              "actor": "@boss",
+              "score": {
+                "base": 0
+              }
+            }
+          ]
+        },
+        "hz": {
+          "onEnter": [
+            {
+              "fact": "crateShown"
+            },
+            {
+              "emit": "shout",
+              "from": "@boss",
+              "radiusM": 40,
+              "factIfPerceivedBy": {
+                "hero": "heardShout"
+              }
+            }
+          ],
+          "exits": [
+            {
+              "to": "idle",
+              "kind": "hazard",
+              "perMille": 500
+            }
+          ]
+        },
+        "chosen": {
+          "onEnter": [
+            {
+              "flag": "busy",
+              "at": "@boss",
+              "ttl": 10
+            },
+            {
+              "gauge": "@boss.boxPull",
+              "add": 50,
+              "holdTicks": 5
+            },
+            {
+              "interrupt": [
+                "@boss",
+                "stretch",
+                2
+              ]
+            }
+          ],
+          "exits": [
+            {
+              "to": "idle",
+              "kind": "auto",
+              "gate": {
+                "not": {
+                  "flag": "busy",
+                  "at": "@boss"
+                }
+              }
+            }
+          ]
+        },
+        "done": {
+          "textKey": "sl.shift.done",
+          "onEnter": [
+            {
+              "stop": "@boss"
+            },
+            {
+              "fact": "gateClosed"
+            },
+            {
+              "trigger": "rite"
+            }
+          ],
+          "exits": []
+        }
+      }
+    },
+    {
+      "id": "rite",
+      "required": false,
+      "once": false,
+      "roles": {
+        "hero": {
+          "cat": "hero"
+        }
+      },
+      "trigger": {
+        "card": "poke",
+        "special": true
+      },
+      "start": "a",
+      "states": {
+        "a": {
+          "onEnter": [
+            {
+              "startActivity": [
+                "@hero",
+                "nap"
+              ]
+            }
+          ],
+          "exits": [
+            {
+              "to": "b",
+              "kind": "auto"
+            }
+          ]
+        },
+        "b": {
+          "onEnter": [
+            {
+              "chance": 1000,
+              "fact": "riteDone"
+            }
+          ],
+          "exits": []
+        }
+      }
+    },
+    {
+      "id": "meet",
+      "required": true,
+      "once": true,
+      "anchor": true,
+      "roles": {
+        "hero": {
+          "cat": "hero"
+        },
+        "pal": {
+          "cat": "pal"
+        }
+      },
+      "trigger": {
+        "all": [
+          {
+            "near": [
+              "@hero",
+              "@pal"
+            ],
+            "m": 5
+          },
+          {
+            "fact": "heroOut"
+          },
+          {
+            "heard": "rumour",
+            "by": "@pal"
+          }
+        ]
+      },
+      "start": "met",
+      "states": {
+        "met": {
+          "textKey": "sl.meet.met",
+          "onEnter": [
+            {
+              "fact": "anchor.met"
+            }
+          ],
+          "exits": []
+        }
+      }
+    }
+  ]
+}

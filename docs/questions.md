@@ -51,4 +51,53 @@ Question: Cost, radius and duration. The slice says 40 charge, 6 m, 5 ticks.
 Chosen for now: the slice's values. Gate A decides.
 Answer:
 
+## M1-1 — Do object tags count in `at` conditions?            (status: open)
+Where: `src/sim/conditions.ts` (`at` with `tag`); `03` §8.2 vs §10.1
+Question: A place selector `{ tag }` counts tags of objects standing at a place ("or holding an
+object carrying it"); the `at … tag` condition says "a node with that tag". Read literally, Marti
+sitting in the box at `flat.window_nook` (the `old_box` object carries `box`; the place does not)
+does not satisfy `boxPull`'s rise rule `{ at: self, tag: box }`.
+Options seen: (a) place tags only, as written; (b) count object tags in conditions too.
+Chosen for now: (a).
+Answer:
+
+## M1-2 — Role holders perceive all of their storylet's events            (status: open)
+Where: `src/sim/step.ts` (`always`); `03` §4 last rule; `ch1/storylets.json` `crew_chatter`
+Question: `crew_chatter` binds Marti as a role so its effects can name him. By `03` §4 he then
+perceives every event of that storylet, so `chatter.catlantis` always reaches him and the
+`overheard` state follows the next tick, wherever he is. The slice's README calls this a
+knife-edge perception test (only through the open window while dry). Seen on seed 1: overheard at
+09:04 while Marti walked in the study.
+Options seen: (a) keep `03` §4; (b) role holders perceive only `storylet` state events, not
+named emits; (c) content: drop the `marti` role in `crew_chatter` (its `factIfPerceivedBy` and
+gauge effect can name `marti` directly).
+Chosen for now: (a), as specified.
+Answer:
+
+## M1-3 — `chance:<n>` keys every chance roll by its order in the tick            (status: open)
+Where: `src/sim/effects.ts`; `03` §9.3 (`chance`)
+Question: `n` counts chance effects in the tick, across all cats and storylets. An unrelated chance
+effect earlier in the tick (e.g. another cat finishing `chat`) shifts every later roll, which works
+against "noise keyed by who, when and why" (`03` §1, §13).
+Options seen: (a) as written; (b) key by source and index, e.g. `chance:<cat or storylet>:<k>`.
+Chosen for now: (a).
+Answer:
+
+## M1-4 — Can a storylet transition on the tick it activates?            (status: open)
+Where: `src/sim/storylets.ts` (`storyletsPhase`); `03` §6 phase 4, §9.1
+Question: "Activation, then one transition at most per storylet." Does a storylet that activates
+in phase 4 also look at its start state's exits in the same phase?
+Options seen: (a) no: activation is that storylet's step for the tick; (b) yes.
+Chosen for now: (a). It delays every first transition by one tick (e.g. `parcel_drop`).
+Answer:
+
+## M1-5 — Performance needed for M2            (status: open, for planning)
+Where: `07` §4 recompute budget
+Measured: one Chapter 1 history (900 ticks, 12 cats) takes about 120 ms in Node (Vitest), so about
+130 µs per history-tick. The M2 budget (an edit at 12:00, 128 histories, 100 ms) allows about
+1.5 µs per history-tick before merging: roughly 80× short. Merging identical histories will help;
+cheaper steps (fewer clones, incremental decisions) will be needed. M2's brief allows lowering
+`waves.cap`, not changing `03`.
+Answer:
+
 <!-- Gate notes and answers go above this line. -->

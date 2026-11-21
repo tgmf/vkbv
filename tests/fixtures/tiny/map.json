@@ -1,0 +1,139 @@
+{
+  "regions": [
+    {
+      "id": "home",
+      "nameKey": "region.home",
+      "revealedAtStart": true
+    },
+    {
+      "id": "street",
+      "nameKey": "region.street",
+      "revealedAtStart": false
+    }
+  ],
+  "nodes": [
+    {
+      "id": "home.room",
+      "region": "home",
+      "nameKey": "node.room",
+      "pos": [
+        0,
+        0
+      ],
+      "tags": [
+        "indoor",
+        "window",
+        "home"
+      ]
+    },
+    {
+      "id": "home.door",
+      "region": "home",
+      "nameKey": "node.door",
+      "pos": [
+        0,
+        5
+      ],
+      "tags": [
+        "indoor"
+      ]
+    },
+    {
+      "id": "street.a",
+      "region": "street",
+      "nameKey": "node.a",
+      "pos": [
+        0,
+        15
+      ],
+      "tags": [
+        "outdoor"
+      ]
+    },
+    {
+      "id": "street.b",
+      "region": "street",
+      "nameKey": "node.b",
+      "pos": [
+        20,
+        15
+      ],
+      "tags": [
+        "outdoor",
+        "box"
+      ]
+    },
+    {
+      "id": "street.c",
+      "region": "street",
+      "nameKey": "node.c",
+      "pos": [
+        40,
+        15
+      ],
+      "tags": [
+        "outdoor",
+        "shore"
+      ]
+    },
+    {
+      "id": "street.d",
+      "region": "street",
+      "nameKey": "node.d",
+      "pos": [
+        20,
+        35
+      ],
+      "tags": [
+        "outdoor",
+        "sheltered"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "a": "home.room",
+      "b": "home.door",
+      "minutes": 1,
+      "walls": 0
+    },
+    {
+      "a": "home.door",
+      "b": "street.a",
+      "minutes": 2,
+      "door": true
+    },
+    {
+      "a": "street.a",
+      "b": "street.b",
+      "minutes": 2
+    },
+    {
+      "id": "gate",
+      "a": "street.b",
+      "b": "street.c",
+      "minutes": 3,
+      "when": {
+        "not": {
+          "fact": "gateClosed"
+        }
+      }
+    },
+    {
+      "a": "street.a",
+      "b": "street.d",
+      "minutes": 3,
+      "tags": [
+        "lane"
+      ]
+    },
+    {
+      "a": "street.d",
+      "b": "street.c",
+      "minutes": 4,
+      "tags": [
+        "lane"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "detectors": [
+    {
+      "id": "soak",
+      "emits": "soaked",
+      "kernel": [
+        {
+          "event": "rainStarted"
+        },
+        {
+          "holds": {
+            "at": "pal",
+            "tag": "outdoor"
+          },
+          "forTicks": 3,
+          "withinTicks": 10
+        }
+      ],
+      "unless": [
+        {
+          "fact": "heroOut",
+          "between": [
+            1,
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bell_noted",
+      "emits": "bellNoted",
+      "kernel": [
+        {
+          "holds": {
+            "fact": "bellSeen"
+          },
+          "forTicks": 1
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "powers": [
+    {
+      "id": "glow",
+      "nameKey": "power.glow.name",
+      "textKey": "power.glow.text",
+      "cost": 10,
+      "targets": [
+        "place"
+      ],
+      "radiusM": 10,
+      "ticks": 10,
+      "affects": {
+        "kinds": [
+          "protagonist"
+        ]
+      },
+      "effects": [
+        {
+          "prim": "attract",
+          "radiusM": 10,
+          "strength": 4,
+          "ticks": 10,
+          "scale": {
+            "primeCount": "hero",
+            "add": 2
+          }
+        },
+        {
+          "prim": "triggerStorylet",
+          "storylet": "lured",
+          "ifTarget": "hero"
+        }
+      ],
+      "pressure": 50
+    },
+    {
+      "id": "gaze",
+      "nameKey": "power.gaze.name",
+      "textKey": "power.gaze.text",
+      "cost": 5,
+      "targets": [
+        "place"
+      ],
+      "radiusM": 6,
+      "ticks": 3,
+      "effects": [
+        {
+          "prim": "collapse",
+          "radiusM": 6,
+          "ticks": 3
+        }
+      ],
+      "pressure": 0
+    }
+  ]
+}

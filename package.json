@@ -17,7 +17,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "content:check": "tsx scripts/content.ts",
-    "sim": "tsx scripts/not-yet.ts sim M1",
+    "sim": "tsx src/cli/sim.ts",
     "balance": "tsx scripts/not-yet.ts balance M4",
     "calibrate": "tsx scripts/not-yet.ts calibrate M2",
     "golden:update": "tsx scripts/not-yet.ts golden:update M2",
