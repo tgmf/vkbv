@@ -64,6 +64,8 @@ export interface Quantities {
   mods: FogMod[]; // in creation order
   /** Per `fact:<f>`, `flag:<key>` and `heard:<cat>:<event>`: its top sources (03 §13.5). */
   heaps: Record<string, Contributor[]>;
+  /** P(the anchor's `fraysIf` has held without the anchor by now): dead (03 §12.2, §13.6). */
+  dead: number;
 }
 
 /** An event emitted in the fog this step: P(emitted at that node). */
@@ -109,6 +111,7 @@ export function initialQuantities(c: Content): Quantities {
     echoes: [],
     mods: [],
     heaps: {},
+    dead: 0,
   };
 }
 
@@ -217,6 +220,7 @@ export function mixQuantities(
     echoes: [],
     mods: [],
     heaps: {},
+    dead: avg((q) => q.dead),
   };
   for (const k of keys((q) => q.facts)) out.facts[k] = avg((q) => q.facts[k] ?? 0);
   for (const k of keys((q) => q.factParts)) {

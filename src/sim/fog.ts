@@ -663,6 +663,8 @@ export function initialFog(setup: FogSetup, fogged: readonly CatId[]): Fog {
 // --- normalising -----------------------------------------------------------------------------------------
 
 const keyOf = (s: ChainState): string => JSON.stringify(s);
+/** A chain state's key, as chains merge states by it (03 §13.2). */
+export const stateKey = keyOf;
 
 /** Whether a condition reads a gauge anywhere in it. */
 const readsGauge = (cond: Condition): boolean =>
@@ -2131,6 +2133,8 @@ function finishStep(
   }
   perceive(setup, fc, sink.events, cc.ctx.t);
   detectorsStep(setup, cc, fc.q, sink.events);
+  // dead: the running maximum of P(fraysIf holds) at the step's end (03 §12.2, §13.6)
+  fc.q.dead = Math.max(fc.q.dead, chance(cc.ctx, c.anchor.fraysIf, {}));
   return fc;
 }
 
@@ -2162,6 +2166,7 @@ function cloneQ(q: Quantities): Quantities {
     echoes: [...q.echoes],
     mods: [...q.mods],
     heaps: { ...q.heaps },
+    dead: q.dead,
   };
 }
 
