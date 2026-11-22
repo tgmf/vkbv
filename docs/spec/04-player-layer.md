@@ -55,13 +55,17 @@ Before the first recompute of a new game, the worker vets the seed once (pacing)
 for k in 0 .. tuning.vetting.maxCandidates - 1:
   candidate = k == 0 ? requested : hash32(requested + "|vet|" + k)
   compute the untouched timeline (no pins, no watched facts, conditioning off): the
-       whole-day projection (03 §13.1: every cat in the fog, Marti included; never
-       drawn), with the candidate's seeded stats (03 §5)
+       whole-day run (03 §13.1: Marti live from tick 0, every other cat in the fog;
+       never drawn), with the candidate's seeded stats (03 §5)
   pass if, for every fact in the anchor's requirement tree (its story storylets'
-       outcomes) and every fact in tuning.vetting.requireFacts, the raw probability
-       that it holds by the chapter's end is >= tuning.vetting.minPpm
+       outcomes) and every fact in tuning.vetting.requireFacts, its raw chance by the
+       end of the run (03 §13.1) is >= tuning.vetting.minPpm
 take the first candidate that passes; if none does, take the requested seed
 ```
+
+Marti is never fogged (Tagir, 2026-11-23): vetting runs him live like every whole-day run.
+Open (`docs/questions.md` M2-17): in the untouched run Marti stays home, so the requirement
+facts that need him out are 0 for every candidate.
 
 The result is stored as `seed` and never changed during play. A bookmarked seed is
 always the vetted one, so it always gives the same world.

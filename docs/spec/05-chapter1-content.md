@@ -79,7 +79,7 @@ have **not** been checked against a model of this content; M4 measures them.
 | `fog.maxLinks` | 2 | links besides the weather (`03` §13.5) |
 | `fog.linkFloorPpm` | 50000 | a lasting meeting effect becomes a link above this, about 5% |
 | `fog.contributors` | 4 | contributor heap size per fact, flag and `heard` |
-| `fog.frayBelowPpm` | 1000 | a projection frays below this chance of reaching the anchor (`03` §16) |
+| `fog.frayBelowPpm` | 1000 | the lantern, and a projection, fray below this chance of reaching the anchor (`03` §16) |
 | `fog.exactTolerancePpm` | 20000 | tiny-world exactness test (`03` §18) |
 | `fog.ppmQuantum` | 50000 | fog probabilities in decision keys are rounded down to this (`03` §8.2) |
 | `behaviour.boredomWeight` | 4 | score taken from the current activity at full boredom (`03` §8.2) |
@@ -143,12 +143,15 @@ Pins are written `card@target@tick` or `power@place@tick`.
 
 ### 5.2 Properties
 
-Measured over seeds 1 to 50, with the vetted seed. Probabilities are raw (conditioning
-off) unless stated.
+Measured over seeds 1 to 50, with the vetted seed, one whole-day run per seed (`03`
+§13.1: Marti live from tick 0, every other cat in the fog; Tagir, 2026-11-23). An event's
+probability is its chance by the end of the run, raw (conditioning off) unless stated,
+averaged over the seeds; for Marti's own events that is the share of seeds whose run has
+them. "Frays" is the lantern's fray (`03` §16).
 
 | Id | Property | Kind |
 | --- | --- | --- |
-| B1 | `untouched`: Marti is in region `flat` at every tick: live in a headless playback to the end, with all his chain's mass there in the whole-day projection | structural, a test from M2 |
+| B1 | `untouched`: Marti is in region `flat` at every tick of the whole-day run | structural, a test from M2 |
 | B2 | `lure_unprimed`: P(`martiOut` by 14:30) ≤ 15% | balance |
 | B3 | `lure_one_prime`: P(`martiOut` by 14:30) ≤ 35% | balance |
 | B4 | `lure_primed`: P(`martiOut` by 14:30) ≥ 60% | balance |

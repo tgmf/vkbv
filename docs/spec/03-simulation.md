@@ -299,7 +299,9 @@ storylets and detectors in file order, effects in creation order, pins in log or
    cats perceive (§4): `heard`, hook `onEvent`, `factIfPerceivedBy`, `socialSpread`
    hops (§9.3), object `onPerceived` (checked for every object every tick).
 8. **Anchor.** If the anchor fact is set and `reachedAt` is null, set it. If
-   `anchor.fraysIf` holds and `deadAt` is null and `reachedAt` is null, set `deadAt`.
+   `anchor.fraysIf` holds and `deadAt` is null and `reachedAt` is null, set `deadAt`. In
+   the lantern `fraysIf` is read on the lantern's own state only (what the fog holds
+   counts as not set); the lantern's fray also follows the fog's odds (§16).
 
 The returned state has `tick + 1`. Interventions at tick `t` change `states[t + 1]`,
 never `states[t]`.
@@ -696,12 +698,21 @@ reference simulation.
   one tick at a time (§15.2), and a **re-run** after an edit simulates the lantern again
   from the edit tick to the frontier limit (§17, `04` §6). A new game starts with
   `lanternEdge = 0`.
+- **Marti is never fogged** (Tagir, 2026-11-23, `docs/questions.md` M2-15). He is always
+  observed: every run of the chapter, in play or not, simulates him live in the lantern
+  from tick 0.
+- A **whole-day run** advances the lantern from tick 0 to the chapter's end with an
+  empty frontier limit and nobody watching: Marti live on stream 0, every other cat in
+  the fog, placement, release and fog events drawn into the lantern exactly as in a
+  re-run (§15.1), the pins of its log applied, no watched facts. It stops at the
+  lantern's fray (§16) or the chapter's end. It serves seed vetting (`04` §2),
+  calibration (`07` §3) and the balance measures (`05` §5.2). An event's **chance by the
+  end of a whole-day run** is 1 000 000 if the lantern holds it, and otherwise its
+  probability in the fog (the cases by weight). Marti's own events are therefore 0 or
+  1 000 000 per seed: one sampled Marti, not a distribution.
 - A **projection from tick `t`** advances the fog alone from `t` to the chapter's end:
-  every cat live at `t` becomes a point mass at its live state. It is computed, never
-  drawn. The **whole-day projection** starts at tick 0 with no cat live (Marti in the
-  fog like everyone else) and serves seed vetting (`04` §2), calibration (`07` §3) and
-  the balance measures (`05` §5.2). Nothing in play needs a projection, except `strain`
-  in the debug panel (§14).
+  every cat live at `t`, Marti included, becomes a point mass at its live state. It is
+  computed, never drawn, and serves only `strain` in the debug panel (§14).
 
 ### 13.2 Cat chains
 
@@ -1044,11 +1055,17 @@ fact ever lies past the lantern edge. (Tagir, 2026-11-22; replaces option (a) of
 
 ## 16. Fray and frames
 
-**Fray.** The lantern frays at the tick `fraysIf` holds in it (a gate, §13.3) without
-the anchor fact. The timeline ends there: neither playback nor a re-run passes it. A
-projection frays at the first tick from which the anchor's probability of being
-reached is below `tuning.fog.frayBelowPpm` (1 000); that fray matters only to vetting,
-calibration and the balance measures.
+**Fray.** (Tagir, 2026-11-23, `docs/questions.md` M2-16: the lantern frays on the fog's
+chance of reaching the anchor, not on a gate.) The chance the anchor can still be
+reached at tick `t` is P(alive) = 1 000 000 − P(dead), where P(dead) is the fog's
+probability, over its cases by weight, that `fraysIf` has held without the anchor fact
+by `t` (§13.6, the running maximum per case), each case reading what the lantern holds
+as fact. The lantern frays at the first tick where P(alive) is below
+`tuning.fog.frayBelowPpm` (1 000): at once when `fraysIf` holds on the lantern's own
+facts, never once the lantern holds the anchor fact, and at the chapter's last tick if
+the anchor was not reached by then. An unwatched fact that is merely likely never ends
+the timeline. The timeline ends at the fray: neither playback nor a re-run passes it.
+A projection frays the same way on its own cases (`docs/questions.md` M2-12).
 
 **Frames.** For each tick up to the lantern edge the worker aggregates what the renderer and the player layer
 need (`02` §4): per cat, the distinct `(position, activity, interrupt)` with their
@@ -1117,6 +1134,5 @@ states, plus re-run time, strain and `localCauses` (debug only).
   `stats.localCauses`.
 - **Calibration** (`07` §3): over many seeds, a probability shown at one tick matches
   how often the event happens in the reference simulation, bucket by bucket.
-- With an empty log, for seeds 1 to 50, Marti is in region `flat` at every tick: live
-  in a headless playback to the chapter's end, and with all his chain's mass there in
-  the whole-day projection.
+- With an empty log, for seeds 1 to 50, Marti is in region `flat` at every tick of the
+  whole-day run (§13.1), to its end.

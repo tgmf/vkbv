@@ -56,19 +56,28 @@ The wave is only worth showing if its probabilities are honest. The fog's odds h
 construction for what is watched (every collapse draws from them); calibration checks
 that the fog, an approximation, stays close to the reference simulation.
 
-`calibrate(seeds, pinSet, atTick, events)`: for each seed,
+`calibrate(seeds, pinSet, events)`: for each seed,
 
-1. compute the whole-day projection (`03` §13.1) with the pin set, conditioning
-   **off**: **no cat live**, protagonists in the fog like everyone else. Read the
-   predicted probability `p` that each event in `events` has happened by the chapter's
-   end, as seen from tick `atTick` (the frame's requirement and fact probabilities);
+1. run the **whole-day run** (`03` §13.1) with the pin set, conditioning **off**: Marti
+   live from tick 0 on stream 0, every other cat in the fog (Tagir, 2026-11-23: Marti is
+   never fogged). Read each event's chance `p` by the end of the run: 1 000 000 if the
+   lantern holds it, otherwise its probability in the fog;
 2. run one **reality**: the reference simulation, a single history (`03` §12.4) in
    stream `100000 + seed`, and record whether each event happened. Its starting stats
    are the seed's (`03` §5); only its behaviour rolls use that stream.
 
-Group all `(p, outcome)` pairs into ten buckets by `p`. For every bucket with at least
-`calibration.minPerBucket` pairs, the mean of `p` and the share of outcomes that
-happened must differ by at most `calibration.tolerancePpm`.
+Two checks:
+
+- **Rates**, every event: over all seeds, the mean of `p` and the share of realities in
+  which the event happened differ by at most `calibration.tolerancePpm`. Marti's events
+  are judged only here: his run and the reality are two independent samples of him, so a
+  single seed's pair says nothing. The full run (`calibration.seeds`) must pass it; the
+  quick run prints it (with 60 seeds the sampling error alone is near the tolerance).
+- **Buckets**, fog events only: an event is a fog event in a seed's run when no
+  storylet that sets it (`03` §12.2) ran live in that run's lantern. Group those
+  `(p, outcome)` pairs into ten buckets by `p`. For every bucket with at least
+  `calibration.minPerBucket` pairs, the mean of `p` and the share of outcomes that
+  happened must differ by at most `calibration.tolerancePpm`.
 
 | Knob | Start |
 | --- | --- |
@@ -77,9 +86,8 @@ happened must differ by at most `calibration.tolerancePpm`.
 | `calibration.minPerBucket` | 20 |
 | `calibration.tolerancePpm` | 100000 |
 
-Pin set `road_both`, `atTick` 140 (08:00), events `crewArrived`, `roadBlocked`,
-`shopClosedEarly`, `rokkoUnderBoat`, `martiOut`, `anchor.meeting`. A second run uses
-`untouched` at tick 20. A calibration failure is a bug in the fog, or an approximation in `03` §13 that does
+Pin set `road_both`, events `crewArrived`, `roadBlocked`, `shopClosedEarly`,
+`rokkoUnderBoat`, `martiOut`, `anchor.meeting`. A second run uses `untouched`. A calibration failure is a bug in the fog, or an approximation in `03` §13 that does
 not hold for this content. Report which events and buckets miss, with numbers, in the
 handoff note and `docs/questions.md`; never change content or tolerance to make it
 pass.
