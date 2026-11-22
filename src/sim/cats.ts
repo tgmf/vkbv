@@ -460,15 +460,32 @@ const offersOf = (ctx: Ctx, id: CatId): RunningEffect[] =>
 function decisionParts(ctx: Ctx, id: CatId, exact: boolean): unknown[] {
   const cs = catState(ctx, id);
   const scope = { self: id };
-  const gauges: string[] = [];
-  const leaves: Condition[] = [];
-  const places: PlaceSelector[] = [];
-  for (const a of readActivities(ctx, id)) {
-    const r = activityReads(ctx, a);
-    for (const g of r.gauges) if (!gauges.includes(g)) gauges.push(g);
-    for (const l of r.leaves) if (!leaves.includes(l)) leaves.push(l);
-    for (const p of r.places) if (!places.includes(p)) places.push(p);
+  const list = need(ctx.c.cat, id, 'cat').activities;
+  const unionKey = list.includes(cs.activity) ? id : `${id}|${cs.activity}`;
+  let union = ctx.decisions.unions[unionKey];
+  if (!union) {
+    union = { gauges: [], leaves: [], places: [] };
+    for (const a of readActivities(ctx, id)) {
+      const r = activityReads(ctx, a);
+      for (const g of r.gauges) if (!union.gauges.includes(g)) union.gauges.push(g);
+      for (const l of r.leaves) if (!union.leaves.includes(l)) union.leaves.push(l);
+      for (const p of r.places) if (!union.places.includes(p)) union.places.push(p);
+    }
+    ctx.decisions.unions[unionKey] = union;
   }
+  const { gauges, leaves, places } = union;
+  // In the fog, inputs that do not depend on the deciding state are evaluated once per case and
+  // step; those that do, once per position and activity (`ctx.partsMemo`).
+  const memo = ctx.partsMemo;
+  const here = memo ? JSON.stringify([catPos(ctx.c, cs), cs.activity]) : '';
+  const once = <T>(key: string, f: () => T): T => {
+    if (!memo) return f();
+    const hit = memo[key];
+    if (hit !== undefined) return hit as T;
+    const v = f();
+    memo[key] = v;
+    return v;
+  };
   const values = gauges.map((ref) => {
     const v = readGauge(ctx, scope, ref);
     return exact ? v : gaugeBand(ctx.c, ref.slice(ref.indexOf('.') + 1), v);
@@ -490,16 +507,38 @@ function decisionParts(ctx: Ctx, id: CatId, exact: boolean): unknown[] {
     cs.activityPlace,
     values,
     exact ? cs.boredom : gaugeBand(ctx.c, BOREDOM, cs.boredom),
-    leaves.map((l) => chance(ctx, l, scope)),
+    leaves.map((l, i) =>
+      once(`${unionKey}|L${i}|${selfDependent(l, id) ? here : ''}`, () => chance(ctx, l, scope)),
+    ),
     offers,
   ];
   if (exact)
     parts.push(
       planFrom(cs),
       cs.knowsClosed,
-      places.map((p) => placeOptions(ctx, id, p)),
+      places.map((p, i) =>
+        once(`${unionKey}|P${i}|${planFrom(cs)}`, () => placeOptions(ctx, id, p)),
+      ),
     );
   return parts;
+}
+
+/**
+ * Whether a leaf's value depends on the deciding cat's own state (its position, activity,
+ * perceptions): it names `self` or the cat, or counts cats. Conservative: unknown leaves do.
+ */
+function selfDependent(l: Condition, id: CatId): boolean {
+  const me = (ref: string | undefined) => ref === 'self' || ref === id;
+  if ('fact' in l || 'state' in l || 'counter' in l || 'clock' in l || 'weather' in l) return false;
+  if ('card' in l || 'bound' in l) return false;
+  if ('flag' in l) return me(l.at);
+  if ('near' in l && Array.isArray(l.near)) return l.near.some(me);
+  if ('power' in l || 'pin' in l) return me(l.near);
+  if ('activity' in l) return me(l.activity);
+  if ('activityFinished' in l) return me(l.activityFinished[0]);
+  if ('heard' in l) return me(l.by);
+  if ('at' in l) return me(l.at);
+  return true;
 }
 
 /**

@@ -193,6 +193,11 @@ export interface Ctx {
   fog?: FogReader;
   /** While a fog decision runs: fog leaves are rounded down to this many ppm (03 §8.2). */
   quantum?: number;
+  /**
+   * In the fog, per case and step: decision inputs already evaluated, by cat, input and (for
+   * inputs that depend on the deciding state) its position and activity. Results are unchanged.
+   */
+  partsMemo?: Record<string, unknown>;
 }
 
 /**
@@ -202,6 +207,8 @@ export interface Ctx {
  */
 export interface DecisionMemo {
   reads: Record<string, DecisionReads>;
+  /** What a cat's whole decision reads, by cat and (when not in its list) current activity. */
+  unions: Record<string, DecisionReads>;
   results: Record<string, { cands: Candidate[]; ppm: number[] }>;
   off: boolean;
   calls: number;
@@ -224,6 +231,7 @@ export interface Candidate {
 
 export const newDecisionMemo = (off = false): DecisionMemo => ({
   reads: {},
+  unions: {},
   results: {},
   off,
   calls: 0,

@@ -366,26 +366,64 @@ interface CaseCtx {
   ctx: Ctx;
   standIns: Record<CatId, StandIns>;
   deciding: { id: CatId | null };
+  /** A chain state's stand-in, built once per fog step (shared by every case of the step). */
+  stand: (id: CatId, s: ChainState, mean: Record<string, number>) => CatState;
+  /** A chain state's canonical key, built once per fog step. */
+  key: (s: ChainState) => string;
 }
+
+/**
+ * What one fog step shares between its cases: stand-ins by cat, state and mean-field values, and
+ * the canonical keys of the states and mean-field records it has seen (by object, so never stale).
+ */
+interface StepMemo {
+  stands: Record<string, CatState>;
+  keys: WeakMap<ChainState, string>;
+  means: WeakMap<Record<string, number>, string>;
+}
+
+const newStepMemo = (): StepMemo => ({ stands: {}, keys: new WeakMap(), means: new WeakMap() });
 
 function caseCtx(
   setup: FogSetup,
   fc: FogCase,
   t: number,
+  step: StepMemo,
   finished: Record<CatId, Record<string, number>> = {},
 ): CaseCtx {
   const { c } = setup;
-  const s = structuredClone(setup.base);
-  s.tick = t;
-  s.weather.now = fc.weather === 'rain' ? 'rain' : 'dry';
+  // a skeleton: only `tick`, `weather.now` and whole cats are ever replaced, nothing deeper
+  const s: SimState = {
+    ...setup.base,
+    tick: t,
+    weather: { ...setup.base.weather, now: fc.weather === 'rain' ? 'rain' : 'dry' },
+    cats: { ...setup.base.cats },
+  };
+  const key = (cs: ChainState): string => {
+    let k = step.keys.get(cs);
+    if (k === undefined) {
+      k = keyOf(cs);
+      step.keys.set(cs, k);
+    }
+    return k;
+  };
+  const meanKey = (mean: Record<string, number>): string => {
+    let k = step.means.get(mean);
+    if (k === undefined) {
+      k = JSON.stringify(mean);
+      step.means.set(mean, k);
+    }
+    return k;
+  };
+  const stand = (id: CatId, cs: ChainState, mean: Record<string, number>): CatState => {
+    const k = `${id}|${key(cs)}|${meanKey(mean)}`;
+    return (step.stands[k] ??= standIn(setup, id, cs, mean));
+  };
   const standIns: Record<CatId, StandIns> = {};
   for (const def of c.cats) {
     const cat = fc.cats[def.id];
     if (cat)
-      standIns[def.id] = cat.chain.map((e) => ({
-        cat: standIn(setup, def.id, e.s, cat.mean),
-        p: e.p,
-      }));
+      standIns[def.id] = cat.chain.map((e) => ({ cat: stand(def.id, e.s, cat.mean), p: e.p }));
   }
   const deciding: { id: CatId | null } = { id: null };
   const likely: Record<CatId, CatState> = {};
@@ -427,8 +465,9 @@ function caseCtx(
     memo: setup.memo,
     decisions: setup.decisions,
     fog,
+    partsMemo: {},
   };
-  return { ctx, standIns, deciding };
+  return { ctx, standIns, deciding, stand, key };
 }
 
 /** Evaluates `fn` with `id` standing as the given chain state (the cat deciding, not mixed). */
@@ -517,7 +556,7 @@ export function initialFog(setup: FogSetup, fogged: readonly CatId[]): Fog {
     cats: {},
     q: initialQuantities(c),
   };
-  const cc = caseCtx(setup, fc, 0);
+  const cc = caseCtx(setup, fc, 0, newStepMemo());
   for (const def of c.cats) {
     if (!fogged.includes(def.id)) continue;
     const seeded = need(setup.seeded, def.id, 'cat');
@@ -546,6 +585,16 @@ export function initialFog(setup: FogSetup, fogged: readonly CatId[]): Fog {
 // --- normalising -----------------------------------------------------------------------------------------
 
 const keyOf = (s: ChainState): string => JSON.stringify(s);
+
+/** Whether a condition reads a gauge anywhere in it. */
+const readsGauge = (cond: Condition): boolean =>
+  'all' in cond
+    ? cond.all.some(readsGauge)
+    : 'any' in cond
+      ? cond.any.some(readsGauge)
+      : 'not' in cond
+        ? readsGauge(cond.not)
+        : 'gauge' in cond;
 
 /**
  * Merges equal states, drops states below `fog.minStatePpm`, renormalises to 1 000 000 and sorts by
@@ -709,7 +758,7 @@ function catEffect(
     const moved = times(x.p, mass);
     if (moved < x.p) chain.push({ s: x.s, p: x.p - moved });
     if (moved === 0) continue;
-    const me = standIn(setup, id, x.s, fc.mean);
+    const me = cc.stand(id, x.s, fc.mean);
     const here = 'at' in me.pos ? me.pos.at : me.pos.to;
     if ('goTo' in e) {
       const walk = walkTo(c, cc.ctx.memo, here, e.goTo[1], {
@@ -981,12 +1030,13 @@ function hooksStep(cc: CaseCtx, setup: FogSetup, id: CatId, fc: FogCat, t: numbe
     if (!cond) return PPM;
     const memo = seen.get(cond) ?? {};
     seen.set(cond, memo);
-    const key = keyOf(e.s);
+    // a condition that reads no gauge depends only on where the cat is and what it does
+    const key = readsGauge(cond)
+      ? cc.key(e.s)
+      : JSON.stringify([e.s.place, e.s.walk, e.s.activity, e.s.interrupt, e.s.control]);
     const hit = memo[key];
     if (hit !== undefined) return hit;
-    const p = as(cc, id, standIn(setup, id, e.s, fc.mean), () =>
-      chance(cc.ctx, cond, { self: id }),
-    );
+    const p = as(cc, id, cc.stand(id, e.s, fc.mean), () => chance(cc.ctx, cond, { self: id }));
     memo[key] = p;
     return p;
   };
@@ -1063,6 +1113,7 @@ function catStep(
   const selfGauge = (e: Effect) =>
     'gauge' in e && e.gauge.slice(0, e.gauge.indexOf('.')) === 'self' ? gaugeName(e.gauge) : null;
   const begun: Record<string, [ChainState, number][]> = {}; // starts by place and activity, this step
+  const decided: Record<string, ReturnType<typeof choices>> = {}; // decisions by state, this step
 
   for (const first of hooked.chain) {
     const s0 = first.s;
@@ -1133,8 +1184,10 @@ function catStep(
         out.push({ s, p: e.p });
         continue;
       }
-      const me = standIn(setup, id, s, mean);
-      const { cands, ppm } = as(cc, id, me, () => choices(cc.ctx, id));
+      const sk = cc.key(s);
+      const { cands, ppm } = (decided[sk] ??= as(cc, id, cc.stand(id, s, mean), () =>
+        choices(cc.ctx, id),
+      ));
       // the actor of an open storylet choice makes no free decision (03 §8.3)
       const moving = cands.length === 0 ? 0 : e.p - times(e.p, blocked);
       if (e.p - moving > 0) out.push({ s, p: e.p - moving });
@@ -1164,7 +1217,7 @@ function catStep(
           const next = (begun[k] ??= starts(
             cc,
             id,
-            standIn(setup, id, l.s, mean),
+            cc.stand(id, l.s, mean),
             cand.activity,
             {},
             'free',
@@ -1200,23 +1253,23 @@ function perceive(setup: FogSetup, fc: FogCase, events: readonly FogEvent[]): vo
       const k = s.walk ? JSON.stringify(s.walk) : s.place;
       return (at[k] ??= index(stateNode(setup, def.id, s)));
     };
+    // where the cat's mass stands: band moves below never move it between places
+    const byNode: [number, number][] = [];
+    for (const e of chain) {
+      const n = nodeOf(e.s);
+      const seen = byNode.find((x) => x[0] === n);
+      if (seen) seen[1] += e.p;
+      else byNode.push([n, e.p]);
+    }
     for (const ev of events) {
       const j = index(ev.node);
-      const sees = (s: ChainState) =>
-        ev.global ||
-        ev.to === def.id ||
-        ev.source === def.id ||
-        tablePerceives(
-          table,
-          def.id,
-          ev.radiusM === null ? 'sight' : 'hearing',
-          weather,
-          nodeOf(s),
-          j,
-          ev.radiusM,
-        );
+      const always = ev.global || ev.to === def.id || ev.source === def.id;
+      const sense = ev.radiusM === null ? 'sight' : 'hearing';
+      const seesNode = (n: number) =>
+        always || tablePerceives(table, def.id, sense, weather, n, j, ev.radiusM);
+      const sees = (s: ChainState) => seesNode(nodeOf(s));
       let pp = 0;
-      for (const e of chain) if (sees(e.s)) pp += e.p;
+      for (const [n, mass] of byNode) if (seesNode(n)) pp += mass;
       const m = times(ev.p, pp);
       if (m === 0) continue;
       addHeard(fc.q, def.id, ev.name, m);
@@ -1288,11 +1341,17 @@ function choiceActors(
 }
 
 /** One case through one step: chains, storylets, effects on chains, perception, detectors. */
-function caseStep(setup: FogSetup, fc: FogCase, t: number, held: readonly string[]): FogCase[] {
+function caseStep(
+  setup: FogSetup,
+  fc: FogCase,
+  t: number,
+  held: readonly string[],
+  step: StepMemo,
+): FogCase[] {
   const { c } = setup;
-  const q = structuredClone(fc.q);
+  const q = cloneQ(fc.q);
   const sink: Sink = { events: [], catFx: [], finished: {} };
-  const cc = caseCtx(setup, { ...fc, q }, t);
+  const cc = caseCtx(setup, { ...fc, q }, t, step);
   const cats: Record<CatId, FogCat> = {};
   const actors = choiceActors(setup, cc, q, held);
   for (const def of c.cats) {
@@ -1301,17 +1360,18 @@ function caseStep(setup: FogSetup, fc: FogCase, t: number, held: readonly string
   }
   // storylets read the new chains; `activityFinished` sees this step's finishes on its first tick
   const next: FogCase = { ...fc, q, cats };
-  const cc2 = caseCtx(setup, next, t, sink.finished);
+  const cc2 = caseCtx(setup, next, t, step, sink.finished);
   const fire = storyletsTick(setup, cc2, q, held, sink, fc.links);
   if (fire === null || fire.m <= 0) return [finishStep(setup, cc2, next, sink)];
   // Split exactly at the transition (03 §13.5): it happened in one case and not in the other.
   const def = need(setup.c.storylet, fire.storylet, 'storylet');
-  const yes = structuredClone(next);
+  const yes: FogCase = { ...next, cats: { ...next.cats }, q: cloneQ(next.q) };
   const yesSink = structuredClone(sink);
   yes.weight = times(fc.weight, fire.m);
   yes.links = { ...fc.links, [`fact:${fire.fact}`]: 1 };
   need(yes.q.storylets, def.id, 'storylet').p = { [fire.state]: PPM };
-  enterMass(setup, caseCtx(setup, yes, t), yes.q, def, fire.roles, fire.state, PPM, yesSink);
+  const ccYes = caseCtx(setup, yes, t, step);
+  enterMass(setup, ccYes, yes.q, def, fire.roles, fire.state, PPM, yesSink);
   const no = next;
   no.weight = fc.weight - yes.weight;
   const sl = need(no.q.storylets, def.id, 'storylet');
@@ -1320,7 +1380,7 @@ function caseStep(setup: FogSetup, fc: FogCase, t: number, held: readonly string
   if ((rest[fire.state] ?? 0) <= 0) delete rest[fire.state];
   sl.p = renormalise(rest);
   return [
-    ...(yes.weight > 0 ? [finishStep(setup, caseCtx(setup, yes, t), yes, yesSink)] : []),
+    ...(yes.weight > 0 ? [finishStep(setup, ccYes, yes, yesSink)] : []),
     ...(no.weight > 0 ? [finishStep(setup, cc2, no, sink)] : []),
   ];
 }
@@ -1339,6 +1399,32 @@ function finishStep(setup: FogSetup, cc: CaseCtx, fc: FogCase, sink: Sink): FogC
   perceive(setup, fc, sink.events);
   detectorsStep(setup, cc, fc.q, sink.events);
   return fc;
+}
+
+/** A copy of a case's quantities, deep only where they are records of records (03 §13.6). */
+function cloneQ(q: Quantities): Quantities {
+  const parts: Quantities['factParts'] = {};
+  for (const k of Object.keys(q.factParts)) parts[k] = { ...q.factParts[k] };
+  const flags: Quantities['flags'] = {};
+  for (const k of Object.keys(q.flags)) flags[k] = (q.flags[k] ?? []).map((x) => ({ ...x }));
+  const storylets: Quantities['storylets'] = {};
+  for (const k of Object.keys(q.storylets)) {
+    const sl = q.storylets[k];
+    if (sl) storylets[k] = { p: { ...sl.p }, roles: sl.roles };
+  }
+  const heard: Quantities['heard'] = {};
+  for (const k of Object.keys(q.heard)) heard[k] = { ...q.heard[k] };
+  const detectors: Quantities['detectors'] = {};
+  for (const k of Object.keys(q.detectors)) detectors[k] = [...(q.detectors[k] ?? [])];
+  return {
+    facts: { ...q.facts },
+    factParts: parts,
+    flags,
+    counters: { ...q.counters },
+    storylets,
+    heard,
+    detectors,
+  };
 }
 
 // --- weather cases, links, merging (03 §13.5) ---------------------------------------------------------
@@ -1364,7 +1450,7 @@ const withWeather = (
   weight,
   weather,
   rainStart,
-  q: structuredClone(fc.q),
+  q: cloneQ(fc.q),
 });
 
 /** Splits cases where the weather changes during the step [t, t + K) (projections only). */
@@ -1446,7 +1532,7 @@ function linkSplit(setup: FogSetup, cases: readonly FogCase[]): FogCase[] {
         continue;
       }
       const w = times(fc.weight, m);
-      const yes = structuredClone(fc);
+      const yes: FogCase = { ...fc, cats: { ...fc.cats }, q: cloneQ(fc.q) };
       const no = fc;
       yes.weight = w;
       yes.links = { ...fc.links, [key]: 1 };
@@ -1558,7 +1644,8 @@ export function fogStep(
 ): Fog {
   const t = fog.tick;
   const split1 = projection ? weatherSplit(setup, fog.cases, t) : [...fog.cases];
-  const stepped = split1.flatMap((fc) => caseStep(setup, fc, t, held));
+  const step = newStepMemo();
+  const stepped = split1.flatMap((fc) => caseStep(setup, fc, t, held, step));
   const cases = mergeCases(setup, linkSplit(setup, stepped));
   return { tick: t + setup.c.tuning.fog.stepTicks, cases };
 }
@@ -1601,7 +1688,7 @@ export function pointMass(setup: FogSetup, id: CatId, cs: CatState): FogCat {
 
 /** The decision function called by the fog for one chain state in one case (for tests). */
 export function fogChoices(setup: FogSetup, fc: FogCase, t: number, id: CatId, s: ChainState) {
-  const cc = caseCtx(setup, fc, t);
+  const cc = caseCtx(setup, fc, t, newStepMemo());
   const mean = fc.cats[id]?.mean ?? {};
   const me = standIn(setup, id, s, mean);
   return as(cc, id, me, () => choices(cc.ctx, id));
