@@ -332,6 +332,29 @@ describe('pin validity in the fog (03 §11, §18)', () => {
   });
 });
 
+describe('perception in the fog (03 §4, §13.6)', () => {
+  it('a role holder perceives every event of its storylet, wherever it stands (as in the lantern)', () => {
+    // crew_chatter binds Marti as a role: the tale (chatter.catlantis, radius 60, from the crew)
+    // reaches him in his flat in every share of the case where the storylet told it.
+    const setup = fogSetup(ch1Coarse, 1);
+    let fog = initialFog(
+      setup,
+      ch1Coarse.cats.map((x) => x.id),
+    );
+    while (fog.tick < 400) fog = fogStep(setup, fog);
+    let told = 0;
+    let heard = 0;
+    for (const fc of fog.cases) {
+      const p = fc.q.storylets['crew_chatter']?.p ?? {};
+      const w = (x: number) => Math.trunc((x * fc.weight) / WAVE_TOTAL);
+      told += w(1_000_000 - (p['inactive'] ?? 0) - (p['idle'] ?? 0));
+      heard += w(fc.q.facts['crewChatterHeard'] ?? 0);
+    }
+    expect(told).toBeGreaterThan(100_000);
+    expect(heard).toBeGreaterThanOrEqual(told - 1_000);
+  }, 60_000);
+});
+
 describe('Chapter 1 with pins (03 §18)', () => {
   it('road_both: chains sum to 1e6, weights to WAVE_TOTAL, integers only, JSON round trip', () => {
     const pins = parsePinSets(pinsets, ch1Coarse)['road_both'] ?? [];

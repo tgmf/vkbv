@@ -800,6 +800,7 @@ function fogEffects(
           global: false,
           factIfPerceivedBy: e.factIfPerceivedBy ?? null,
           hops: 0,
+          storylet: scope.storylet ?? null,
         });
     } else if ('trigger' in e) {
       activateMass(setup, cc, q, need(c.storylet, e.trigger, 'storylet'), mass, sink);
@@ -1216,6 +1217,7 @@ function pinPrims(
             global: false,
             factIfPerceivedBy: null,
             hops: p.hops,
+            storylet: null,
           });
         break;
       case 'delay': {
@@ -1379,6 +1381,7 @@ function enterMass(
       global: false,
       factIfPerceivedBy: null,
       hops: 0,
+      storylet: null,
     });
 }
 
@@ -1871,7 +1874,13 @@ function perceive(setup: FogSetup, fc: FogCase, events: readonly FogEvent[], t: 
     }
     for (const ev of events) {
       const j = index(ev.node);
-      const always = ev.global || ev.to === def.id || ev.source === def.id;
+      // a cat also perceives every event of a storylet it holds a role in (03 §4, QUESTION M1-2)
+      const roles = ev.storylet === null ? null : fc.q.storylets[ev.storylet]?.roles;
+      const always =
+        ev.global ||
+        ev.to === def.id ||
+        ev.source === def.id ||
+        (roles != null && Object.values(roles).some((list) => list.includes(def.id)));
       const sense = ev.radiusM === null ? 'sight' : 'hearing';
       const seesNode = (n: number) =>
         always || tablePerceives(table, def.id, sense, weather, n, j, ev.radiusM);
@@ -1893,12 +1902,14 @@ function perceive(setup: FogSetup, fc: FogCase, events: readonly FogEvent[], t: 
           if (p > 0 && node !== undefined)
             fc.q.echoes = [
               ...fc.q.echoes,
-              { ...ev, node, p, source: def.id, to: null, hops: ev.hops - 1 },
+              { ...ev, node, p, source: def.id, to: null, hops: ev.hops - 1, storylet: null },
             ];
         }
       const fact = ev.factIfPerceivedBy?.[def.id];
       if (fact) {
-        addFactChance(fc.q, fact, m);
+        // a once-storylet emits it from disjoint entering masses, so those shares add (as its facts)
+        const once = ev.storylet !== null && c.storylet[ev.storylet]?.once === true;
+        addFactChance(fc.q, fact, m, once ? `ev:${ev.storylet}:${ev.name}` : '');
         contribute(fc.q, `fact:${fact}`, { ...by, cats: [...by.cats, def.id] }, t, m, size);
       }
       for (const h of c.hooks) {

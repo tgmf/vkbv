@@ -77,6 +77,7 @@ export interface FogEvent {
   global: boolean;
   factIfPerceivedBy: Record<CatId, string> | null;
   hops: number; // socialSpread hops left: perceivers re-emit it next step while above 0
+  storylet: string | null; // the storylet whose effect emitted it: its role holders perceive it (03 §4)
 }
 
 export const INACTIVE = 'inactive';
