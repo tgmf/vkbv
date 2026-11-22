@@ -16,7 +16,9 @@ import {
 } from '../../src/sim/fog';
 import { runHistory } from '../../src/sim/history';
 import type { Content } from '../../src/sim/types';
-import { ch1, ch1Coarse, makeCtx, tiny } from './helpers';
+import { readChapterDir } from '../../src/cli/files';
+import { loadChapter } from '../../src/content/load';
+import { ch1, ch1Coarse, makeCtx, tiny, TINY_DIR, tuning } from './helpers';
 
 const ids = (c: Content) => c.cats.map((x) => x.id);
 
@@ -176,5 +178,40 @@ describe('decisions at triggers only (03 §13.3, §18)', () => {
     expect(count()).toBe(0);
     fogStep(setup, walking); // arrives: a trigger
     expect(count()).toBeGreaterThan(0);
+  });
+});
+
+describe('whole-band boredom (fog.boredomWhole, docs/questions.md M2-7)', () => {
+  it('carries exact boredom per state: no split, rate × step ticks per step, a band change decides', () => {
+    const c = loadChapter(readChapterDir(TINY_DIR), {
+      ...tuning,
+      fog: { ...tuning.fog, boredomWhole: true },
+    });
+    const setup = fogSetup(c, 1);
+    const fog = initialFog(setup, ['bystander']);
+    const fc = fog.cases[0];
+    const by = fc?.cats['bystander'];
+    if (!fc || !by) throw new Error('no bystander');
+    // fetch at its place, boredom 0: fetch tires at trunc(2000 / 4) = 500 a tick
+    by.chain = [
+      {
+        s: {
+          activity: 'fetch',
+          place: 'street.b',
+          walk: null,
+          bands: { ...by.chain[0]?.s.bands, $boredom: 0 },
+          bored: 0,
+          interrupt: null,
+          control: 'storylet', // no free decision: the boredom alone is under test
+        },
+        p: 1_000_000,
+      },
+    ];
+    const next = fogStep(setup, { tick: 1, cases: [fc] }).cases[0]?.cats['bystander']?.chain;
+    // 5 ticks × 500 caps at 1000: one state, at the top band, and control handed back
+    expect(next?.length).toBeGreaterThan(0);
+    const fetching = next?.filter((e) => e.s.activity === 'fetch') ?? [];
+    for (const e of fetching) expect(e.s.bored).toBe(1000);
+    expect(next?.every((e) => e.s.control === 'free')).toBe(true);
   });
 });

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addCounter,
   addFactChance,
+  counterOf,
   clearFlag,
   flagChance,
   initialQuantities,
@@ -38,16 +39,24 @@ describe('fog quantities (03 §13.6)', () => {
   it('a counter gains Bernoulli terms; mixing cases keeps the total variance', () => {
     const a = initialQuantities(tiny);
     const b = initialQuantities(tiny);
+    // kept in millionths of a unit, so no fraction is lost
     addCounter(a, 'n', 10, 500_000);
-    expect(a.counters['n']).toEqual({ mean: 5, variance: 25 });
+    expect(a.counters['n']).toEqual({ mean: 5_000_000, variance: 25_000_000 });
+    expect(counterOf(a, 'n')).toEqual({ mean: 5, variance: 25 });
+    addCounter(a, 'n', 5, 960_000); // 4.8 more: whole units would have kept 4
+    expect(a.counters['n']?.mean).toBe(9_800_000);
     addCounter(b, 'n', 30, 1_000_000);
-    expect(b.counters['n']).toEqual({ mean: 30, variance: 0 });
-    // equal weights: mean 17 (17.5 truncated), E[X²] = (25 + 25 + 900) / 2 = 475, var = 475 − 289
+    expect(b.counters['n']).toEqual({ mean: 30_000_000, variance: 0 });
+    // equal weights: mean (9.8 + 30) / 2 = 19.9; variance = mean variance + spread of the means
     const m = mixQuantities(tiny, [
       { w: 1, q: a },
       { w: 1, q: b },
     ]);
-    expect(m.counters['n']).toEqual({ mean: 17, variance: 475 - 17 * 17 });
+    const va = 25_000_000 + 25 * 38_400; // 5² × 0.96 × 0.04 = 0.96 units² more
+    expect(m.counters['n']).toEqual({
+      mean: 19_900_000,
+      variance: Math.trunc(va / 2) + 10_100 * 10_100, // (9.8 − 19.9)² = (30 − 19.9)² = 102.01
+    });
   });
 });
 

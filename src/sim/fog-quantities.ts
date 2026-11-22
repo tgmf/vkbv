@@ -20,6 +20,7 @@ export interface Quantities {
   /** A fact's sources: '' for independent contributions; a storylet state's entering masses add. */
   factParts: Record<string, Record<string, number>>;
   flags: Record<string, FlagPart[]>; // by flag key (`name` or `name@node`)
+  /** Expected value and variance in millionths of a unit, so no fraction is lost (decisions.md). */
   counters: Record<string, { mean: number; variance: number }>;
   storylets: Record<string, FogStorylet>;
   heard: Record<CatId, Record<string, number>>; // P(the cat has perceived the event)
@@ -51,7 +52,7 @@ export function initialQuantities(c: Content): Quantities {
     if (v !== 0) flags[k] = [{ p: PPM, until: null }];
   const counters: Quantities['counters'] = {};
   for (const [k, v] of Object.entries(c.world.counters))
-    counters[k] = { mean: v.start, variance: 0 };
+    counters[k] = { mean: v.start * PPM, variance: 0 };
   const storylets: Record<string, FogStorylet> = {};
   for (const sl of c.storylets) storylets[sl.id] = { p: { [INACTIVE]: PPM }, roles: null };
   return { facts: {}, factParts: {}, flags, counters, storylets, heard: {}, detectors: {} };
@@ -79,17 +80,23 @@ export function clearFlag(q: Quantities, key: string, m: number): void {
   for (const part of q.flags[key] ?? []) part.p = times(part.p, PPM - m);
 }
 
-/** A counter gains `add` with probability m (a Bernoulli term: mean m·add, variance add²·m(1 − m)). */
+/**
+ * A counter gains `add` with probability m (a Bernoulli term: mean m·add, variance add²·m(1 − m)),
+ * kept in millionths of a unit.
+ */
 export function addCounter(q: Quantities, name: string, add: number, m: number): void {
   const cur = q.counters[name] ?? { mean: 0, variance: 0 };
   q.counters[name] = {
-    mean: cur.mean + Math.trunc((add * m) / PPM),
-    variance: cur.variance + Math.trunc((add * add * times(m, PPM - m)) / PPM),
+    mean: cur.mean + add * m,
+    variance: cur.variance + add * add * times(m, PPM - m),
   };
 }
 
-export const counterOf = (q: Quantities, name: string) =>
-  q.counters[name] ?? { mean: 0, variance: 0 };
+/** A counter's expected value and variance in whole units, as conditions read them (03 §13.7). */
+export const counterOf = (q: Quantities, name: string) => {
+  const c = q.counters[name] ?? { mean: 0, variance: 0 };
+  return { mean: Math.trunc(c.mean / PPM), variance: Math.trunc(c.variance / PPM) };
+};
 
 /**
  * A fact set with probability m. With a `source` (a once-storylet's state), the masses entering it
@@ -169,13 +176,19 @@ export function mixQuantities(
       p: avg((q) => q.flags[k]?.find((part) => part.until === until)?.p ?? 0),
     }));
   }
+  // counters, in millionths: weights as shares so products stay below 2^53; the mixture's variance
+  // is the mean variance plus the spread of the means ((Δ / 1000)² is units² in millionths)
+  const shares = parts.map((x) => Math.trunc((x.w * PPM) / total));
+  const mix = (get: (q: Quantities) => number) =>
+    parts.reduce((a, x, i) => a + times(get(x.q), shares[i] ?? 0), 0);
   for (const k of keys((q) => q.counters)) {
-    const mean = avg((q) => q.counters[k]?.mean ?? 0);
-    const second = avg((q) => {
+    const mean = mix((q) => q.counters[k]?.mean ?? 0);
+    const variance = mix((q) => {
       const m = q.counters[k] ?? { mean: 0, variance: 0 };
-      return m.variance + m.mean * m.mean;
+      const d = Math.trunc((m.mean - mean) / 1000);
+      return m.variance + d * d;
     });
-    out.counters[k] = { mean, variance: Math.max(0, second - mean * mean) };
+    out.counters[k] = { mean, variance };
   }
   for (const sl of c.storylets) {
     const p: Record<string, number> = {};

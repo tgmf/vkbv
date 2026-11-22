@@ -12,6 +12,7 @@
     "minStatePpm": 100,
     "bands": 4,
     "ppmQuantum": 50000,
+    "boredomWhole": false,
     "maxBandedGauges": 3,
     "gateThresholdPpm": 500000,
     "maxLinks": 2,

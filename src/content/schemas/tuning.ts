@@ -23,6 +23,9 @@ export const TuningSchema = z.strictObject({
     stepTicks: int('Ticks per fog step (03 §13.2)').min(1),
     minStatePpm: ppm('Chain states below this are dropped and the chain renormalised'),
     bands: int('Bands per changing gauge (03 §13.2)').min(1),
+    boredomWhole: bool(
+      'Fog boredom moves whole bands: each chain state carries its exact boredom, so no mass splits (docs/questions.md M2-7; off = 03 §13.2 as written)',
+    ),
     ppmQuantum: int(
       'Fog probabilities in decision keys and fog decisions are rounded down to this (03 §8.2)',
     ).min(1),

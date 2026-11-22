@@ -199,4 +199,40 @@ quantum in the decision itself; (b) cache by the band key and accept differences
 Chosen for now: (a).
 Answer: Tagir, 2026-11-22: (a), two keys.
 
+## M2-7 — Whole-band boredom in the fog            (status: open)
+Where: `03` §13.2 (boredom always banded), `src/sim/fog.ts`; knob `fog.boredomWhole` (default false)
+Question: In the fog, boredom rises by moving a fraction of every state's mass up a band each step,
+so nearly all mass "changes key" and decides every step, and the top band's midpoint (833 at
+3 bands) never reaches the 1000 a live cat reaches. Should the fog carry each state's exact boredom
+instead (no mass splits; a decision only when a band changes)?
+Measured (seed 1, whole day; 60-seed calibration, `untouched`):
+| knobs | boredom | all fogged | Marti live | 08:00–12:00 live | states | road blocked (obs. 41.7%) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1000/3 | fraction (spec) | 14.2 s | 5.6 s | 203 ticks/s | 1265 | 13.8% |
+| 1000/3 | whole | 19.4 s | 4.7 s | 177 ticks/s | 1667 | 22.1% |
+| 100/4 | fraction (spec) | 31.2 s | 13.4 s | 57 ticks/s | 3410 | — |
+| 100/4 | whole | 39.2 s | 14.7 s | 52 ticks/s | 4223 | — |
+Whole bands are not faster: states differ by exact boredom, so there are more of them (like the old
+timers), and fewer of them are shared. They are more accurate: the fog no longer under-tires.
+Options seen: (a) keep the spec (fraction of mass moves); (b) whole bands (`fog.boredomWhole`);
+(c) keep fractions but read the top band as full boredom (1000) in decisions, the part of the bias
+whole bands fix, at no cost.
+Chosen for now: (a), the knob stays off. Recommendation: (c), measured before choosing.
+Answer:
+
+## M2-8 — The fog's road counter misses calibration            (status: open)
+Where: `07` §3; `03` §13.6 (counters as mean and variance); `docs/handoff/M2.md`
+Question: Calibration (60 seeds, `untouched`) passes for the crew, the shop and Rokko, but road
+blocked depends on a race: the crew must reach 800 units of work before the rain. Holding the
+counter in whole units lost work (fixed: millionths of a unit). Now the fogged crew work about 9%
+faster than the reference (777 vs 714 by 11:00; spread sd 59 vs 70), so road blocked is predicted at
+14% against 42% observed (22% with whole-band boredom). A small bias in the mean flips most of the
+mass across the threshold.
+Options seen: (a) fix the remaining bias at its source (boredom read at band midpoints, M2-7 (c),
+and look for other sources) and measure again; (b) make "road done before the rain" a link, so the
+cases carry it (needs a third link; `fog.maxLinks` is 2 by your instruction); (c) hold threshold
+counters as a distribution (buckets) instead of mean and variance.
+Chosen for now: (a), next.
+Answer:
+
 <!-- Gate notes and answers go above this line. -->

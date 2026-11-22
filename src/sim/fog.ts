@@ -64,6 +64,8 @@ export interface ChainState {
   place: NodeId;
   walk: null | { from: NodeId; path: NodeId[]; leftSteps: number; ofSteps: number };
   bands: Record<string, number>;
+  /** With `fog.boredomWhole`: the exact boredom; its band is in `bands` (docs/questions.md M2-7). */
+  bored?: number;
   interrupt: null | { action: string; leftSteps: number };
   control: 'free' | 'storylet' | 'forced';
 }
@@ -322,7 +324,7 @@ export function standIn(
     pos,
     route,
     activity: s.activity,
-    boredom: midOf(c, BOREDOM, s.bands[BOREDOM] ?? 0),
+    boredom: s.bored ?? midOf(c, BOREDOM, s.bands[BOREDOM] ?? 0),
     forcedLeft: 0,
     lastKey: -1,
     activityStart: 0,
@@ -377,12 +379,19 @@ interface CaseCtx {
  * the canonical keys of the states and mean-field records it has seen (by object, so never stale).
  */
 interface StepMemo {
+  /** The lantern's state at the step's start, when cats are live (03 §13.4, §14); else null. */
+  live: SimState | null;
   stands: Record<string, CatState>;
   keys: WeakMap<ChainState, string>;
   means: WeakMap<Record<string, number>, string>;
 }
 
-const newStepMemo = (): StepMemo => ({ stands: {}, keys: new WeakMap(), means: new WeakMap() });
+const newStepMemo = (live: SimState | null = null): StepMemo => ({
+  live,
+  stands: {},
+  keys: new WeakMap(),
+  means: new WeakMap(),
+});
 
 function caseCtx(
   setup: FogSetup,
@@ -397,7 +406,7 @@ function caseCtx(
     ...setup.base,
     tick: t,
     weather: { ...setup.base.weather, now: fc.weather === 'rain' ? 'rain' : 'dry' },
-    cats: { ...setup.base.cats },
+    cats: { ...(step.live ?? setup.base).cats }, // live cats as the lantern has them
   };
   const key = (cs: ChainState): string => {
     let k = step.keys.get(cs);
@@ -440,7 +449,8 @@ function caseCtx(
     chain: (id) => (id === deciding.id ? null : (standIns[id] ?? null)),
     likely: (id) => likely[id] ?? null,
     quantity: (key) => {
-      if (key.startsWith('fact:')) return q.facts[key.slice(5)] ?? 0;
+      if (key.startsWith('fact:'))
+        return step.live?.facts.includes(key.slice(5)) ? PPM : (q.facts[key.slice(5)] ?? 0);
       if (key.startsWith('flag:')) return flagChance(q, key.slice(5), ctx.t);
       const dot = key.indexOf('.');
       return q.storylets[key.slice(6, dot)]?.p[key.slice(dot + 1)] ?? 0;
@@ -526,8 +536,14 @@ function starts(
   const ad = c.activity[activity];
   const here = 'at' in from.pos ? from.pos.at : from.pos.to;
   const fresh = { ...bands, [BOREDOM]: 0 }; // a switch resets boredom (03 §8.2)
+  const whole = c.tuning.fog.boredomWhole ? { bored: 0 } : {};
   if (!ad)
-    return [[{ activity, place: here, walk: null, bands: fresh, interrupt: null, control }, PPM]];
+    return [
+      [
+        { activity, place: here, walk: null, bands: fresh, ...whole, interrupt: null, control },
+        PPM,
+      ],
+    ];
   const places = as(cc, id, from, () => placeOptions(cc.ctx, id, ad.at));
   const out: [ChainState, number][] = [];
   for (const [place, pp] of split(
@@ -536,7 +552,7 @@ function starts(
   )) {
     const walk = walkTo(c, memo, here, place);
     if (walk === undefined) continue;
-    out.push([{ activity, place, walk, bands: fresh, interrupt: null, control }, pp]);
+    out.push([{ activity, place, walk, bands: fresh, ...whole, interrupt: null, control }, pp]);
   }
   return out;
 }
@@ -774,6 +790,7 @@ function catEffect(
             place: e.goTo[1],
             walk,
             bands: { ...x.s.bands, [BOREDOM]: 0 },
+            ...(c.tuning.fog.boredomWhole && { bored: 0 }),
             control: 'storylet',
           },
           p: moved,
@@ -1159,17 +1176,36 @@ function catStep(
       }
       const rate = boredomRate(c, s0.activity) * K;
       const storylet = s0.control === 'storylet' && s0.activity !== 'goTo';
-      entries = entries.flatMap((e) =>
-        bandMove(c, e, BOREDOM, rate, PPM, storylet ? top + 1 : undefined, true).map((x) =>
-          (x.s.bands[BOREDOM] ?? 0) > top
-            ? {
-                s: { ...x.s, bands: { ...x.s.bands, [BOREDOM]: top }, control: 'free' as const },
-                p: x.p,
-                d: true,
-              }
-            : x,
-        ),
-      );
+      if (c.tuning.fog.boredomWhole) {
+        // whole bands (docs/questions.md M2-7): exact boredom, no split; a band change is a trigger
+        entries = entries.map((e) => {
+          const was = e.s.bored ?? 0;
+          const bored = Math.min(1000, was + rate);
+          const band = gaugeBand(c, BOREDOM, bored);
+          const back = storylet && bored >= 1000; // a storylet's activity hands control back
+          return {
+            s: {
+              ...e.s,
+              bored,
+              bands: { ...e.s.bands, [BOREDOM]: band },
+              ...(back && { control: 'free' as const }),
+            },
+            p: e.p,
+            ...((e.d === true || back || band !== e.s.bands[BOREDOM]) && { d: true }),
+          };
+        });
+      } else
+        entries = entries.flatMap((e) =>
+          bandMove(c, e, BOREDOM, rate, PPM, storylet ? top + 1 : undefined, true).map((x) =>
+            (x.s.bands[BOREDOM] ?? 0) > top
+              ? {
+                  s: { ...x.s, bands: { ...x.s.bands, [BOREDOM]: top }, control: 'free' as const },
+                  p: x.p,
+                  d: true,
+                }
+              : x,
+          ),
+        );
     }
     for (const e0 of entries) {
       // a goTo that has arrived ends (03 §9.3): the cat stands, free
@@ -1634,17 +1670,29 @@ export function mergeCases(setup: FogSetup, cases: readonly FogCase[]): FogCase[
 /**
  * Advances the fog one step of `fog.stepTicks` ticks (03 §13.2, §13.5, §13.6). `held` lists the
  * storylets the fog runs (all of them in a projection). The weather changes by case only in a
- * projection (`projection: true`); up to the lantern edge it is the lantern's.
+ * projection (`projection: true`); up to the lantern edge it is the lantern's, read from `live`
+ * with the live cats. Placement and the lantern's events reaching the fog come in M2 step 6.
  */
 export function fogStep(
   setup: FogSetup,
   fog: Fog,
   held: readonly string[] = setup.c.storylets.map((s) => s.id),
   projection = true,
+  live: SimState | null = null,
 ): Fog {
   const t = fog.tick;
-  const split1 = projection ? weatherSplit(setup, fog.cases, t) : [...fog.cases];
-  const step = newStepMemo();
+  // up to the lantern edge the weather is the lantern's: one weather case (03 §13.5)
+  const weather: Weather | null = live
+    ? live.weather.now === 'rain'
+      ? 'rain'
+      : live.weather.startedAt === null
+        ? 'dry'
+        : 'stopped'
+    : null;
+  const split1 = projection
+    ? weatherSplit(setup, fog.cases, t)
+    : fog.cases.map((fc) => (weather && fc.weather !== weather ? { ...fc, weather } : fc));
+  const step = newStepMemo(live);
   const stepped = split1.flatMap((fc) => caseStep(setup, fc, t, held, step));
   const cases = mergeCases(setup, linkSplit(setup, stepped));
   return { tick: t + setup.c.tuning.fog.stepTicks, cases };
@@ -1665,6 +1713,7 @@ export function pointMass(setup: FogSetup, id: CatId, cs: CatState): FogCat {
     return clampBase(c, g, v);
   };
   const bands: Record<string, number> = { [BOREDOM]: gaugeBand(c, BOREDOM, cs.boredom) };
+  const whole = c.tuning.fog.boredomWhole ? { bored: cs.boredom } : {};
   for (const g of need(setup.banded, id, 'cat')) bands[g] = bandOf(c, value(g));
   const mean: Record<string, number> = {};
   for (const h of c.hooks) if (h.id in cs.base && !(h.id in bands)) mean[h.id] = value(h.id);
@@ -1677,6 +1726,7 @@ export function pointMass(setup: FogSetup, id: CatId, cs: CatState): FogCat {
     place: cs.activityPlace ?? (rest.length > 0 ? (rest[rest.length - 1] ?? from) : from),
     walk: walkSteps === 0 ? null : { from, path: rest, leftSteps: walkSteps, ofSteps: walkSteps },
     bands,
+    ...whole,
     interrupt: cs.interrupt && {
       action: cs.interrupt.action,
       leftSteps: ceilDiv(cs.interrupt.left, K),
