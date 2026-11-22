@@ -115,12 +115,18 @@ describe('chains', () => {
   }, 120_000);
 });
 
+/** The tiny world with 4 bands: the band tests check the arithmetic, whatever the default knobs. */
+const tiny4 = loadChapter(readChapterDir(TINY_DIR), {
+  ...tuning,
+  fog: { ...tuning.fog, bands: 4 },
+});
+
 describe('bands (03 §13.2)', () => {
   it('a hook rule moves trunc(add × 1e6 / bandWidth) ppm to the next band', () => {
     // Tiny world: hooks floor 20, 4 bands: 3 equal ones up to fog.saturatedBandFrom (950), edges
     // 20 / 330 / 640 / 950, and a saturated band 950-1000. boxPull rises 10 per tick while the cat
     // stands at a box; over a 5-tick step that is 50, so trunc(50e6 / 310) = 161 290 ppm move up.
-    const setup = fogSetup(tiny, 1);
+    const setup = fogSetup(tiny4, 1);
     expect(setup.banded['hero']).toContain('boxPull');
     const fog = initialFog(setup, ['hero']);
     const fc = fog.cases[0];
@@ -128,7 +134,7 @@ describe('bands (03 §13.2)', () => {
     if (!fc || !hero) throw new Error('no hero');
     // street.b carries the box tag itself (object tags do not count in conditions, M1-1)
     const box = { id: 'street.b' };
-    const b = bandOf(tiny, 100);
+    const b = bandOf(tiny4, 100);
     // One state: napping in the box for long enough, boxPull in its seeded band.
     hero.chain = [
       {
@@ -150,16 +156,16 @@ describe('bands (03 §13.2)', () => {
     expect(up?.reduce((a, e) => a + e.p, 0)).toBe(
       Math.trunc((161_290 * (1_000_000 - 3_225)) / 1_000_000),
     );
-    expect(bandMid(tiny, b)).toBe(Math.trunc((20 + 330 - 1) / 2));
+    expect(bandMid(tiny4, b)).toBe(Math.trunc((20 + 330 - 1) / 2));
   });
 
   it('the saturated top band: narrow, at the cap, read at its own midpoint (03 §13.2)', () => {
-    expect(bandEdges(tiny, 'boxPull')).toEqual([20, 330, 640, 950, 1001]);
-    expect(bandEdges(tiny, BOREDOM)).toEqual([0, 316, 633, 950, 1001]);
-    expect(bandOf(tiny, 949)).toBe(2);
-    expect(bandOf(tiny, 950)).toBe(3);
-    expect(bandMid(tiny, 3)).toBe(975); // a tired cat in the fog reads about the cap
-    expect(bandWidthOf(tiny, BOREDOM, 3)).toBe(51);
+    expect(bandEdges(tiny4, 'boxPull')).toEqual([20, 330, 640, 950, 1001]);
+    expect(bandEdges(tiny4, BOREDOM)).toEqual([0, 316, 633, 950, 1001]);
+    expect(bandOf(tiny4, 949)).toBe(2);
+    expect(bandOf(tiny4, 950)).toBe(3);
+    expect(bandMid(tiny4, 3)).toBe(975); // a tired cat in the fog reads about the cap
+    expect(bandWidthOf(tiny4, BOREDOM, 3)).toBe(51);
   });
 });
 

@@ -9,8 +9,8 @@
   },
   "fog": {
     "stepTicks": 5,
-    "minStatePpm": 100,
-    "bands": 4,
+    "minStatePpm": 1000,
+    "bands": 3,
     "saturatedBandFrom": 950,
     "ppmQuantum": 50000,
     "boredomWhole": false,

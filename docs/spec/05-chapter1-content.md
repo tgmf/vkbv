@@ -71,8 +71,9 @@ have **not** been checked against a model of this content; M4 measures them.
 | `waves.checkpointEvery` | 30 | ticks between checkpoints of the lantern (`03` §17) |
 | `waves.anchorConditioning` | true | the anchor treated as already seen, in projections (`03` §14; open, `docs/questions.md` M2-2) |
 | `fog.stepTicks` | 5 | ticks per fog step (`03` §13.2) |
-| `fog.minStatePpm` | 100 | chain states below this are dropped |
-| `fog.bands` | 4 | bands per changing gauge |
+| `fog.minStatePpm` | 1000 | chain states below this are dropped (adopted 2026-11-22 after calibration; was 100) |
+| `fog.bands` | 3 | bands per changing gauge, the top one saturated (adopted 2026-11-22; was 4) |
+| `fog.saturatedBandFrom` | 950 | the saturated top band starts here (`03` §13.2) |
 | `fog.maxBandedGauges` | 3 | banded gauges per cat; the rest are mean-field |
 | `fog.gateThresholdPpm` | 500000 | a gate holds in the fog at this probability (`03` §13.3) |
 | `fog.maxLinks` | 2 | links besides the weather (`03` §13.5) |

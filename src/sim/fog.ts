@@ -70,6 +70,12 @@ export interface ChainState {
   bored?: number;
   interrupt: null | { action: string; leftSteps: number };
   control: 'free' | 'storylet' | 'forced';
+  /**
+   * `storylet.state` of the storylet state that last directed this cat (decisions.md, M2-8): a
+   * storylet's effects move the mass that belongs to their source state, and a choice blocks the
+   * mass that belongs to its state, so the cat's chain stays correlated with the storylet.
+   */
+  sl?: string;
 }
 
 export interface Entry {
@@ -645,9 +651,20 @@ export function normalise(c: Content, chain: readonly Entry[]): Entry[] {
 // --- effects in the fog -------------------------------------------------------------------------------------
 
 /** What a case's step collects: events, and storylet effects on fogged cats to apply to chains. */
+/**
+ * Where a storylet effect comes from: the transition `from` → `to` of a storylet, and the source
+ * state's probability before it (`from` '' = the transition happened for sure, as in a link split).
+ */
+interface Via {
+  storylet: string;
+  from: string;
+  pFrom: number;
+  to: string;
+}
+
 interface Sink {
   events: FogEvent[];
-  catFx: { cat: CatId; mass: number; effect: Effect; scope: Scope }[];
+  catFx: { cat: CatId; mass: number; effect: Effect; scope: Scope; via: Via | null }[];
   finished: Record<CatId, Record<string, number>>;
 }
 
@@ -684,6 +701,7 @@ function fogEffects(
   sink: Sink,
   here: NodeId | null = null,
   source = '',
+  via: Via | null = null,
 ): void {
   const { c } = setup;
   const ctx = cc.ctx;
@@ -705,7 +723,7 @@ function fogEffects(
                 ? e.interrupt[0]
                 : e.gauge.slice(0, e.gauge.indexOf('.'));
       for (const id of catsOf(ctx, scope, who))
-        if (fogged(id)) sink.catFx.push({ cat: id, mass, effect: e, scope });
+        if (fogged(id)) sink.catFx.push({ cat: id, mass, effect: e, scope, via });
     } else if ('emit' in e) {
       const source =
         (e.from ? catsOf(ctx, scope, e.from)[0] : undefined) ?? scope.self ?? scope.origin ?? null;
@@ -757,6 +775,7 @@ function catEffect(
   fc: FogCat,
   mass: number,
   e: Effect,
+  via: Via | null = null,
 ): FogCat {
   const { c } = setup;
   const K = c.tuning.fog.stepTicks;
@@ -771,9 +790,26 @@ function catEffect(
     );
     return out;
   }
+  // A storylet's effect moves the mass that belongs to its source state, with the transition's
+  // probability given that state (decisions.md, M2-8): mass the storylet last directed from another
+  // of its states is not touched. Without such mass (or a source), every state moves by `mass`.
+  const prefix = via ? `${via.storylet}.` : '';
+  let fromSource = (s: ChainState) =>
+    !via || via.from === '' || !s.sl?.startsWith(prefix) || s.sl === prefix + via.from;
+  let share = via?.from === '' ? PPM : mass;
+  if (via && via.from !== '') {
+    const sel = fc.chain.reduce((a, x) => a + (fromSource(x.s) ? x.p : 0), 0);
+    if (sel > 0 && via.pFrom > 0) share = Math.min(PPM, Math.trunc((mass * PPM) / via.pFrom));
+    else fromSource = () => true;
+  }
+  const tag = via ? { sl: prefix + via.to } : {};
   const chain: Entry[] = [];
   for (const x of fc.chain) {
-    const moved = times(x.p, mass);
+    if (!fromSource(x.s)) {
+      chain.push(x);
+      continue;
+    }
+    const moved = times(x.p, share);
     if (moved < x.p) chain.push({ s: x.s, p: x.p - moved });
     if (moved === 0) continue;
     const me = cc.stand(id, x.s, fc.mean);
@@ -794,16 +830,17 @@ function catEffect(
             bands: { ...x.s.bands, [BOREDOM]: 0 },
             ...(c.tuning.fog.boredomWhole && { bored: 0 }),
             control: 'storylet',
+            ...tag,
           },
           p: moved,
         });
     } else if ('startActivity' in e) {
       const next = starts(cc, id, me, e.startActivity[1], x.s.bands, 'storylet');
       if (next.length === 0) chain.push({ s: x.s, p: moved });
-      for (const [s, p] of next) chain.push({ s, p: times(moved, p) });
+      for (const [s, p] of next) chain.push({ s: { ...s, ...tag }, p: times(moved, p) });
     } else if ('stop' in e) {
       chain.push({
-        s: { ...x.s, activity: 'none', place: here, walk: null, control: 'free' },
+        s: { ...x.s, activity: 'none', place: here, walk: null, control: 'free', ...tag },
         d: true,
         p: moved,
       });
@@ -842,12 +879,14 @@ function enterMass(
   state: string,
   m: number,
   sink: Sink,
+  via: Via | null = null,
 ): void {
   if (m <= 0) return;
   const scope: Scope = { roles, storylet: def.id, origin: origin(def, roles) };
   const onEnter = need(def.states, state, 'storylet state').onEnter ?? [];
   // a once-storylet enters a state by disjoint masses, so its facts add up (03 §13.6)
-  fogEffects(setup, cc, q, onEnter, scope, m, sink, null, def.once ? `sl:${def.id}.${state}` : '');
+  const source = def.once ? `sl:${def.id}.${state}` : '';
+  fogEffects(setup, cc, q, onEnter, scope, m, sink, null, source, via);
   for (const [node, p] of nodeMass(setup, cc, scope.origin ?? ''))
     sink.events.push({
       name: `storylet:${def.id}.${state}`,
@@ -874,12 +913,14 @@ function activateMass(
   if (!sl) return;
   const roles = sl.roles ?? bindRoles(cc.ctx, def);
   if (!roles) return;
-  const moved = times(sl.p[INACTIVE] ?? 0, m);
+  const inactive = sl.p[INACTIVE] ?? 0;
+  const moved = times(inactive, m);
   if (moved <= 0) return;
   sl.roles = roles;
-  sl.p[INACTIVE] = (sl.p[INACTIVE] ?? 0) - moved;
+  sl.p[INACTIVE] = inactive - moved;
   sl.p[def.start] = (sl.p[def.start] ?? 0) + moved;
-  enterMass(setup, cc, q, def, roles, def.start, moved, sink);
+  const via = { storylet: def.id, from: INACTIVE, pFrom: inactive, to: def.start };
+  enterMass(setup, cc, q, def, roles, def.start, moved, sink, via);
 }
 
 /** P(the actor is available and chooses each option), averaged over its chain (03 §13.6). */
@@ -953,12 +994,12 @@ function storyletsTick(
     const sl = need(q.storylets, def.id, 'storylet');
     const roles = sl.roles;
     const before = { ...sl.p };
-    const entered: [string, number][] = [];
+    const entered: [string, number, string][] = [];
     const move = (from: string, to: string, m: number) => {
       if (m <= 0) return;
       sl.p[from] = (sl.p[from] ?? 0) - m;
       sl.p[to] = (sl.p[to] ?? 0) + m;
-      entered.push([to, m]);
+      entered.push([to, m, from]);
     };
     if (roles) {
       const scope: Scope = { roles, storylet: def.id, origin: origin(def, roles) };
@@ -1009,7 +1050,7 @@ function storyletsTick(
     }
     const r = sl.roles;
     if (r)
-      for (const [state, m] of entered) {
+      for (const [state, m, from] of entered) {
         // The first transition this step that sets a link still false splits the case (03 §13.5)
         const fact: string | null = fire === null ? linkFact(setup, def, state, links) : null;
         if (fact !== null) {
@@ -1017,7 +1058,8 @@ function storyletsTick(
           fire = { storylet: def.id, state, fact, m: same, roles: r };
         }
         if (fire?.storylet === def.id && fire.state === state) continue;
-        enterMass(setup, cc, q, def, r, state, m, sink);
+        const via = { storylet: def.id, from, pFrom: before[from] ?? 0, to: state };
+        enterMass(setup, cc, q, def, r, state, m, sink, via);
       }
     if (!def.once)
       for (const state of Object.keys(def.states))
@@ -1116,7 +1158,7 @@ function catStep(
   t: number,
   q: Quantities,
   sink: Sink,
-  blocked = 0,
+  blocks?: Blocks[string],
 ): FogCat {
   const { c } = setup;
   const K = c.tuning.fog.stepTicks;
@@ -1227,7 +1269,7 @@ function catStep(
         choices(cc.ctx, id),
       ));
       // the actor of an open storylet choice makes no free decision (03 §8.3)
-      const moving = cands.length === 0 ? 0 : e.p - times(e.p, blocked);
+      const moving = cands.length === 0 ? 0 : e.p - times(e.p, blockedShare(blocks, s));
       if (e.p - moving > 0) out.push({ s, p: e.p - moving });
       if (moving === 0) continue;
       // leaving: the old activity's onFinish on the leaving mass (gauges on the state, the rest on the world)
@@ -1261,7 +1303,11 @@ function catStep(
             'free',
           ));
           for (const [n, q2] of next)
-            out.push({ s: { ...n, bands: { ...l.s.bands, [BOREDOM]: 0 } }, p: times(p, q2) });
+            out.push({
+              // a free choice keeps the storylet tag: the mass still belongs to that state
+              s: { ...n, bands: { ...l.s.bands, [BOREDOM]: 0 }, ...(l.s.sl && { sl: l.s.sl }) },
+              p: times(p, q2),
+            });
         });
     }
   }
@@ -1357,13 +1403,16 @@ function detectorsStep(
 }
 
 /** P(each cat is the actor of an open choice exit) in the storylets the fog holds (03 §8.3). */
+/** For each cat, per storylet: the states where it is the actor of an open choice, and their mass. */
+type Blocks = Record<CatId, { storylet: string; states: string[]; p: number }[]>;
+
 function choiceActors(
   setup: FogSetup,
   cc: CaseCtx,
   q: Quantities,
   held: readonly string[],
-): Record<CatId, number> {
-  const out: Record<CatId, number> = {};
+): Blocks {
+  const out: Blocks = {};
   for (const def of setup.c.storylets) {
     const sl = q.storylets[def.id];
     if (!held.includes(def.id) || !sl?.roles) continue;
@@ -1372,10 +1421,30 @@ function choiceActors(
       const m = sl.p[state] ?? 0;
       if (m <= 0 || isTerminal(def, state)) continue;
       const { choices, actor } = exitOptions(cc.ctx, def, state, scope);
-      if (actor && choices.length > 0) out[actor] = or(out[actor] ?? 0, m);
+      if (!actor || choices.length === 0) continue;
+      const list = (out[actor] ??= []);
+      let b = list.find((x) => x.storylet === def.id);
+      if (!b) list.push((b = { storylet: def.id, states: [], p: 0 }));
+      b.states.push(state);
+      b.p = or(b.p, m);
     }
   }
   return out;
+}
+
+/**
+ * The share of a chain state's mass that is the actor of an open choice (03 §8.3): for a storylet
+ * that last directed the state, whether its state there is a choice state; otherwise the chance
+ * that the storylet is in one (decisions.md, M2-8).
+ */
+function blockedShare(blocks: Blocks[string] | undefined, s: ChainState): number {
+  let free = PPM;
+  for (const b of blocks ?? []) {
+    const mine = s.sl?.startsWith(`${b.storylet}.`) === true;
+    const p = mine ? (b.states.includes(s.sl?.slice(b.storylet.length + 1) ?? '') ? PPM : 0) : b.p;
+    free = times(free, PPM - p);
+  }
+  return PPM - free;
 }
 
 /** One case through one step: chains, storylets, effects on chains, perception, detectors. */
@@ -1394,7 +1463,7 @@ function caseStep(
   const actors = choiceActors(setup, cc, q, held);
   for (const def of c.cats) {
     const cat = fc.cats[def.id];
-    if (cat) cats[def.id] = catStep(cc, setup, def.id, cat, t, q, sink, actors[def.id] ?? 0);
+    if (cat) cats[def.id] = catStep(cc, setup, def.id, cat, t, q, sink, actors[def.id]);
   }
   // storylets read the new chains; `activityFinished` sees this step's finishes on its first tick
   const next: FogCase = { ...fc, q, cats };
@@ -1409,7 +1478,8 @@ function caseStep(
   yes.links = { ...fc.links, [`fact:${fire.fact}`]: 1 };
   need(yes.q.storylets, def.id, 'storylet').p = { [fire.state]: PPM };
   const ccYes = caseCtx(setup, yes, t, step);
-  enterMass(setup, ccYes, yes.q, def, fire.roles, fire.state, PPM, yesSink);
+  const sure = { storylet: def.id, from: '', pFrom: PPM, to: fire.state };
+  enterMass(setup, ccYes, yes.q, def, fire.roles, fire.state, PPM, yesSink, sure);
   const no = next;
   no.weight = fc.weight - yes.weight;
   const sl = need(no.q.storylets, def.id, 'storylet');
@@ -1428,7 +1498,7 @@ function finishStep(setup: FogSetup, cc: CaseCtx, fc: FogCase, sink: Sink): FogC
   const { c } = setup;
   for (const fx of sink.catFx) {
     const cat = fc.cats[fx.cat];
-    if (cat) fc.cats[fx.cat] = catEffect(setup, cc, fx.cat, cat, fx.mass, fx.effect);
+    if (cat) fc.cats[fx.cat] = catEffect(setup, cc, fx.cat, cat, fx.mass, fx.effect, fx.via);
   }
   for (const def of c.cats) {
     const cat = fc.cats[def.id];

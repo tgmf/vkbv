@@ -13,7 +13,7 @@ import {
 } from '../../src/sim/fog-quantities';
 import { fogSetup, fogStep, initialFog, linkKey, WAVE_TOTAL, type Fog } from '../../src/sim/fog';
 import { runHistory } from '../../src/sim/history';
-import { ch1Coarse, tiny } from './helpers';
+import { ch1, ch1Coarse, tiny } from './helpers';
 
 describe('fog quantities (03 §13.6)', () => {
   it('a once-storylet state adds its disjoint entering masses; other sources combine as independent', () => {
@@ -111,17 +111,18 @@ describe('cases (03 §13.5)', () => {
   }, 120_000);
 
   it('storylets in the fog land near the reference simulation by the end of the day', () => {
-    // A smoke check ahead of calibration (07 §3): within 10 points over 60 behaviour streams.
-    const c = ch1Coarse;
+    // A smoke check ahead of calibration (07 §3): within 10 points over 200 behaviour streams, at
+    // the default fog knobs (npm run calibrate checks the buckets over many seeds).
+    const c = ch1;
     const fog = project(c, c.world.ticks, () => undefined);
-    const n = 60;
+    // 200 behaviour streams: for a 50% event the reference's own noise is then about 3.5 points
+    const n = 200;
+    const ends = Array.from({ length: n }, (_, i) => {
+      const h = runHistory(c, 1, 100_001 + i);
+      return h.states[h.states.length - 1]?.facts ?? [];
+    });
     for (const fact of ['rokkoOnBeach', 'rokkoUnderBoat', 'shopClosedEarly', 'crewArrived']) {
-      let hit = 0;
-      for (let s = 1; s <= n; s++) {
-        const h = runHistory(c, 1, 100_000 + s);
-        if (h.states[h.states.length - 1]?.facts.includes(fact)) hit++;
-      }
-      const ref = Math.trunc((hit * 1_000_000) / n);
+      const ref = Math.trunc((ends.filter((f) => f.includes(fact)).length * 1_000_000) / n);
       expect(Math.abs(mixed(fog, fact) - ref), fact).toBeLessThanOrEqual(100_000);
     }
   }, 300_000);
