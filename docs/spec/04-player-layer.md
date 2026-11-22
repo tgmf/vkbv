@@ -196,10 +196,14 @@ puts it at the frontier limit; live playback at the edge moves it one tick at a 
 moves the frontier with it, so the edge and the frontier limit stay the same tick. It is
 not saved: loading a save re-runs from tick 0 to the frontier limit.
 
-- **Scrubbing** (dragging the playhead, stepping, jumping) is clamped to
-  `0..lanternEdge`.
-- **Playback** behind the edge watches what the lantern holds; at the edge it is live and
-  extends the edge (`03` §15.2).
+- **Scrubbing** (dragging the playhead back, the shuttle backward at any speed, or forward
+  faster than `player.observeMaxTps` behind the edge) moves only within `0..lanternEdge`
+  and observes nothing. The timeline cannot be clicked or dragged ahead of the playhead
+  (the shuttle, `06` §3).
+- **Playback** is forward at up to `player.observeMaxTps`: behind the edge it watches what
+  the lantern holds; at the edge it is live and extends the edge (`03` §15.2), at a speed
+  capped at `player.observeMaxTps` and at what the simulation sustains. During a re-run
+  forward movement waits at the last tick that has arrived.
 - An edit that makes new story happen earlier moves the edge earlier in clock time.
   That is intended.
 - When playback watches the anchor (§7), `anchorWatched = true`.

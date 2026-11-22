@@ -64,7 +64,9 @@
     "playSpeedsTps": [
       4,
       16
-    ]
+    ],
+    "shuttleTps": [4, 16, 64, 256],
+    "observeMaxTps": 16
   },
   "timeline": {
     "minSpanTicks": 36

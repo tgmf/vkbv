@@ -87,6 +87,13 @@ export const TuningSchema = z.strictObject({
       .array(z.int().min(1))
       .min(1)
       .describe('Playback speeds, ticks per real second'),
+    shuttleTps: z
+      .array(z.int().min(1))
+      .min(1)
+      .describe('Shuttle speeds, ticks per real second in either direction (06 §3)'),
+    observeMaxTps: int(
+      'Forward at up to this speed is playback and observes; faster behind the edge is a scrub (06 §3)',
+    ).min(1),
   }),
   timeline: z.strictObject({
     minSpanTicks: int(

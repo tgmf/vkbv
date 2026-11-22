@@ -67,6 +67,7 @@ One English and one Russian form per name, taken from the character and encyclop
 | Playback (play mode) | Moving the playhead forward at normal speed or paused. Only during playback can protagonists collapse what they perceive. |  |
 | Scrubbing | Scrolling fast by dragging the playhead. Shows a blur and observes nothing. |  |
 | Scroll | Any move of the playhead along time, forward or back: playback or scrubbing. | Replaces rewind and time travel. |
+| Shuttle | The VHS-style control that moves the playhead: forward or back at `player.shuttleTps` speeds, each press faster; the timeline can only be clicked at or before the playhead. Forward at up to `player.observeMaxTps` is playback; back, or faster forward behind the lantern edge, is scrubbing. | Decided 2026-11-22. Keys J, K, L. Replaces "jump to the edge". |
 | Chapter | A stretch of story ending at an anchor, computed on its own. | Demo = Chapter 1. |
 | Anchor | The canon event that ends a chapter (Chapter 1: Marti meets Rokko under the boat). Shown first as a teaser. | Treated as already seen by default (knob), so unwatched waves lean toward it. The final chapter has no anchor. |
 | Teaser | The anchor shown before the chapter is played, like a "three months earlier" opening. | The whole game is a flashback. Not the same as a locked thread. |
