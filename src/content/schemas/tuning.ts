@@ -39,7 +39,7 @@ export const TuningSchema = z.strictObject({
     maxLinks: int('Links besides the weather (03 §13.5)').min(0),
     linkFloorPpm: ppm('A lasting meeting effect becomes a link above this, about 5%'),
     contributors: int('Contributor heap size per fact, flag and heard (03 §13.5)').min(1),
-    frayBelowPpm: ppm('A projection frays below this chance of reaching the anchor (03 §16)'),
+    frayBelowPpm: ppm('The lantern, and a projection, fray below this chance of reaching the anchor (03 §16)'),
     exactTolerancePpm: ppm('Tiny-world exactness test tolerance (03 §18)'),
   }),
   behaviour: z.strictObject({

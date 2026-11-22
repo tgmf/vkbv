@@ -299,7 +299,7 @@ inputs); (b) accept the bystander test as the acceptance check and leave the her
 Chosen for now: (b) in the test; (a) recommended.
 Answer:
 
-## M2-14 — martiOut under road_both after the walking fix            (status: open)
+## M2-14 — martiOut under road_both after the walking fix            (status: answered)
 Where: `07` §3; `src/sim/fog.ts` (`pathTicks`); `docs/handoff/M2.md`
 Question: Fogged cats walked one tick per edge faster than live ones (the lantern starts each edge the tick
 after it stands at its first node); fixed in step 6. With it, 60-seed calibration: `untouched` passes
@@ -317,9 +317,10 @@ effects on a live cat were dropped. Fixed (`03` §13.4, §15.1): fog events a pr
 drawn into the lantern and a fog-held storylet that emitted one runs live. martiOut is now 67% vs 66%;
 crewChatterHeard 87% vs 100% (the fog's crew break), itch 852 vs 898. The fogged-Marti gap no longer
 matters (M2-15). New finding: M2-16.
-Answer:
+Answer: Tagir, 2026-11-23: the remaining gap (the tale reaches Marti in 87% of seeds, 100% in the
+reference) is acceptable: the player may be able to steer Marti to hear it in those seeds.
 
-## M2-15 — Marti is never fogged            (status: answered, spec to update)
+## M2-15 — Marti is never fogged            (status: spec updated)
 Where: `03` §13.1 (the whole-day projection: "no cat live, Marti in the fog"), `04` §2 (vetting),
 `07` §3 (calibration: "no cat live, protagonists in the fog"), `05` §5.2 (balance)
 Question: Should any whole-day run hold Marti in the fog?
@@ -329,8 +330,10 @@ fog. Consequences to settle in the spec: Marti's own events are 0 or 1 per seed 
 calibration checks them as rates over seeds against the reference, and the fog's other events as
 probabilities; vetting reads Marti's requirement facts from the lantern run. martiOut is investigated
 as live-vs-reference rates (M2-14).
+Spec updated 2026-11-23 at Tagir's request: `03` §13.1 (the whole-day run; projections only for strain),
+§18 (B1), `04` §2, `05` §5.2, `07` §3 (rates for every event, buckets for fog events only, no `atTick`).
 
-## M2-16 — The lantern frays on a fog probability            (status: open)
+## M2-16 — The lantern frays on a fog probability            (status: spec updated)
 Where: `03` §16 ("the lantern frays at the tick `fraysIf` holds in it (a gate, §13.3)"); `src/sim/step.ts`
 phase 8; `docs/handoff/M2.md` (Marti live, road_both)
 Question: Chapter 1's `fraysIf` is "Rokko left or ran home, and no meeting". With Marti live and Rokko in
@@ -342,6 +345,19 @@ the lantern's own state only (fog quantities read as 0), i.e. only once the fact
 lantern frays when the fog's P(anchor still reachable) falls below `fog.frayBelowPpm` (the glossary's
 "probability is zero").
 Chosen for now: (a), unchanged.
+Answer: Tagir, 2026-11-23: (c). Spec updated (`03` §6 phase 8, §16, `05` §4): the lantern frays at the
+first tick where the fog's P(alive) is below `fog.frayBelowPpm`, at once when `fraysIf` holds on its own
+facts, and at the chapter's end without the anchor. Seeds 3, 5, 10 under road_both now run to the end.
+
+## M2-17 — Vetting asks for facts an untouched Marti never sets            (status: open)
+Where: `04` §2 ("pass if, for every fact in the anchor's requirement tree … and requireFacts …")
+Question: Vetting runs the untouched timeline (no pins). In it Marti stays home (B1), so the requirement
+facts that need him out (`martiOut`, `martiOutInRain`, …, `anchor.meeting`) are 0 in every candidate, and
+every seed fails: vetting then always keeps the requested seed. This was so with fogged Marti too.
+Options seen: (a) vet only the requirement facts that do not depend on Marti, plus `requireFacts`
+(Chapter 1: the crew, the rain, Rokko under the boat); (b) vet with a pin set that sends Marti out
+(e.g. `lure_primed`) instead of the untouched timeline; (c) vet only `vetting.requireFacts`.
+Chosen for now: none (vetting is not built yet).
 Answer:
 
 <!-- Gate notes and answers go above this line. -->

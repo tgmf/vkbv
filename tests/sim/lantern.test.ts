@@ -345,6 +345,27 @@ describe('the lantern frays when fraysIf holds in it (03 §16)', () => {
   });
 });
 
+describe('the lantern frays on the fog’s chance of reaching the anchor (03 §16, M2-16)', () => {
+  /** The tiny wave at tick 7 (off a fog step boundary) with every case's P(dead) set. */
+  const withDead = (dead: number) => {
+    const setup = fogSetup(tiny, 1);
+    let w = initialWave(setup, ['hero']);
+    while (w.lantern.sim.tick < 7) w = advance(setup, w, [], ['hero']);
+    const fog = { ...w.fog, cases: w.fog.cases.map((fc) => ({ ...fc, q: { ...fc.q, dead } })) };
+    return advance(setup, { ...w, fog }, [], ['hero']);
+  };
+
+  it('a likely but unwatched fray does not end the timeline', () => {
+    expect(lanternFray(withDead(600_000))).toBeNull();
+    expect(lanternFray(withDead(1_000_000 - tiny.tuning.fog.frayBelowPpm))).toBeNull();
+  });
+
+  it('it frays once the anchor can be reached with less than fog.frayBelowPpm', () => {
+    const w = withDead(1_000_000 - tiny.tuning.fog.frayBelowPpm + 1);
+    expect(lanternFray(w)).toBe(w.lantern.sim.tick);
+  });
+});
+
 describe('B1 live (05 §5.2, 03 §18)', () => {
   it.each([1, 2, 3])(
     'untouched, seed %i: Marti stays in his flat at every tick',

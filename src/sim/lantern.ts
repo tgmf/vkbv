@@ -5,7 +5,7 @@
 // Fog events a protagonist would perceive are drawn into the lantern (03 §15.1): drawn ones happen
 // (and a fog-held storylet that emitted one runs live from there, its unperceived roles staying in the
 // fog), the rest are negative evidence.
-import { applyEvidence } from './backward';
+import { aliveChance, applyEvidence } from './backward';
 import { bandEdges, BOREDOM } from './cats';
 import {
   fogStates,
@@ -53,6 +53,8 @@ export interface Wave {
   fogFx: NonNullable<StepResult['fogFx']>;
   incoming: SimEvent[];
   localCauses: number;
+  /** The tick the lantern frayed (03 §16), or null. */
+  fray: number | null;
 }
 
 const inCast = (setup: FogSetup, ids: readonly CatId[]): CatId[] =>
@@ -96,6 +98,7 @@ export function initialWave(setup: FogSetup, followed: readonly CatId[], live = 
     fogFx: [],
     incoming: [],
     localCauses: 0,
+    fray: null,
   };
 }
 
@@ -390,6 +393,14 @@ export function advance(
     held = held.filter((x) => x !== id);
   }
 
+  // 5. the fray (03 §16): `fraysIf` on the lantern's own facts, or the fog's chance that the
+  // anchor can still be reached below the floor, or the chapter's end without the anchor
+  let fray = wave.fray;
+  if (fray === null && sim.anchor.reachedAt === null) {
+    if (sim.anchor.deadAt !== null) fray = sim.anchor.deadAt;
+    else if (aliveChance(fog) < c.tuning.fog.frayBelowPpm || t >= c.world.ticks) fray = t;
+  }
+
   return {
     lantern: { sim, live, dwell, heldStorylets: held, unseen },
     fog,
@@ -397,6 +408,7 @@ export function advance(
     fogFx,
     incoming,
     localCauses,
+    fray,
   };
 }
 
@@ -497,5 +509,5 @@ const fogRuns = (sim: SimState, held: readonly string[], id: string): boolean =>
 const inStorylets = (setup: FogSetup, ids: readonly string[]): string[] =>
   setup.c.storylets.map((s) => s.id).filter((id) => ids.includes(id));
 
-/** The lantern frays when `fraysIf` holds in it without the anchor (03 §16): its dead tick. */
-export const lanternFray = (wave: Wave): number | null => wave.lantern.sim.anchor.deadAt;
+/** The tick the lantern frayed (03 §16), or null. */
+export const lanternFray = (wave: Wave): number | null => wave.fray;

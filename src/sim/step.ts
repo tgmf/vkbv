@@ -336,7 +336,11 @@ function anchor(ctx: Ctx): void {
     s.anchor.reachedAt = t;
     ctx.events.push({ tick: t, type: 'anchor', reached: true });
   }
-  if (s.anchor.reachedAt === null && s.anchor.deadAt === null && test(ctx, c.anchor.fraysIf, {})) {
+  // in the lantern, `fraysIf` on its own state only: an unwatched, likely fact does not end the
+  // timeline (03 §6 phase 8, §16); the fog's odds end it through the lantern's fray
+  const own: Ctx = { ...ctx };
+  if (ctx.live !== undefined) delete own.fog;
+  if (s.anchor.reachedAt === null && s.anchor.deadAt === null && test(own, c.anchor.fraysIf, {})) {
     s.anchor.deadAt = t;
     ctx.events.push({ tick: t, type: 'anchor', reached: false });
   }
