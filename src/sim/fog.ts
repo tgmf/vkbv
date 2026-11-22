@@ -71,6 +71,7 @@ import type {
   Pin,
   RunningEffect,
   Scope,
+  SimEvent,
   SimState,
   StandIns,
 } from './types';
@@ -92,6 +93,11 @@ export interface ChainState {
    */
   forced?: number;
   /**
+   * Its decision key changed since its last decision, on a step without a decision tick: it decides
+   * at the next step that holds one (03 §8.2). Only when `fog.stepTicks` is finer than decisions.
+   */
+  due?: true;
+  /**
    * `storylet.state` of the storylet state that last directed this cat (decisions.md, M2-8): a
    * storylet's effects move the mass that belongs to their source state, and a choice blocks the
    * mass that belongs to its state, so the cat's chain stays correlated with the storylet.
@@ -102,8 +108,13 @@ export interface ChainState {
 export interface Entry {
   s: ChainState;
   p: number; // ppm within the cat's chain in this case
-  /** Transient, within one step: this mass changed its decision key (03 §13.3). Never stored. */
+  /**
+   * Transient, within one step, never stored (03 §8.2, §13.3): `d` — this mass decides at once
+   * (it arrived, control came back to it, an offer reached it); `k` — its decision key changed or
+   * its interrupt ended, which triggers only on a step that holds a decision tick.
+   */
   d?: boolean;
+  k?: boolean;
 }
 
 /** A fogged cat in one case: its chain and its mean-field gauges (expected values). */
@@ -276,7 +287,8 @@ function bandMove(
   const at = (to: number, p: number): Entry => ({
     s: { ...e.s, bands: { ...e.s.bands, [g]: to } },
     p,
-    ...((e.d === true || (mark && to !== b)) && { d: true }),
+    ...(e.d === true && { d: true }),
+    ...((e.k === true || (mark && to !== b)) && { k: true }),
   });
   if (cur === lim) return [at(cur, e.p)];
   const frac = Math.min(PPM, Math.trunc(rest / width(cur)));
@@ -293,7 +305,8 @@ function bandSet(c: Content, e: Entry, g: string, v: number, ppm: number, mark =
   const set: Entry = {
     s: { ...e.s, bands: { ...e.s.bands, [g]: to } },
     p: moved,
-    ...(mark && to !== b && { d: true }),
+    ...(e.d === true && { d: true }),
+    ...((e.k === true || (mark && to !== b)) && { k: true }),
   };
   return moved === e.p ? [set] : [{ s: e.s, p: e.p - moved }, set];
 }
@@ -332,22 +345,21 @@ export function standIn(
   if (s.walk) {
     const w = s.walk;
     const nodes = [w.from, ...w.path];
-    const ticks = (a: NodeId, b: NodeId) =>
-      Math.trunc(need(c.edge, edgeBetween(c, a, b) ?? '', 'edge').minutes / c.world.tickMinutes);
     let elapsed = Math.trunc(((w.ofSteps - w.leftSteps) * pathTicks(c, nodes)) / w.ofSteps);
     for (let i = 0; i + 1 < nodes.length; i++) {
       const a = nodes[i] ?? '';
       const b = nodes[i + 1] ?? '';
-      const of = ticks(a, b);
-      if (elapsed < of) {
+      const of = edgeTicks(c, a, b);
+      // a tick standing at `a`, then `of` ticks on the edge
+      if (elapsed < of + 1) {
         pos =
           elapsed === 0
             ? { at: a }
-            : { from: a, to: b, edge: edgeBetween(c, a, b) ?? '', left: of - elapsed, of };
+            : { from: a, to: b, edge: edgeBetween(c, a, b) ?? '', left: of - elapsed + 1, of };
         route = nodes.slice(elapsed === 0 ? i + 1 : i + 2);
         break;
       }
-      elapsed -= of;
+      elapsed -= of + 1;
       pos = { at: b };
       route = nodes.slice(i + 2);
     }
@@ -378,11 +390,22 @@ export function standIn(
   };
 }
 
+/** Ticks of an edge, as the lantern walks it (03 §6 phase 3e). */
+const edgeTicks = (c: Content, a: NodeId, b: NodeId): number =>
+  Math.max(
+    1,
+    Math.trunc(need(c.edge, edgeBetween(c, a, b) ?? '', 'edge').minutes / c.world.tickMinutes),
+  );
+
+/**
+ * Ticks to walk a path as a live cat does: each edge starts on the tick after the cat stands at its
+ * first node (03 §6 phase 3e), so an edge costs its ticks plus one.
+ */
 function pathTicks(c: Content, nodes: readonly NodeId[]): number {
   let sum = 0;
   for (let i = 0; i + 1 < nodes.length; i++)
-    sum += need(c.edge, edgeBetween(c, nodes[i] ?? '', nodes[i + 1] ?? '') ?? '', 'edge').minutes;
-  return Math.trunc(sum / c.world.tickMinutes);
+    sum += edgeTicks(c, nodes[i] ?? '', nodes[i + 1] ?? '') + 1;
+  return sum;
 }
 
 /** The node a chain state stands at for perception: a walking cat at the nearer end of its edge. */
@@ -391,6 +414,12 @@ const stateNode = (setup: FogSetup, id: CatId, s: ChainState): NodeId =>
 
 // --- one case's context -------------------------------------------------------------------------------
 
+/** Whether the lantern holds a flag set and unexpired at tick t. */
+const liveFlag = (s: SimState, key: string, t: number): boolean => {
+  const f = s.flags[key];
+  return f !== undefined && f.value !== 0 && (f.until === null || f.until > t);
+};
+
 /**
  * A step context over one case: a skeleton state, and a fog reader over the case's chains.
  * `finished` gives P(the cat finished the activity in this step) to `activityFinished`, on the
@@ -398,6 +427,8 @@ const stateNode = (setup: FogSetup, id: CatId, s: ChainState): NodeId =>
  */
 interface CaseCtx {
   ctx: Ctx;
+  /** The case's fog reader (also `ctx.fog`). */
+  fog: FogReader;
   standIns: Record<CatId, StandIns>;
   deciding: { id: CatId | null };
   /** A chain state's stand-in, built once per fog step (shared by every case of the step). */
@@ -413,13 +444,16 @@ interface CaseCtx {
 interface StepMemo {
   /** The lantern's state at the step's start, when cats are live (03 §13.4, §14); else null. */
   live: SimState | null;
+  /** The storylets the fog holds; the others are the lantern's, read from `live`. */
+  held: readonly string[];
   stands: Record<string, CatState>;
   keys: WeakMap<ChainState, string>;
   means: WeakMap<Record<string, number>, string>;
 }
 
-const newStepMemo = (live: SimState | null = null): StepMemo => ({
+const newStepMemo = (live: SimState | null = null, held: readonly string[] = []): StepMemo => ({
   live,
+  held,
   stands: {},
   keys: new WeakMap(),
   means: new WeakMap(),
@@ -439,14 +473,18 @@ function caseCtx(
     tick: t,
     weather: { ...setup.base.weather, now: fc.weather === 'rain' ? 'rain' : 'dry' },
     cats: { ...(step.live ?? setup.base).cats }, // live cats as the lantern has them
-    // the fog's running effects of this step, for offers and `pin`/`power` conditions (03 §13.6).
-    // QUESTION(M2-10): an effect that exists with P < 1 counts when P reaches the gate threshold.
-    effects: fc.q.effects.filter(
-      (e) =>
-        e.born < t + c.tuning.fog.stepTicks &&
-        t < effectUntil(e) &&
-        e.p >= c.tuning.fog.gateThresholdPpm,
-    ),
+    // the running effects of this step, for offers and `pin`/`power` conditions (03 §13.6): the
+    // lantern's (they exist), then the fog's. QUESTION(M2-10): an effect that exists with P < 1
+    // counts when P reaches the gate threshold.
+    effects: [
+      ...(step.live?.effects ?? []),
+      ...fc.q.effects.filter(
+        (e) =>
+          e.born < t + c.tuning.fog.stepTicks &&
+          t < effectUntil(e) &&
+          e.p >= c.tuning.fog.gateThresholdPpm,
+      ),
+    ],
   };
   const key = (cs: ChainState): string => {
     let k = step.keys.get(cs);
@@ -489,13 +527,31 @@ function caseCtx(
     chain: (id) => (id === deciding.id ? null : (standIns[id] ?? null)),
     likely: (id) => likely[id] ?? null,
     quantity: (key) => {
+      // what the lantern fixed is fact (03 §14); the rest is the fog's
+      const live = step.live;
       if (key.startsWith('fact:'))
-        return step.live?.facts.includes(key.slice(5)) ? PPM : (q.facts[key.slice(5)] ?? 0);
-      if (key.startsWith('flag:')) return flagChance(q, key.slice(5), ctx.t);
+        return live?.facts.includes(key.slice(5)) ? PPM : (q.facts[key.slice(5)] ?? 0);
+      if (key.startsWith('flag:'))
+        return live && liveFlag(live, key.slice(5), ctx.t)
+          ? PPM
+          : flagChance(q, key.slice(5), ctx.t);
       const dot = key.indexOf('.');
-      return q.storylets[key.slice(6, dot)]?.p[key.slice(dot + 1)] ?? 0;
+      const sl = key.slice(6, dot);
+      if (live && !step.held.includes(sl))
+        return live.storylets[sl]?.state === key.slice(dot + 1) ? PPM : 0;
+      return q.storylets[sl]?.p[key.slice(dot + 1)] ?? 0;
     },
-    counter: (name) => counterOf(q, name),
+    counter: (name) => {
+      // the fog's share of a counter plus what the lantern's cats added to it
+      if (!step.live) return counterOf(q, name);
+      const start = c.world.counters[name]?.start ?? 0;
+      const added = (step.live.counters[name] ?? start) - start;
+      const fog = q.counters[name] ?? { mean: start * PPM, variance: 0 };
+      return counterOf(
+        { ...q, counters: { [name]: { ...fog, mean: fog.mean + added * PPM } } },
+        name,
+      );
+    },
     heard: (id, event) => q.heard[id]?.[event] ?? 0,
     finished: (id, a) => (ctx.t === t ? (finished[id]?.[a] ?? 0) : 0),
   };
@@ -517,7 +573,59 @@ function caseCtx(
     fog,
     partsMemo: {},
   };
-  return { ctx, standIns, deciding, stand, key };
+  return { ctx, fog, standIns, deciding, stand, key };
+}
+
+/** A fogged cat's states over the cases: chain state, stand-in, mean-field values, mixture mass. */
+export function fogStates(setup: FogSetup, fog: Fog, id: CatId) {
+  const out: { s: ChainState; mean: Record<string, number>; cat: CatState; p: number }[] = [];
+  for (const fc of fog.cases) {
+    const fcat = fc.cats[id];
+    if (!fcat) continue;
+    for (const e of fcat.chain) {
+      const cat = standIn(setup, id, e.s, fcat.mean);
+      out.push({ s: e.s, mean: fcat.mean, cat, p: Math.trunc((e.p * fc.weight) / WAVE_TOTAL) });
+    }
+  }
+  return out;
+}
+
+/**
+ * The fog as the lantern reads it at tick t (03 §13.3, §14): fogged cats as their chains and fog
+ * quantities as probabilities, over the cases by weight. Only the fog's part: the lantern's step
+ * reads what the lantern holds from its own state as it changes (`fogLeaf`).
+ */
+export function lanternReader(setup: FogSetup, fog: Fog, t: number): FogReader {
+  const step = newStepMemo();
+  const parts = fog.cases.map((fc) => ({ w: fc.weight, r: caseCtx(setup, fc, t, step) }));
+  const mix = (get: (r: FogReader) => number) =>
+    parts.reduce((a, x) => a + Math.trunc((get(x.r.fog) * x.w) / WAVE_TOTAL), 0);
+  const chains: Record<CatId, { cat: CatState; p: number }[]> = {};
+  for (const x of parts)
+    for (const [id, list] of Object.entries(x.r.standIns))
+      for (const e of list)
+        (chains[id] ??= []).push({ cat: e.cat, p: Math.trunc((e.p * x.w) / WAVE_TOTAL) });
+  return {
+    chain: (id) => chains[id] ?? null,
+    likely: (id) => {
+      let best: { cat: CatState; p: number } | undefined;
+      for (const x of chains[id] ?? []) if (best === undefined || x.p > best.p) best = x;
+      return best?.cat ?? null;
+    },
+    quantity: (key) => mix((r) => r.quantity(key)),
+    counter: (name) => {
+      // the mixture's mean, and its variance: the mean variance plus the spread of the means
+      const each = parts.map((x) => ({ w: x.w, c: x.r.fog.counter(name) }));
+      const mean = each.reduce((a, x) => a + Math.trunc((x.c.mean * x.w) / WAVE_TOTAL), 0);
+      const variance = each.reduce((a, x) => {
+        const d = x.c.mean - mean;
+        return a + Math.trunc(((x.c.variance + d * d) * x.w) / WAVE_TOTAL);
+      }, 0);
+      return { mean, variance };
+    },
+    heard: (id, event) => mix((r) => r.heard(id, event)),
+    finished: () => 0, // within a fog step the lantern sees no fogged cat finish
+  };
 }
 
 /** Evaluates `fn` with `id` standing as the given chain state (the cat deciding, not mixed). */
@@ -945,6 +1053,13 @@ function catEffect(
 /** The first tick a running effect is gone: phase 1 counts it down from its first tick (03 §9.3). */
 const effectUntil = (e: RunningEffect): number => e.born + e.left - 1;
 
+/** A state no longer waiting for a decision tick. */
+const withoutDue = (s: ChainState): ChainState => {
+  const out = { ...s };
+  delete out.due;
+  return out;
+};
+
 /** A state with its delay countdown removed. */
 const unforced = (s: ChainState): ChainState => {
   const out = { ...s };
@@ -1043,6 +1158,7 @@ function firePins(
   t: number,
   pins: readonly Pin[],
   sink: Sink,
+  lantern: { live: SimState; held: readonly string[] } | null,
 ): void {
   const K = setup.c.tuning.fog.stepTicks;
   const q = fc.q;
@@ -1052,10 +1168,23 @@ function firePins(
     // a pin before this fog began is the lantern's; a fired one is done
     if ((!seen && pin.tick < t) || (seen && seen.fired >= PPM)) continue;
     const r = fogResolve(setup, cc, pin);
+    if (lantern) {
+      // with a lantern (03 §13.6, §14): a card on a fogged cat is the fog's; a card on a live cat
+      // the lantern's; any other pin the lantern fires, and the fog then applies the parts that
+      // act on fogged cats and held storylets
+      if (pin.kind === 'card' && 'cat' in pin.target) {
+        if (!fc.cats[pin.target.cat]) continue;
+      } else {
+        if (lantern.live.pins[pin.id] !== 'fired') continue;
+        q.pins = { ...q.pins, [pin.id]: { fired: PPM, fizzled: 0 } };
+        pinPrims(setup, cc, fc, pin, r, PPM, Math.max(t, pin.tick), sink, lantern.held);
+        continue;
+      }
+    }
     const fired = seen?.fired ?? 0;
     const m = times(PPM - fired, r.v);
     q.pins = { ...q.pins, [pin.id]: { fired: fired + m, fizzled: seen?.fizzled ?? PPM - r.v } };
-    if (m > 0) pinPrims(setup, cc, fc, pin, r, m, Math.max(t, pin.tick), sink);
+    if (m > 0) pinPrims(setup, cc, fc, pin, r, m, Math.max(t, pin.tick), sink, null);
   }
 }
 
@@ -1069,10 +1198,13 @@ function pinPrims(
   m: number,
   u: number,
   sink: Sink,
+  /** With a lantern: the storylets the fog holds; the lantern did the pin's world parts. */
+  held: readonly string[] | null,
 ): void {
   const { c } = setup;
   const ctx = cc.ctx;
   const K = c.tuning.fog.stepTicks;
+  const world = held === null;
   const q = fc.q;
   const power = pin.kind === 'power' ? need(c.power, pin.power, 'power') : null;
   const source = pin.kind === 'power' ? { power: pin.power } : { card: pin.card };
@@ -1120,7 +1252,7 @@ function pinPrims(
         ...more,
         p: times(m, pp),
       };
-      q.effects = [...q.effects, e];
+      if (world) q.effects = [...q.effects, e]; // with a lantern, its own effect is the one
       return e;
     };
 
@@ -1210,6 +1342,7 @@ function pinPrims(
         }
         break;
       case 'socialSpread':
+        if (!world) break; // the lantern emitted it; fogged cats perceive the lantern's events
         for (const [node, pp] of where)
           sink.events.push({
             name: p.event,
@@ -1268,11 +1401,13 @@ function pinPrims(
         break;
       }
       case 'triggerStorylet': {
+        if (held && !held.includes(p.storylet)) break; // a storylet the lantern runs
         const mass = p.ifTarget === undefined ? m : (reached[p.ifTarget] ?? 0);
         activateMass(setup, cc, q, need(c.storylet, p.storylet, 'storylet'), mass, sink);
         break;
       }
       case 'setFlag':
+        if (!world) break; // the lantern's flag; the fog reads it
         for (const [node, pp] of where) {
           const key = p.at === '$target' ? `${p.flag}@${node}` : p.flag;
           setFlag(q, key, times(m, pp), p.ticks === undefined ? null : u + p.ticks);
@@ -1334,7 +1469,8 @@ function preStep(
   sink.events.push(...q.echoes);
   q.echoes = [];
   shiftBack(setup, cur);
-  if (pins.length > 0) firePins(setup, caseCtx(setup, cur, t, step), cur, t, pins, sink);
+  const lantern = step.live && { live: step.live, held: step.held };
+  if (pins.length > 0) firePins(setup, caseCtx(setup, cur, t, step), cur, t, pins, sink, lantern);
   return cur;
 }
 
@@ -1731,9 +1867,11 @@ function catStep(
   const { c } = setup;
   const K = c.tuning.fog.stepTicks;
   const top = c.tuning.fog.bands - 1;
-  // conditions the decision reads, against the last step: a changed bucket triggers all mass
-  const conds = conditionVector(cc.ctx, id);
-  const all = conds !== fc.conds;
+  // key changes trigger only on a step that holds a decision tick (03 §8.2); the conditions the
+  // decision reads are compared between such steps: a changed bucket triggers all mass
+  const decisionStep = hits(t, K, c.decisionEveryTicks) > 0;
+  const conds = decisionStep ? conditionVector(cc.ctx, id) : fc.conds;
+  const all = decisionStep && conds !== fc.conds;
   const hooked = hooksStep(cc, setup, id, fc, t);
   const mean = { ...hooked.mean };
   const out: Entry[] = [];
@@ -1769,7 +1907,8 @@ function catStep(
         {
           s: { ...s0, interrupt: left > 0 ? { ...s0.interrupt, leftSteps: left } : null },
           p: first.p,
-          ...((first.d === true || left === 0) && { d: true }),
+          ...(first.d === true && { d: true }),
+          ...((first.k === true || left === 0) && { k: true }),
         },
       ];
     } else if (s0.walk) {
@@ -1779,6 +1918,7 @@ function catStep(
           s: { ...s0, walk: left > 0 ? { ...s0.walk, leftSteps: left } : null },
           p: first.p,
           ...((first.d === true || left === 0) && { d: true }),
+          ...(first.k === true && { k: true }),
         },
       ];
     } else {
@@ -1823,7 +1963,8 @@ function catStep(
               ...(back && { control: 'free' as const }),
             },
             p: e.p,
-            ...((e.d === true || back || band !== e.s.bands[BOREDOM]) && { d: true }),
+            ...((e.d === true || back) && { d: true }),
+            ...((e.k === true || band !== e.s.bands[BOREDOM]) && { k: true }),
           };
         });
       } else
@@ -1864,9 +2005,12 @@ function catStep(
         as(cc, id, cc.stand(id, e.s, mean), () => fresh.some((x) => reaches(cc.ctx, x, id)))
       )
         e = { ...e, d: true };
-      const s = e.s;
-      if (s.control !== 'free' || s.walk || s.interrupt || !(all || e.d === true)) {
-        out.push({ s, p: e.p });
+      const keyed = e.k === true || e.s.due === true;
+      const s = keyed && decisionStep ? withoutDue(e.s) : e.s;
+      const free = s.control === 'free' && !s.walk && !s.interrupt;
+      if (!free || !(e.d === true || (decisionStep && (all || keyed)))) {
+        // a key change between decision ticks waits for the next one
+        out.push({ s: free && e.k === true && !decisionStep ? { ...s, due: true } : s, p: e.p });
         continue;
       }
       out.push(...decideMass(cc, setup, id, s, e.p, mean, q, sink, blocks, memo));
@@ -2046,11 +2190,12 @@ function caseStep(
   held: readonly string[],
   step: StepMemo,
   pins: readonly Pin[],
+  lanternEvents: readonly FogEvent[],
 ): FogCase[] {
   const { c } = setup;
   const K = c.tuning.fog.stepTicks;
   const q = cloneQ(fc.q);
-  const sink: Sink = { events: [], catFx: [], finished: {} };
+  const sink: Sink = { events: [...lanternEvents], catFx: [], finished: {} };
   const due =
     q.echoes.length > 0 ||
     q.mods.length > 0 ||
@@ -2378,9 +2523,9 @@ export function mergeCases(setup: FogSetup, cases: readonly FogCase[]): FogCase[
  * Advances the fog one step of `fog.stepTicks` ticks (03 §13.2, §13.5, §13.6). `held` lists the
  * storylets the fog runs (all of them in a projection). The weather changes by case only in a
  * projection (`projection: true`); up to the lantern edge it is the lantern's, read from `live`
- * with the live cats. Without a lantern (`live` null) the fog applies `pins` itself; with one, the
- * pins are the lantern's to share with the fog, and placement and the lantern's events reaching
- * the fog come in M2 step 6.
+ * with the live cats. Without a lantern (`live` null) the fog applies `pins` itself; with one,
+ * the pins are shared (`firePins`), and `events` (the lantern's events of the step's ticks) reach
+ * the fogged cats (03 §14).
  */
 export function fogStep(
   setup: FogSetup,
@@ -2389,6 +2534,7 @@ export function fogStep(
   projection = true,
   live: SimState | null = null,
   pins: readonly Pin[] = [],
+  events: readonly SimEvent[] = [],
 ): Fog {
   const t = fog.tick;
   // up to the lantern edge the weather is the lantern's: one weather case (03 §13.5)
@@ -2402,11 +2548,47 @@ export function fogStep(
   const split1 = projection
     ? weatherSplit(setup, fog.cases, t)
     : fog.cases.map((fc) => (weather && fc.weather !== weather ? { ...fc, weather } : fc));
-  const step = newStepMemo(live);
-  const ordered = live ? [] : [...pins].sort((a, b) => a.tick - b.tick || a.seq - b.seq);
-  const stepped = split1.flatMap((fc) => caseStep(setup, fc, t, held, step, ordered));
+  const step = newStepMemo(live, held);
+  const ordered = [...pins].sort((a, b) => a.tick - b.tick || a.seq - b.seq);
+  const heardFrom = events.flatMap(asFogEvent);
+  const stepped = split1.flatMap((fc) => caseStep(setup, fc, t, held, step, ordered, heardFrom));
   const cases = mergeCases(setup, linkSplit(setup, stepped));
   return { tick: t + setup.c.tuning.fog.stepTicks, cases };
+}
+
+/** A lantern event as the fog perceives it: it happened, at its node (03 §14). */
+function asFogEvent(e: SimEvent): FogEvent[] {
+  if (e.type === 'emit')
+    return [
+      {
+        name: e.name,
+        node: e.node,
+        p: PPM,
+        radiusM: e.radiusM,
+        source: e.source,
+        to: e.to,
+        global: e.global,
+        factIfPerceivedBy: e.factIfPerceivedBy,
+        hops: e.hops,
+        storylet: e.storylet,
+      },
+    ];
+  if (e.type === 'voice')
+    return [
+      {
+        name: 'voice',
+        node: e.node,
+        p: PPM,
+        radiusM: e.radiusM,
+        source: e.cat,
+        to: null,
+        global: false,
+        factIfPerceivedBy: null,
+        hops: 0,
+        storylet: null,
+      },
+    ];
+  return [];
 }
 
 // --- live cats as chains --------------------------------------------------------------------------------

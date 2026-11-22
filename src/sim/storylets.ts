@@ -81,6 +81,7 @@ function enter(ctx: Ctx, def: StoryletDef, state: string): void {
 /** Activates a storylet now if it may (not running, and `once` respected); used by trigger effects too. */
 export function activate(ctx: Ctx, id: string, roles?: Record<string, CatId[]>): boolean {
   const def = need(ctx.c.storylet, id, 'storylet');
+  if (ctx.held?.includes(id)) return false; // the fog holds it (03 §13.4)
   const r = run(ctx, id);
   if (isActive(ctx, def) || (def.once && r.ended)) return false;
   const bound = roles ?? bindRoles(ctx, def);

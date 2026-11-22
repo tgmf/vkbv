@@ -155,9 +155,23 @@ function counterChance(
  * is the leaf's own boolean averaged over that cat's chain (each state stands in for the cat).
  */
 function fogLeaf(ctx: Ctx, fog: FogReader, cond: Leaf, scope: Scope): number {
-  if ('fact' in cond) return fog.quantity(`fact:${cond.fact}`);
-  if ('state' in cond) return fog.quantity(`state:${cond.state[0]}.${cond.state[1]}`);
-  if ('counter' in cond) return counterChance(fog.counter(cond.counter), cond);
+  // In the lantern's step (`ctx.live` set) what the lantern holds is fact, read as it is now; the
+  // reader gives only the fog's part (03 §13.3, §14).
+  const lantern = ctx.live !== undefined;
+  if ('fact' in cond)
+    return lantern && hasFact(ctx, cond.fact) ? PPM : fog.quantity(`fact:${cond.fact}`);
+  if ('state' in cond) {
+    if (lantern && !ctx.held?.includes(cond.state[0])) return ppmOf(leaf(ctx, cond, scope));
+    return fog.quantity(`state:${cond.state[0]}.${cond.state[1]}`);
+  }
+  if ('counter' in cond) {
+    const f = fog.counter(cond.counter);
+    if (!lantern) return counterChance(f, cond);
+    // the fog's share (its mean counts the start once) plus what the lantern's cats added
+    const start = ctx.c.world.counters[cond.counter]?.start ?? 0;
+    const mean = f.mean + (ctx.s.counters[cond.counter] ?? start) - start;
+    return counterChance({ mean, variance: f.variance }, cond);
+  }
   if ('heard' in cond) {
     const id = cat(ctx, scope, cond.by);
     if (id === null) return 0;
@@ -183,6 +197,7 @@ function fogLeaf(ctx: Ctx, fog: FogReader, cond: Leaf, scope: Scope): number {
     if ('flag' in cond) {
       const node = cond.at === undefined ? null : placeOf(ctx, scope, cond.at);
       if (cond.at !== undefined && node === null) return 0;
+      if (lantern && leaf(ctx, cond, scope)) return PPM;
       return fog.quantity(`flag:${flagKey(cond.flag, node)}`);
     }
     return ppmOf(leaf(ctx, cond, scope));
@@ -266,9 +281,9 @@ function countCatsChance(
 
 /** Whether a flag is set: live, non-zero; in the fog, its probability passes the gate (03 §13.3). */
 export const flagHolds = (ctx: Ctx, key: string): boolean =>
-  ctx.fog
-    ? ctx.fog.quantity(`flag:${key}`) >= ctx.c.tuning.fog.gateThresholdPpm
-    : flagValue(ctx, key) !== 0;
+  // in the lantern's step its own flags are fact; the reader adds the fog's (03 §14)
+  (ctx.live !== undefined || !ctx.fog ? flagValue(ctx, key) !== 0 : false) ||
+  (ctx.fog !== undefined && ctx.fog.quantity(`flag:${key}`) >= ctx.c.tuning.fog.gateThresholdPpm);
 
 /** A gate: holds when its probability reaches `fog.gateThresholdPpm` (03 §13.3). */
 export const test = (ctx: Ctx, cond: Condition, scope: Scope): boolean =>

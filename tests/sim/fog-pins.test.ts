@@ -100,11 +100,17 @@ describe('pins on fogged cats (03 §13.6)', () => {
 
   it('a move sends the whole chain there as a forced goTo', () => {
     const setup = fogSetup(tiny, 1);
-    // send: goTo street.d. street.b → street.a → street.d is 5 ticks: one step, then it stands free.
-    const next = run(setup, initialFog(setup, ['pal']), [cardPin('send', { cat: 'pal' }, 0)], 1);
+    // send: goTo street.d. street.b → street.a → street.d: 2 + 3 minutes and a tick per edge, 7
+    // ticks: two steps walking (forced), then it stands there free.
+    const pin = cardPin('send', { cat: 'pal' }, 0);
+    const one = run(setup, initialFog(setup, ['pal']), [pin], 1);
+    const going = (s: ChainState) =>
+      s.activity === 'goTo' && s.control === 'forced' && s.walk?.path.at(-1) === 'street.d';
+    expect(massOf(one, 'pal', going)).toBe(1_000_000);
+    const two = run(setup, one, [pin], 1);
     const there = (s: ChainState) => s.place === 'street.d' || s.walk?.from === 'street.d';
-    expect(massOf(next, 'pal', there)).toBe(1_000_000);
-    expect(massOf(next, 'pal', (s) => s.control === 'forced')).toBe(0);
+    expect(massOf(two, 'pal', there)).toBe(1_000_000);
+    expect(massOf(two, 'pal', (s) => s.control === 'forced')).toBe(0);
   });
 });
 

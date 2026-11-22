@@ -27,11 +27,11 @@ import { cardPin, ch1Coarse, powerPin, tiny, TINY_DIR, tuning } from './helpers'
 const CATS = ['hero', 'pal', 'bystander'];
 const glow = powerPin('glow', 'home.room', 0);
 
-/** The tiny world 3 steps into a glow on the hero's room: two cases, heroOut 0 and 1 (a link). */
+/** The tiny world 5 steps into a glow on the hero's room: two cases, heroOut 0 and 1 (a link). */
 function split(): { setup: ReturnType<typeof fogSetup>; fog: Fog } {
   const setup = fogSetup(tiny, 1);
   let fog = initialFog(setup, CATS);
-  for (let i = 0; i < 3; i++) fog = fogStep(setup, fog, undefined, true, null, [glow]);
+  for (let i = 0; i < 5; i++) fog = fogStep(setup, fog, undefined, true, null, [glow]);
   return { setup, fog };
 }
 
@@ -69,7 +69,11 @@ describe('evidence over cases and chains (03 §14 steps 1-2)', () => {
     if (!after) throw new Error('impossible evidence');
     const got = after.cases.map((fc) => fc.weight);
     const want = bayes(w, l);
-    got.forEach((x, i) => expect(Math.abs(x - (want[i] ?? 0))).toBeLessThanOrEqual(2));
+    // integers: w·L is kept in millionths before rescaling, so each weight may be off by up to
+    // WAVE_TOTAL / Σ trunc(w·L / 1e6) units, plus one
+    const kept = sum(w.map((x, i) => Math.trunc((x * (l[i] ?? 0)) / 1_000_000)));
+    const tol = Math.ceil(WAVE_TOTAL / kept) + 1;
+    got.forEach((x, i) => expect(Math.abs(x - (want[i] ?? 0))).toBeLessThanOrEqual(tol));
     expect(sum(got)).toBe(WAVE_TOTAL);
     // the hero's chain keeps only the napping states, renormalised; the other cats are untouched
     const keys = napping(fog).map(stateKey);
@@ -224,7 +228,7 @@ describe('a projection’s fray (03 §16, docs/questions.md M2-12)', () => {
       ch1Coarse.cats.map((x) => x.id),
     );
     const both = projectToEnd(setup, fog, sets['road_both'] ?? []);
-    expect(both.anchor).toBeGreaterThan(100_000);
+    expect(both.anchor).toBeGreaterThan(ch1Coarse.tuning.fog.frayBelowPpm);
     expect(both.fray).toBeNull();
     const late = projectToEnd(setup, fog, sets['late_lure'] ?? []);
     expect(late.anchor).toBe(0);

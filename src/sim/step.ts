@@ -78,6 +78,8 @@ export function step(
     memo,
     decisions,
     ...(lantern && { live: lantern.live, held: lantern.held }),
+    ...(lantern?.dwell && { dwell: lantern.dwell }),
+    ...(lantern?.fog && { fog: lantern.fog }),
   };
   try {
     pinsAndEffects(ctx); // 1
@@ -205,7 +207,7 @@ function decisionsPhase(ctx: Ctx): void {
   const busy = openChoiceActors(ctx);
   for (const def of c.cats) {
     const id = def.id;
-    if (!isLive(ctx, id)) continue;
+    if (!isLive(ctx, id) || ctx.dwell?.includes(id)) continue; // a placed cat dwells (03 §15.1)
     const cs = catState(ctx, id);
     if (cs.control !== 'free' || cs.interrupt || !('at' in cs.pos) || busy.includes(id)) continue;
     const was = need(ctx.prev.cats, id, 'cat');

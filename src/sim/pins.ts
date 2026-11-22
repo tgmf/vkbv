@@ -8,7 +8,7 @@ import { rand } from './rng';
 import { catNode, catPos, nodePos, within } from './space';
 import { activate } from './storylets';
 import type { CatId, Ctx, NodeId, Pin, RunningEffect } from './types';
-import { catScope, need } from './types';
+import { catScope, isLive, need } from './types';
 
 type Reason = 'noBranch' | 'wrongCat' | 'hidden';
 
@@ -46,6 +46,8 @@ function resolve(
 /** Phase 1: fire the pins of this tick and re-check pending ones, in log order. */
 export function pinsPhase(ctx: Ctx): void {
   for (const pin of ctx.pins) {
+    // a card on a fogged cat is the fog's (03 §13.6): the lantern leaves it alone
+    if (pin.kind === 'card' && 'cat' in pin.target && !isLive(ctx, pin.target.cat)) continue;
     const status = ctx.s.pins[pin.id];
     if (!((pin.tick === ctx.t && status === undefined) || status === 'pending')) continue;
     const r = resolve(ctx, pin);
@@ -88,6 +90,7 @@ function fire(
   prims.forEach((p, index) => {
     // `target: "marti"` inside a special points at that cat; it is not a direct play (03 §8.4).
     const cat = p.target ?? targetCat;
+    if (cat && !isLive(ctx, cat)) return; // a fogged cat: the fog applies this part (03 §13.6)
     const direct = targetCat !== null && p.target === undefined;
     const at = cat ? catNode(catState(ctx, cat)) : node;
     const centre = cat ? catPos(c, catState(ctx, cat)) : nodePos(c, node);
@@ -102,6 +105,7 @@ function fire(
           p.radiusM !== undefined && !cat
             ? c.cats
                 .map((x) => x.id)
+                .filter((id) => isLive(ctx, id))
                 .filter((id) => within(catPos(c, catState(ctx, id)), centre, p.radiusM ?? 0))
             : cat
               ? [cat]
@@ -153,7 +157,7 @@ function fire(
           affects: power?.affects ?? null,
         };
         ctx.s.effects.push(effect);
-        for (const x of c.cats) if (reaches(ctx, effect, x.id)) touch(x.id);
+        for (const x of c.cats) if (isLive(ctx, x.id) && reaches(ctx, effect, x.id)) touch(x.id);
         break;
       }
       case 'socialSpread':

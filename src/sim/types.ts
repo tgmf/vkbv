@@ -189,6 +189,8 @@ export interface Ctx {
   live?: readonly CatId[];
   /** Storylets held by the fog (03 §13.4); phase 4 skips them. */
   held?: readonly string[];
+  /** Placed cats still dwelling (03 §15.1): phase 6 makes no free decision for them. */
+  dwell?: readonly CatId[];
   /** Set while the fog evaluates content: reads of fogged cats and fog quantities (03 §13.3). */
   fog?: FogReader;
   /** While a fog decision runs: fog leaves are rounded down to this many ppm (03 §8.2). */
@@ -265,6 +267,9 @@ export const isLive = (ctx: Pick<Ctx, 'live'>, id: CatId): boolean =>
 export interface LanternArgs {
   live: readonly CatId[];
   held: readonly string[];
+  dwell?: readonly CatId[];
+  /** The fog as the lantern reads it: fogged cats and fog quantities as ppm (03 §13.3, §14). */
+  fog?: FogReader;
 }
 
 /** Who `self` and `@role` mean while evaluating content. */
