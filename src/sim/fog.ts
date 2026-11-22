@@ -889,7 +889,7 @@ function catEffect(
       continue;
     }
     const moved = times(x.p, share);
-    if (moved < x.p) chain.push({ s: x.s, p: x.p - moved });
+    if (moved < x.p) chain.push({ ...x, p: x.p - moved });
     if (moved === 0) continue;
     const me = cc.stand(id, x.s, fc.mean);
     const here = 'at' in me.pos ? me.pos.at : me.pos.to;
@@ -912,6 +912,8 @@ function catEffect(
             ...tag,
           },
           p: moved,
+          // a goTo to where the cat stands ends at once, and the cat decides (03 §8.3, §9.3)
+          ...(walk === null && { d: true }),
         });
     } else if ('startActivity' in e) {
       const next = starts(cc, id, me, e.startActivity[1], x.s.bands, 'storylet');
@@ -1627,6 +1629,85 @@ function hooksStep(cc: CaseCtx, setup: FogSetup, id: CatId, fc: FogCat, t: numbe
   return { chain, mean, conds: fc.conds };
 }
 
+/** What one cat's decisions reuse within a step: results by state, and starts by place and activity. */
+interface DecideMemo {
+  decided: Record<string, ReturnType<typeof choices>>;
+  begun: Record<string, [ChainState, number][]>;
+}
+
+const selfGaugeOf = (e: Effect) =>
+  'gauge' in e && e.gauge.slice(0, e.gauge.indexOf('.')) === 'self' ? gaugeName(e.gauge) : null;
+
+/**
+ * A free, standing state's mass `p0` decides (03 §8.2, §13.3): the share that is the actor of an
+ * open storylet choice stays, the rest leaves its activity (its `onFinish`) and is split over
+ * `better` by the shared decision function, or stays when nothing beats it. Returns the entries.
+ */
+function decideMass(
+  cc: CaseCtx,
+  setup: FogSetup,
+  id: CatId,
+  s: ChainState,
+  p0: number,
+  mean: Record<string, number>,
+  q: Quantities,
+  sink: Sink,
+  blocks: Blocks[string] | undefined,
+  memo: DecideMemo,
+): Entry[] {
+  const { c } = setup;
+  const scope: Scope = { self: id };
+  const out: Entry[] = [];
+  const sk = cc.key(s);
+  const { cands, ppm } = (memo.decided[sk] ??= as(cc, id, cc.stand(id, s, mean), () =>
+    choices(cc.ctx, id),
+  ));
+  // the actor of an open storylet choice makes no free decision (03 §8.3)
+  const moving = cands.length === 0 ? 0 : p0 - times(p0, blockedShare(blocks, s));
+  if (p0 - moving > 0) out.push({ s, p: p0 - moving });
+  if (moving === 0) return out;
+  // leaving: the old activity's onFinish on the leaving mass (gauges on the state, the rest on the world)
+  let leaving: Entry[] = [{ s, p: moving }];
+  const ad = c.activity[s.activity];
+  if (ad) {
+    for (const f of ad.onFinish ?? []) {
+      const g = selfGaugeOf(f);
+      const pm = f.chance === undefined ? PPM : f.chance * 1000;
+      if (g !== null && 'gauge' in f) {
+        meanEffect(c, { mean }, g, f.add ?? null, f.set ?? null, times(moving, pm));
+        leaving = leaving.flatMap((x) =>
+          f.set !== undefined ? bandSet(c, x, g, f.set, pm) : bandMove(c, x, g, f.add ?? 0, pm),
+        );
+      } else
+        fogEffects(setup, cc, q, [f], scope, moving, sink, s.place, '', null, {
+          source: `act:${s.activity}`,
+          cats: [id],
+        });
+    }
+    const fin = (sink.finished[id] ??= {});
+    fin[s.activity] = (fin[s.activity] ?? 0) + moving;
+  }
+  for (const l of leaving)
+    cands.forEach((cand, i) => {
+      const p = times(l.p, ppm[i] ?? 0);
+      if (p === 0) return;
+      const offer = cand.effect;
+      const k = `${s.place}|${cand.activity}${offer ? `|${offer.id}` : ''}`;
+      const from = cc.stand(id, l.s, mean);
+      const next = (memo.begun[k] ??= offer
+        ? offerStarts(cc, id, from, offer)
+        : starts(cc, id, from, cand.activity, {}, 'free'));
+      if (next.length === 0 && offer) out.push({ s: l.s, p }); // nowhere to go: it stays
+      for (const [n, q2] of next)
+        out.push({
+          // a free choice keeps the storylet tag: the mass still belongs to that state
+          s: { ...n, bands: { ...l.s.bands, [BOREDOM]: 0 }, ...(l.s.sl && { sl: l.s.sl }) },
+          p: times(p, q2),
+        });
+    });
+  return out;
+}
+
 /**
  * Advances one cat's chain one fog step in one case (03 §13.2, §13.3): interrupts and walks count
  * down; at its place an activity runs its `while` effects and tires (boredom moves bands). There
@@ -1658,8 +1739,7 @@ function catStep(
   const counted: Record<string, number> = {}; // `${counter}|${add}` → this cat's mass doing it
   const selfGauge = (e: Effect) =>
     'gauge' in e && e.gauge.slice(0, e.gauge.indexOf('.')) === 'self' ? gaugeName(e.gauge) : null;
-  const begun: Record<string, [ChainState, number][]> = {}; // starts by place and activity, this step
-  const decided: Record<string, ReturnType<typeof choices>> = {}; // decisions by state, this step
+  const memo: DecideMemo = { decided: {}, begun: {} }; // decisions by state, starts by place, this step
   const effects = cc.ctx.s.effects;
   // offers born this step: the mass they reach decides at once (03 §9.3)
   const fresh = effects.filter((x) => (x.kind === 'attract' || x.kind === 'repel') && x.born >= t);
@@ -1787,53 +1867,7 @@ function catStep(
         out.push({ s, p: e.p });
         continue;
       }
-      const sk = cc.key(s);
-      const { cands, ppm } = (decided[sk] ??= as(cc, id, cc.stand(id, s, mean), () =>
-        choices(cc.ctx, id),
-      ));
-      // the actor of an open storylet choice makes no free decision (03 §8.3)
-      const moving = cands.length === 0 ? 0 : e.p - times(e.p, blockedShare(blocks, s));
-      if (e.p - moving > 0) out.push({ s, p: e.p - moving });
-      if (moving === 0) continue;
-      // leaving: the old activity's onFinish on the leaving mass (gauges on the state, the rest on the world)
-      let leaving: Entry[] = [{ s, p: moving }];
-      const ad = c.activity[s.activity];
-      if (ad) {
-        for (const f of ad.onFinish ?? []) {
-          const g = selfGauge(f);
-          const pm = f.chance === undefined ? PPM : f.chance * 1000;
-          if (g !== null && 'gauge' in f) {
-            meanEffect(c, { mean }, g, f.add ?? null, f.set ?? null, times(moving, pm));
-            leaving = leaving.flatMap((x) =>
-              f.set !== undefined ? bandSet(c, x, g, f.set, pm) : bandMove(c, x, g, f.add ?? 0, pm),
-            );
-          } else
-            fogEffects(setup, cc, q, [f], scope, moving, sink, s.place, '', null, {
-              source: `act:${s.activity}`,
-              cats: [id],
-            });
-        }
-        const fin = (sink.finished[id] ??= {});
-        fin[s.activity] = (fin[s.activity] ?? 0) + moving;
-      }
-      for (const l of leaving)
-        cands.forEach((cand, i) => {
-          const p = times(l.p, ppm[i] ?? 0);
-          if (p === 0) return;
-          const offer = cand.effect;
-          const k = `${s.place}|${cand.activity}${offer ? `|${offer.id}` : ''}`;
-          const from = cc.stand(id, l.s, mean);
-          const next = (begun[k] ??= offer
-            ? offerStarts(cc, id, from, offer)
-            : starts(cc, id, from, cand.activity, {}, 'free'));
-          if (next.length === 0 && offer) out.push({ s: l.s, p }); // nowhere to go: it stays
-          for (const [n, q2] of next)
-            out.push({
-              // a free choice keeps the storylet tag: the mass still belongs to that state
-              s: { ...n, bands: { ...l.s.bands, [BOREDOM]: 0 }, ...(l.s.sl && { sl: l.s.sl }) },
-              p: times(p, q2),
-            });
-        });
+      out.push(...decideMass(cc, setup, id, s, e.p, mean, q, sink, blocks, memo));
     }
   }
   // the cat's states are exclusive: one Bernoulli term per counter and amount
@@ -2032,7 +2066,7 @@ function caseStep(
   const next: FogCase = { ...cur, q, cats };
   const cc2 = caseCtx(setup, next, t, step, sink.finished);
   const fire = storyletsTick(setup, cc2, q, held, sink, fc.links);
-  if (fire === null || fire.m <= 0) return [finishStep(setup, cc2, next, sink)];
+  if (fire === null || fire.m <= 0) return [finishStep(setup, cc2, next, sink, held)];
   // Split exactly at the transition (03 §13.5): it happened in one case and not in the other.
   const def = need(setup.c.storylet, fire.storylet, 'storylet');
   const yes: FogCase = { ...next, cats: { ...next.cats }, q: cloneQ(next.q) };
@@ -2051,17 +2085,45 @@ function caseStep(
   if ((rest[fire.state] ?? 0) <= 0) delete rest[fire.state];
   sl.p = renormalise(rest);
   return [
-    ...(yes.weight > 0 ? [finishStep(setup, ccYes, yes, yesSink)] : []),
-    ...(no.weight > 0 ? [finishStep(setup, cc2, no, sink)] : []),
+    ...(yes.weight > 0 ? [finishStep(setup, ccYes, yes, yesSink, held)] : []),
+    ...(no.weight > 0 ? [finishStep(setup, cc2, no, sink, held)] : []),
   ];
 }
 
 /** The rest of a case's step: storylet effects on chains, perception, detectors. */
-function finishStep(setup: FogSetup, cc: CaseCtx, fc: FogCase, sink: Sink): FogCase {
+function finishStep(
+  setup: FogSetup,
+  cc: CaseCtx,
+  fc: FogCase,
+  sink: Sink,
+  held: readonly string[],
+): FogCase {
   const { c } = setup;
   for (const fx of sink.catFx) {
     const cat = fc.cats[fx.cat];
     if (cat) fc.cats[fx.cat] = catEffect(setup, cc, fx.cat, cat, fx.mass, fx.effect, fx.via, fc.q);
+  }
+  // Mass a storylet effect hands back at once (a goTo to where it stands, a stop) decides now, in
+  // the step the effect lands, as a live cat decides on the tick its control returns (03 §8.2).
+  let actors: Blocks | null = null;
+  for (const def of c.cats) {
+    const cat = fc.cats[def.id];
+    if (!cat?.chain.some((e) => e.d === true)) continue;
+    actors ??= choiceActors(setup, cc, fc.q, held);
+    const mean = { ...cat.mean };
+    const memo: DecideMemo = { decided: {}, begun: {} };
+    const chain = cat.chain.flatMap((e0): Entry[] => {
+      if (e0.d !== true) return [e0];
+      let s = e0.s;
+      if (s.activity === 'goTo' && !s.walk && !s.interrupt) {
+        const fin = (sink.finished[def.id] ??= {});
+        fin['goTo'] = (fin['goTo'] ?? 0) + e0.p;
+        s = { ...s, activity: 'none', control: 'free' };
+      }
+      if (s.control !== 'free' || s.walk || s.interrupt) return [{ s, p: e0.p }];
+      return decideMass(cc, setup, def.id, s, e0.p, mean, fc.q, sink, actors?.[def.id], memo);
+    });
+    fc.cats[def.id] = { ...cat, chain, mean };
   }
   for (const def of c.cats) {
     const cat = fc.cats[def.id];

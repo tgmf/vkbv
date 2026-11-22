@@ -355,6 +355,32 @@ describe('perception in the fog (03 §4, §13.6)', () => {
   }, 60_000);
 });
 
+describe('storylet effects that end at once (03 §8.2, §9.3)', () => {
+  it('a goTo to where the cat stands ends in the step it lands, and the cat decides', () => {
+    // roadworks_day sends the crew `goTo` the roadworks each time it re-enters `working` (after
+    // the tea break of road_both): they already stand there, so that goTo ends at once.
+    const pins = parsePinSets(pinsets, ch1Coarse)['road_both'] ?? [];
+    const setup = fogSetup(ch1Coarse, 1);
+    let fog = initialFog(
+      setup,
+      ch1Coarse.cats.map((x) => x.id),
+    );
+    let worked = 0;
+    while (fog.tick < 260) {
+      fog = fogStep(setup, fog, undefined, true, null, pins);
+      for (const fc of fog.cases)
+        for (const cat of Object.values(fc.cats))
+          for (const e of cat.chain) {
+            expect(e.s.activity === 'goTo' && e.s.walk === null && e.s.interrupt === null).toBe(
+              false,
+            );
+            if (fog.tick > 190 && e.s.activity === 'work_road') worked += e.p;
+          }
+    }
+    expect(worked).toBeGreaterThan(0);
+  }, 60_000);
+});
+
 describe('Chapter 1 with pins (03 §18)', () => {
   it('road_both: chains sum to 1e6, weights to WAVE_TOTAL, integers only, JSON round trip', () => {
     const pins = parsePinSets(pinsets, ch1Coarse)['road_both'] ?? [];
