@@ -10,7 +10,7 @@ import {
   projectToEnd,
   type Evidence,
 } from '../../src/sim/backward';
-import { loadChapter } from '../../src/content/load';
+import { loadChapter, parsePinSets } from '../../src/content/load';
 import { readChapterDir } from '../../src/cli/files';
 import {
   fogSetup,
@@ -21,7 +21,8 @@ import {
   type ChainState,
   type Fog,
 } from '../../src/sim/fog';
-import { cardPin, powerPin, tiny, TINY_DIR, tuning } from './helpers';
+import pinsets from '../../src/content/data/pinsets.json';
+import { cardPin, ch1Coarse, powerPin, tiny, TINY_DIR, tuning } from './helpers';
 
 const CATS = ['hero', 'pal', 'bystander'];
 const glow = powerPin('glow', 'home.room', 0);
@@ -214,4 +215,19 @@ describe('a projection’s fray (03 §16, docs/questions.md M2-12)', () => {
     expect(may.anchor).toBeGreaterThan(tiny.tuning.fog.frayBelowPpm);
     expect(may.fray).toBeNull();
   });
+
+  it('Chapter 1: road_both may reach the anchor and does not fray; late_lure frays (B6, B7)', () => {
+    const sets = parsePinSets(pinsets, ch1Coarse);
+    const setup = fogSetup(ch1Coarse, 1);
+    const fog = initialFog(
+      setup,
+      ch1Coarse.cats.map((x) => x.id),
+    );
+    const both = projectToEnd(setup, fog, sets['road_both'] ?? []);
+    expect(both.anchor).toBeGreaterThan(100_000);
+    expect(both.fray).toBeNull();
+    const late = projectToEnd(setup, fog, sets['late_lure'] ?? []);
+    expect(late.anchor).toBe(0);
+    expect(late.fray).toBe(ch1Coarse.world.ticks); // Rokko leaves in ~3/4 of cases: alive to the end
+  }, 120_000);
 });

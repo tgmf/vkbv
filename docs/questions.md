@@ -269,4 +269,19 @@ has a free slot.
 Chosen for now: (b). Contributor heaps are built (they also serve links on demand, `03` §15.3, M3).
 Answer:
 
+## M2-12 — When a projection frays            (status: open)
+Where: `03` §16 ("a projection frays at the first tick from which the anchor's probability of being
+reached is below `fog.frayBelowPpm`"); `src/sim/backward.ts` (`projectToEnd`)
+Question: A projection holds no evidence, so P(anchor reached by the end) is one number for the whole day,
+not one per tick. Which tick is the fray?
+Options seen: (a) the fog's version of `03` §12.2's "dead": P(alive at t) = 1 − P(`fraysIf` has held
+without the anchor by t), and at the chapter's end P(reached); the fray is the first tick where it is below
+the floor. It bounds the anchor's chance from above, and matches the lantern's dead in expectation;
+(b) only "frays or not", at the end, from P(reached).
+Chosen for now: (a). Measured on Chapter 1, seeds 1–3: `road_both` P(anchor) 14–15%, no fray; `late_lure`
+and `untouched` P(anchor) 0, fray at the end (tick 900): Rokko leaves in about 73% of cases, so P(alive)
+stays about 27% all day. Whether a projection frays (B6, B7) is clear either way; its tick will usually be
+the end.
+Answer:
+
 <!-- Gate notes and answers go above this line. -->
