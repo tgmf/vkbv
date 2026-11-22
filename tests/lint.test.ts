@@ -14,7 +14,9 @@ async function errors(fixture: string): Promise<string[]> {
   return (result?.messages ?? []).map((m) => `${m.line} ${m.ruleId ?? m.message}`);
 }
 
-describe('lint guardrails', () => {
+// The first lint call builds the TypeScript program for the type-aware rules: about 1 s alone, but
+// past Vitest's default 5 s under the full suite's load. Only the time limit is longer.
+describe('lint guardrails', { timeout: 30_000 }, () => {
   it('src/sim may not import Solid, three or other src folders (types from content are fine)', async () => {
     expect(await errors('sim/imports.ts')).toEqual([
       '2 no-restricted-imports', // solid-js

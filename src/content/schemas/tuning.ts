@@ -83,10 +83,6 @@ export const TuningSchema = z.strictObject({
     playedCardRule: z
       .enum(['pinned', 'spent', 'discard'])
       .describe('What happens to a card once played (04 §3)'),
-    playSpeedsTps: z
-      .array(z.int().min(1))
-      .min(1)
-      .describe('Playback speeds, ticks per real second'),
     shuttleTps: z
       .array(z.int().min(1))
       .min(1)
@@ -123,6 +119,7 @@ export const TuningSchema = z.strictObject({
   flags: z.strictObject({
     telemetry: bool('Send telemetry when VITE_TELEMETRY_URL is set'),
     assist: bool('Assist-mode highlights on by default'),
+    jumpToEdge: bool('A "jump to the edge" button and End key, for playtests only (06 §3)'),
   }),
 });
 

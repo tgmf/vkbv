@@ -235,7 +235,7 @@ counters as a distribution (buckets) instead of mean and variance.
 Chosen for now: (a), next.
 Answer: Tagir, 2026-11-22: fix the bias at its source after M2-7 (measure the crew against the reference hour by hour, find the decision that diverges). No third link; `fog.maxLinks` stays 2. Only if the mean work is right and road blocked still fails: threshold counters as a spread of values, behind a knob. Road blocked must pass calibration (07 §3) before M2 is done.
 
-## M2-9 — Shuttle follow-ups            (status: open)
+## M2-9 — Shuttle follow-ups            (status: answered)
 Where: `06` §3, §8; `04` §6; `05` §4; `docs/glossary.md`; `docs/milestones/M5-viewer.md`
 Question: The shuttle (2026-11-22) is in the spec and the glossary. Three loose ends:
 1. **Glossary:** please copy the new "Shuttle" row of `docs/glossary.md` into the master glossary doc.
@@ -243,6 +243,6 @@ Question: The shuttle (2026-11-22) is in the spec and the glossary. Three loose 
 3. **The M5 brief** still lists "speeds, jump" for the timeline and "Space, arrows, Home, End" for the keyboard. It should say shuttle, J/K/L, ← and →, and Home.
 Options seen: (2) remove the knob, or keep it as play's speed; (3) update M5 when M5 starts.
 Chosen for now: the knob stays unused; M5 is unchanged until you say.
-Answer:
+Answer: Tagir, 2026-11-22: (1) Tagir copies the row; (2) remove `player.playSpeedsTps` (done); (3) M5 corrected now; "jump to the edge" kept as a playtest option behind `flags.jumpToEdge`, off by default.
 
 <!-- Gate notes and answers go above this line. -->

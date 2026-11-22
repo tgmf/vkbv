@@ -98,7 +98,6 @@ have **not** been checked against a model of this content; M4 measures them.
 | `vetting.minPpm` | 300000 | |
 | `vetting.maxCandidates` | 20 | |
 | `player.playedCardRule` | `"pinned"` | `pinned`, `spent` or `discard` (`04` §3) |
-| `player.playSpeedsTps` | `[4, 16]` | ticks per real second (replaced by the shuttle; `docs/questions.md` M2-9) |
 | `player.shuttleTps` | `[4, 16, 64, 256]` | shuttle speeds in ticks per real second, either direction (`06` §3) |
 | `player.observeMaxTps` | 16 | forward at up to this speed is playback and observes; faster behind the edge is a scrub |
 | `timeline.minSpanTicks` | 36 | the bar spans at least this many ticks; past it, it rescales to keep the lantern edge on the right (`06` §3) |
@@ -110,6 +109,7 @@ have **not** been checked against a model of this content; M4 measures them.
 | `budgets.rerunTps` | 120 | ticks per second a re-run streams at, at least (`07` §4) |
 | `flags.telemetry` | true | |
 | `flags.assist` | false | assist-mode highlights default |
+| `flags.jumpToEdge` | false | a "jump to the edge" button and End key, for playtests only (`06` §3) |
 
 Every key is editable in the debug panel. A number used by the engine that is not in
 content or here is a bug.

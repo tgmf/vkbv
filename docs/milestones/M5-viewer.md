@@ -20,8 +20,10 @@ hand yet.
    `data-node` and `data-activity` (`02` §4).
 4. The timeline: ruler, weather band, story dots, pins (read only), playhead,
    the lantern edge (the bar's right end, rescaling past `timeline.minSpanTicks`),
-   re-runs streaming in, fray, changed-unwatched marks, play/pause, speeds, jump,
-   keyboard.
+   re-runs streaming in, fray, changed-unwatched marks, play/pause and the shuttle
+   (`06` §3: clicking only at or before the playhead, J/K/L speeds both ways, playback
+   up to `player.observeMaxTps`, faster forward a scrub), keyboard. "Jump to the edge" only
+   behind `flags.jumpToEdge` (off by default), kept for playtests.
 5. The playback loop on `requestAnimationFrame` with a real-time accumulator; each
    tick passed in playback calls `observe` (M3) and applies rewards; scrubbing only
    moves the playhead.
@@ -43,7 +45,11 @@ hand yet.
       one frame and observes nothing; it cannot pass the edge; playback observes every
       tick it passes and extends the edge when it reaches it.
 - [ ] `untouched` shows the fray when Rokko leaves; playback stops there.
-- [ ] Keyboard: Space, arrows, Home, End work.
+- [ ] Keyboard: Space, J, K, L, ←, → and Home work as `06` §8 says; End jumps to the edge
+      only with `flags.jumpToEdge`.
+- [ ] The timeline cannot be clicked or dragged ahead of the playhead; the shuttle steps up a
+      speed per press; forward faster than `player.observeMaxTps` behind the edge observes
+      nothing; during a re-run forward waits at the last tick that has arrived.
 - [ ] A Playwright test loads `road_both`, plays to five ticks, and checks Marti's
       `data-node` against the headless playback.
 - [ ] Reduced motion turns off the focus layer and pulsing; ghosts stay, with static

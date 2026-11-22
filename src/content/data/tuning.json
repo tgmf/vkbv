@@ -61,10 +61,6 @@
   },
   "player": {
     "playedCardRule": "pinned",
-    "playSpeedsTps": [
-      4,
-      16
-    ],
     "shuttleTps": [4, 16, 64, 256],
     "observeMaxTps": 16
   },
@@ -91,6 +87,7 @@
   },
   "flags": {
     "telemetry": true,
-    "assist": false
+    "assist": false,
+    "jumpToEdge": false
   }
 }

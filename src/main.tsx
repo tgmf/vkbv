@@ -29,7 +29,7 @@ try {
     content,
     pinsets: Object.keys(parsePinSets(PINSETS_FILE, content)),
     sim,
-    speeds: tuning.player.playSpeedsTps,
+    speeds: tuning.player.shuttleTps,
   };
   render(() => <App tuningRows={tuningRows(tuning)} inspector={inspector} />, root);
 } catch (e) {
