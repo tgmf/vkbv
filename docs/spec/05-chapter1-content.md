@@ -94,8 +94,11 @@ have **not** been checked against a model of this content; M4 measures them.
 | `charge.floorOn` | true | the charge floor at rain start |
 | `charge.multCapPm` | 3000 | cap on the pressure multiplier |
 | `frontier.countAtPpm` | 500000 | a requirement counts toward progress at 50% |
-| `vetting.requireFacts` | `["crewArrived", "rainStarted", "rokkoUnderBoat"]` | seed vetting (`04` §2) |
+| `vetting.solutions` | `["road_tea", "road_box", "road_both"]` | the recorded solutions vetting runs (`04` §2): pin sets of §5.1. Tagir may add variants (e.g. the lure at other ticks) |
+| `vetting.requireFacts` | `["crewArrived", "rainStarted", "rokkoUnderBoat"]` | must have this chance in the solving run (`04` §2) |
 | `vetting.minPpm` | 300000 | |
+| `vetting.minStoryletShare` | set by Tagir | share of authored storylets the solutions' runs must enter (`04` §2) |
+| `vetting.fog` | coarser fog knobs | `fog.minStatePpm` and `fog.bands` for live vetting of a typed or bookmarked seed |
 | `vetting.maxCandidates` | 20 | |
 | `player.playedCardRule` | `"pinned"` | `pinned`, `spent` or `discard` (`04` §3) |
 | `player.shuttleTps` | `[4, 16, 64, 256]` | shuttle speeds in ticks per real second, either direction (`06` §3) |

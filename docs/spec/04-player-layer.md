@@ -49,23 +49,39 @@ everything else empty. The requested seed comes from the UI (`?seed=` or random)
 
 ## 2. Seed vetting
 
-Before the first recompute of a new game, the worker vets the seed once (pacing):
+Every seed the game offers must be **solvable** with the player's actions and must make
+enough of the chapter's **authored story** reachable (Tagir, 2026-11-23,
+`docs/questions.md` M2-17). Solvability cannot be computed for every seed, so vetting
+uses a sufficient check: the chapter's **recorded solutions**, pin sets that solve it
+in the intended ways. Marti's choices are keyed by seed and tick, not by the log, so a
+seed's whole-day run under a solution is exactly what a player playing those pins gets.
 
 ```
 for k in 0 .. tuning.vetting.maxCandidates - 1:
   candidate = k == 0 ? requested : hash32(requested + "|vet|" + k)
-  compute the untouched timeline (no pins, no watched facts, conditioning off): the
-       whole-day run (03 §13.1: Marti live from tick 0, every other cat in the fog;
-       never drawn), with the candidate's seeded stats (03 §5)
-  pass if, for every fact in the anchor's requirement tree (its story storylets'
-       outcomes) and every fact in tuning.vetting.requireFacts, its raw chance by the
-       end of the run (03 §13.1) is >= tuning.vetting.minPpm
+  for each recorded solution in tuning.vetting.solutions (pin sets of 05 §5.1):
+       the whole-day run (03 §13.1: Marti live from tick 0, the other cats in the fog)
+       with the solution's pins and no watched facts, conditioning off, with the
+       candidate's seeded stats (03 §5)
+  solvable: at least one solution's run reaches the anchor (the lantern holds the
+       anchor fact) and, in that run, every fact of tuning.vetting.requireFacts has a
+       chance by the end (03 §13.1) of at least tuning.vetting.minPpm
+  story: over all the solutions' runs, the share of authored storylets entered is at
+       least tuning.vetting.minStoryletShare; a storylet counts when the lantern ran
+       it, or when a state other than its start has a chance in the fog of at least
+       tuning.vetting.minPpm
+  pass if solvable and story
 take the first candidate that passes; if none does, take the requested seed
 ```
 
-Marti is never fogged (Tagir, 2026-11-23): vetting runs him live like every whole-day run.
-Open (`docs/questions.md` M2-17): in the untouched run Marti stays home, so the requirement
-facts that need him out are 0 for every candidate.
+The check is sufficient, not necessary: a rejected seed may be solvable some other way,
+and is simply replaced by the next candidate.
+
+**Where it runs.** Vetting a candidate costs one whole-day run per solution, too slow
+for a page load. `npm run vet` vets seeds offline and writes the list of vetted seeds
+(`src/content/data/ch1/vetted-seeds.json`); a new game draws its seed from that list.
+Only a seed the player types (`?seed=`) or a bookmark is vetted live, in the worker,
+behind a loading indicator, with the coarser fog knobs `tuning.vetting.fog`.
 
 The result is stored as `seed` and never changed during play. A bookmarked seed is
 always the vetted one, so it always gives the same world.

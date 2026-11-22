@@ -349,7 +349,7 @@ Answer: Tagir, 2026-11-23: (c). Spec updated (`03` §6 phase 8, §16, `05` §4):
 first tick where the fog's P(alive) is below `fog.frayBelowPpm`, at once when `fraysIf` holds on its own
 facts, and at the chapter's end without the anchor. Seeds 3, 5, 10 under road_both now run to the end.
 
-## M2-17 — Vetting asks for facts an untouched Marti never sets            (status: open)
+## M2-17 — Vetting asks for facts an untouched Marti never sets            (status: spec updated)
 Where: `04` §2 ("pass if, for every fact in the anchor's requirement tree … and requireFacts …")
 Question: Vetting runs the untouched timeline (no pins). In it Marti stays home (B1), so the requirement
 facts that need him out (`martiOut`, `martiOutInRain`, …, `anchor.meeting`) are 0 in every candidate, and
@@ -358,6 +358,12 @@ Options seen: (a) vet only the requirement facts that do not depend on Marti, pl
 (Chapter 1: the crew, the rain, Rokko under the boat); (b) vet with a pin set that sends Marti out
 (e.g. `lure_primed`) instead of the untouched timeline; (c) vet only `vetting.requireFacts`.
 Chosen for now: none (vetting is not built yet).
-Answer:
+Answer: Tagir, 2026-11-23: the wording was wrong: an untouched timeline can do nothing. Each seed must
+be solvable with the player's actions and have at least a portion of its authored storylets reachable
+with them. Chosen: reference solutions (recorded solutions run as whole-day runs; solvable if one reaches
+the anchor; story if their runs enter at least `vetting.minStoryletShare` of the authored storylets).
+Spec updated: `04` §2, `05` §4. Its start value of `vetting.minStoryletShare` is Tagir's to set. The
+glossary's "Seed vetting" row ("checked once with no player input") needs the same change in the
+master glossary.
 
 <!-- Gate notes and answers go above this line. -->
