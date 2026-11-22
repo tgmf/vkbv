@@ -304,29 +304,20 @@
           "textKey": "sl.rokko_morning.to_beach",
           "onEnter": [{ "fact": "rokkoOnBeach" }, { "goTo": ["@rokko", "beach.north"] }, { "startActivity": ["@rokko", "listen_to_sea"] }],
           "exits": [
+            { "to": "sails", "kind": "auto", "gate": { "fact": "boatLeft" } },
             { "to": "under_boat", "kind": "choice", "actor": "@rokko", "gate": { "weather": "rain" },
-              "score": { "base": 2, "terms": [{ "gauge": "@rokko.fearOfWater", "per": 300, "add": 1 }] } },
-            { "to": "runs_home", "kind": "choice", "actor": "@rokko", "gate": { "weather": "rain" },
-              "score": { "base": -2, "terms": [{ "gauge": "@rokko.fearOfWater", "per": 200, "add": 1 }, { "gauge": "@rokko.pillowStandards", "per": 300, "add": 1 }] } },
-            { "to": "runs_home", "kind": "hazard", "perMille": 3, "gate": { "all": [{ "weather": "dry" }, { "clock": ["09:00", "11:00"] }] } }
+              "score": { "base": 2, "terms": [{ "gauge": "@rokko.fearOfWater", "per": 300, "add": 1 }] } }
           ]
         },
         "under_boat": {
           "textKey": "sl.rokko_morning.under_boat",
           "onEnter": [{ "fact": "rokkoUnderBoat" }, { "goTo": ["@rokko", "beach.boat"] }, { "startActivity": ["@rokko", "doze"] }],
           "exits": [
-            { "to": "left", "kind": "auto", "gate": { "all": [{ "weather": "dry" }, { "fact": "rainStarted" }] } },
-            { "to": "left", "kind": "hazard", "perMille": 0, "terms": [{ "if": { "gauge": "@rokko.pillowStandards", "gte": 900 }, "addPerMille": 10 }] }
+            { "to": "sails", "kind": "auto", "gate": { "fact": "boatLeft" } }
           ]
         },
-        "runs_home": {
-          "textKey": "sl.rokko_morning.runs_home",
-          "onEnter": [{ "fact": "rokkoRanHome" }, { "goTo": ["@rokko", "town.netmaker_attic"] }],
-          "exits": []
-        },
-        "left": {
-          "textKey": "sl.rokko_morning.left",
-          "onEnter": [{ "fact": "rokkoLeft" }, { "goTo": ["@rokko", "town.netmaker_attic"] }],
+        "sails": {
+          "textKey": "sl.rokko_morning.sails",
           "exits": []
         }
       }

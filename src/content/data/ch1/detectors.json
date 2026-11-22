@@ -35,6 +35,10 @@
     {
       "id": "rain_started", "emits": "rainStartedSeen",
       "kernel": [{ "event": "rainStarted" }]
+    },
+    {
+      "id": "boat_sails", "emits": "boatLeft",
+      "kernel": [{ "event": "rainStopped" }, { "holds": { "weather": "dry" }, "forTicks": 120 }]
     }
   ]
 }

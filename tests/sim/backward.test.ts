@@ -220,18 +220,16 @@ describe('a projection’s fray (03 §16, docs/questions.md M2-12)', () => {
     expect(may.fray).toBeNull();
   });
 
-  it('Chapter 1: road_both may reach the anchor and does not fray; late_lure frays (B6, B7)', () => {
-    const sets = parsePinSets(pinsets, ch1Coarse);
+  it('Chapter 1: a projection that never reaches the anchor frays at the end of the day', () => {
+    // The 05 §5.1 solutions were timed for the old midday rain (docs/questions.md M2-18), so only the
+    // untouched day is used here; reaching the anchor is covered on the tiny world above.
     const setup = fogSetup(ch1Coarse, 1);
     const fog = initialFog(
       setup,
       ch1Coarse.cats.map((x) => x.id),
     );
-    const both = projectToEnd(setup, fog, sets['road_both'] ?? []);
-    expect(both.anchor).toBeGreaterThan(ch1Coarse.tuning.fog.frayBelowPpm);
-    expect(both.fray).toBeNull();
-    const late = projectToEnd(setup, fog, sets['late_lure'] ?? []);
-    expect(late.anchor).toBe(0);
-    expect(late.fray).toBe(ch1Coarse.world.ticks); // Rokko leaves in ~3/4 of cases: alive to the end
+    const untouched = projectToEnd(setup, fog, parsePinSets(pinsets, ch1Coarse)['untouched'] ?? []);
+    expect(untouched.anchor).toBe(0);
+    expect(untouched.fray).toBe(ch1Coarse.world.ticks);
   }, 120_000);
 });

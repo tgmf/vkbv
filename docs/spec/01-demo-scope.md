@@ -65,8 +65,9 @@ everything below must emerge from the rules in `03` to `05`.
    arrives.
 3. The player inspects the five objects in the flat and gets five cards, tries some on
    Marti. Little happens, but the charge payouts start to grow.
-4. The player plays on, faster. Some time between 11:00 and 13:00 it rains; a couple of
-   hours after the rain stops, Rokko takes the boat out to sea and the timeline frays.
+4. The player plays on, faster. Around 17:00 it rains; around 22:00 it stops, and a
+   couple of hours later, near midnight, Rokko takes the boat out to sea and the timeline
+   frays.
 5. The rain's start made the lure affordable. The player scrolls back and places it at
    the front door; the day re-runs up to the new story and stops. Playing on, Marti goes
    to the door and turns back. The player learns to prime him (an empty kettle, light

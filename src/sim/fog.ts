@@ -49,7 +49,7 @@ import {
   tablePerceives,
 } from './readers';
 import type { Link, PerceptionTable } from './readers';
-import { detectorCats } from './sifting';
+import { detectorCats, namedCats } from './sifting';
 import {
   catNode,
   catPos,
@@ -2129,12 +2129,15 @@ function detectorsStep(
   cc: CaseCtx,
   q: Quantities,
   events: readonly FogEvent[],
+  lantern: boolean,
 ): void {
   const { c } = setup;
   for (const id of setup.detectors) {
     const d = c.detectors.find((x) => x.id === id);
     if (!d) continue;
-    if (!detectorCats(c, d).some((x) => cc.standIns[x] !== undefined)) continue;
+    // the fog's when it names a fogged cat; one naming no cat is the lantern's when there is one
+    const named = namedCats(c, d);
+    if (named.length > 0 ? !named.some((x) => cc.standIns[x] !== undefined) : lantern) continue;
     const best = q.detectors[id] ?? d.kernel.map(() => 0);
     d.kernel.forEach((clause, i) => {
       let p: number;
@@ -2237,7 +2240,8 @@ function caseStep(
   const next: FogCase = { ...cur, q, cats };
   const cc2 = caseCtx(setup, next, t, step, sink.finished);
   const fire = storyletsTick(setup, cc2, q, held, sink, fc.links);
-  if (fire === null || fire.m <= 0) return [finishStep(setup, cc2, next, sink, held)];
+  if (fire === null || fire.m <= 0)
+    return [finishStep(setup, cc2, next, sink, held, step.live !== null)];
   // Split exactly at the transition (03 §13.5): it happened in one case and not in the other.
   const def = need(setup.c.storylet, fire.storylet, 'storylet');
   const yes: FogCase = { ...next, cats: { ...next.cats }, q: cloneQ(next.q) };
@@ -2256,8 +2260,8 @@ function caseStep(
   if ((rest[fire.state] ?? 0) <= 0) delete rest[fire.state];
   sl.p = renormalise(rest);
   return [
-    ...(yes.weight > 0 ? [finishStep(setup, ccYes, yes, yesSink, held)] : []),
-    ...(no.weight > 0 ? [finishStep(setup, cc2, no, sink, held)] : []),
+    ...(yes.weight > 0 ? [finishStep(setup, ccYes, yes, yesSink, held, step.live !== null)] : []),
+    ...(no.weight > 0 ? [finishStep(setup, cc2, no, sink, held, step.live !== null)] : []),
   ];
 }
 
@@ -2268,6 +2272,7 @@ function finishStep(
   fc: FogCase,
   sink: Sink,
   held: readonly string[],
+  lantern: boolean,
 ): FogCase {
   const { c } = setup;
   for (const fx of sink.catFx) {
@@ -2301,7 +2306,7 @@ function finishStep(
     if (cat) fc.cats[def.id] = { chain: normalise(c, cat.chain), mean: cat.mean, conds: cat.conds };
   }
   perceive(setup, fc, sink.events, cc.ctx.t);
-  detectorsStep(setup, cc, fc.q, sink.events);
+  detectorsStep(setup, cc, fc.q, sink.events, lantern);
   fc.q.stepEvents = sink.events.slice(sink.own); // what the lantern may perceive (03 §15.1)
   // dead: the running maximum of P(fraysIf holds) at the step's end (03 §12.2, §13.6)
   fc.q.dead = Math.max(fc.q.dead, chance(cc.ctx, c.anchor.fraysIf, {}));

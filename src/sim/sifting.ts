@@ -13,6 +13,16 @@ const order = (a: PartialMatch, b: PartialMatch) =>
  * named, every cat (03 §10.4).
  */
 export function detectorCats(c: Content, d: Content['detectors'][number]): CatId[] {
+  const named = namedCats(c, d);
+  return named.length > 0 ? named : c.cats.map((x) => x.id);
+}
+
+/**
+ * The cats a detector's clauses name, in cast order. Where it runs follows them: a detector that
+ * names a fogged cat is left to the fog; one that names none reads only the world, which the
+ * lantern holds (03 §13.4).
+ */
+export function namedCats(c: Content, d: Content['detectors'][number]): CatId[] {
   const named: CatId[] = [];
   const add = (id: string) => {
     if (c.cat[id] && !named.includes(id)) named.push(id);
@@ -26,21 +36,19 @@ export function detectorCats(c: Content, d: Content['detectors'][number]): CatId
     else if ('countCats' in x) (x.countCats.except ?? []).forEach(add);
   };
   for (const clause of d.kernel) if ('holds' in clause) walk(clause.holds);
-  return named.length > 0
-    ? c.cats.filter((x) => named.includes(x.id)).map((x) => x.id)
-    : c.cats.map((x) => x.id);
+  return c.cats.filter((x) => named.includes(x.id)).map((x) => x.id);
 }
 
 /**
  * Phase 5: advance every pool; a completed kernel sets its fact and emits `detector` once.
- * In the lantern, a detector that involves a fogged cat is left to the fog (decisions.md, M2).
+ * In the lantern, a detector that names a fogged cat is left to the fog (decisions.md, M2).
  */
 export function siftingPhase(ctx: Ctx): void {
   const { c, s, t } = ctx;
   const factsNow = ctx.events.flatMap((e) => (e.type === 'fact' ? [e.fact] : []));
   for (const d of c.detectors) {
     if (hasFact(ctx, d.emits)) continue;
-    if (ctx.live && !detectorCats(c, d).every((id) => isLive(ctx, id))) continue;
+    if (ctx.live && !namedCats(c, d).every((id) => isLive(ctx, id))) continue;
     const pool = s.pools[d.id] ?? [];
     // The stage-0 match is implicit and always present.
     const live = pool.some((m) => m.stage === 0)

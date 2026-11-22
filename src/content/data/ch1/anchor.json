@@ -16,7 +16,7 @@
   },
   "fraysIf": {
     "all": [
-      { "any": [{ "fact": "rokkoLeft" }, { "fact": "rokkoRanHome" }] },
+      { "fact": "boatLeft" },
       { "not": { "fact": "anchor.meeting" } }
     ]
   },

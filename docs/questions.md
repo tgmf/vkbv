@@ -372,7 +372,7 @@ Fray (same day): Tagir pointed out that the anchor's reachability cannot be comp
 player's future actions). The fray never computes it: it is the chapter's point of no return
 (`fraysIf`). `03` §16 and the glossary's "Fray" row reworded to say so.
 
-## M2-18 — Chapter 1's point of no return: the boat leaves            (status: spec updated, content to change)
+## M2-18 — Chapter 1's point of no return: the boat leaves            (status: content changed; follow-ups open)
 Where: `src/content/data/ch1/anchor.json` (`fraysIf`), `storylets.json` (Rokko's leaving), `world.json`
 (`ticks`), `05` §5.2 (B7)
 Decision: Tagir, 2026-11-23: Rokko does not go home. He waits, and a couple of hours after the rain is
@@ -390,6 +390,19 @@ Content changes this needs (Tagir's files, not made by the coding model):
    15:20–19:00; "closer to midnight" would need a longer delay and a longer day than `world.ticks` 900
    (05:40–20:40).
 4. B7 (`late_lure` at 17:30 frays on 45 of 50 seeds) may no longer hold with a later departure.
-Answer:
+Answer: Tagir, 2026-11-23: edit the content; the rain starts around 17:00 and ends around 22:00.
+Done (at Tagir's request): `world.json` rain windows 16:30–17:30 and 21:30–22:30, the day to 00:40
+(`ticks` 1140); detector `boat_sails` emits `boatLeft` 120 dry ticks after `rainStopped`; `fraysIf` is
+`boatLeft` without the meeting; Rokko no longer runs home or climbs back to town (`runs_home`, `left`
+and their text removed); from the beach or under the boat he `sails` when the boat leaves (text: a
+writer marker). Engine: a detector naming no cat runs in the lantern (decisions.md). Golden files
+updated for this. Headless runs with Marti live: every day frays at 23:23–23:30.
+Open follow-ups (Tagir's content):
+- the `05` §5.1 pin sets were timed for the midday rain: under `road_both` Marti goes out at 13:05 but
+  no seed of 1–4 reaches the anchor (Rokko goes under the boat only when it rains);
+- the roadworks race: the crew reach 800 units long before a 17:00 rain, so the road is rarely
+  blocked and `blocked_road` (a main storylet) rarely happens;
+- the charge floor comes at rain start (17:00), so the lure is affordable late in the day;
+- B2–B7 and calibration need measuring again once the pin sets are retimed.
 
 <!-- Gate notes and answers go above this line. -->

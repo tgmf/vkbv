@@ -110,7 +110,7 @@ describe('histories', () => {
     const a = runHistory(ch1, 1, 0);
     const b = runHistory(ch1, 1, 0);
     expect(b).toEqual(a);
-    expect(a.states.length).toBe(901);
+    expect(a.states.length).toBe(ch1.world.ticks + 1);
   });
 });
 

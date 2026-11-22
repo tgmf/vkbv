@@ -162,7 +162,14 @@ describe('cases (03 §13.5)', () => {
 
   it('the weather splits into rain and stopped cases; rain has surely started by its window’s end', () => {
     const c = ch1Coarse;
-    const fog = project(c, 460, () => undefined); // 13:20, past the start window (11:00–13:00)
+    // past the end of the start window, rounded up to a fog step
+    const minutes = (hhmm: string) => {
+      const [h = 0, m = 0] = hhmm.split(':').map(Number);
+      return h * 60 + m;
+    };
+    const end = minutes(c.world.weather.rainStart.window[1]) - minutes(c.world.startClock);
+    const K = c.tuning.fog.stepTicks;
+    const fog = project(c, Math.ceil((end + 1) / K) * K, () => undefined);
     expect(fog.cases.every((fc) => fc.weather !== 'dry')).toBe(true);
     for (const fc of fog.cases) expect(fc.q.facts['rainStarted']).toBe(1_000_000);
     for (const fc of fog.cases)
