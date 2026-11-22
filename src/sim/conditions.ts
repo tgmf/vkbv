@@ -169,8 +169,9 @@ function fogLeaf(ctx: Ctx, fog: FogReader, cond: Leaf, scope: Scope): number {
     return ppmOf(leaf(ctx, cond, scope));
   }
   if ('countCats' in cond) return countCatsChance(ctx, fog, cond);
-  if ('near' in cond) {
+  if ('near' in cond && Array.isArray(cond.near)) {
     // two references, each a place, a live cat or a fogged cat's positions with their mass
+    // (`power` and `pin` leaves also have `near`: one cat, read below as in the lantern)
     const a = positions(ctx, fog, scope, cond.near[0]);
     const b = positions(ctx, fog, scope, cond.near[1]);
     let sum = 0;

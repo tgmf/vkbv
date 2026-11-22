@@ -352,6 +352,12 @@ describe('Chapter 1 with pins (03 §18)', () => {
     for (const fc of fog.cases)
       fired = Math.max(fired, ...pins.map((p) => fc.q.pins[p.id]?.fired ?? 0));
     expect(fired).toBe(1_000_000);
+    // the lure at 445 brings the fogged Marti to the door; its gate { power: lure, near: @marti }
+    // opens door_lure's choice and the walk out can follow
+    const share = (get: (fc: FogCase) => number) =>
+      fog.cases.reduce((a, fc) => a + Math.trunc((get(fc) * fc.weight) / WAVE_TOTAL), 0);
+    expect(share((fc) => fc.q.storylets['door_lure']?.p['home'] ?? 0)).toBeLessThan(500_000);
+    expect(share((fc) => fc.q.facts['martiOut'] ?? 0)).toBeGreaterThan(0);
     const json = JSON.stringify(fog);
     expect(JSON.parse(json)).toEqual(fog);
     JSON.parse(json, (_k, v: unknown) => {
