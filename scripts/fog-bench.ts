@@ -2,9 +2,11 @@
 //   npx tsx scripts/fog-bench.ts [seed]          whole-day projection, every cat fogged
 //   npx tsx scripts/fog-bench.ts [seed] --live   Marti live (lantern `step`), the others fogged:
 //                                                 the re-run workload; also times 08:00-12:00
+//   --pinset <name>                              a pin set of 05 §5.1 (projection only, for now)
 // Knob overrides for measuring: FOG=minStatePpm,bands; WHOLE=1 for whole-band boredom
 import { CHAPTER1_FILES, TUNING_FILE } from '../src/content/chapter1';
-import { loadChapter, loadTuning } from '../src/content/load';
+import pinsets from '../src/content/data/pinsets.json';
+import { loadChapter, loadTuning, parsePinSets } from '../src/content/load';
 import { fogSetup, fogStep, initialFog, type Fog } from '../src/sim/fog';
 import { initialState, uniformStreams } from '../src/sim/history';
 import { sample } from '../src/sim/math';
@@ -21,6 +23,12 @@ if (process.env['WHOLE'] === '1') tuning.fog.boredomWhole = true; // docs/questi
 const c = loadChapter(CHAPTER1_FILES, tuning);
 const seed = Number(process.argv[2] ?? 1);
 const live = process.argv.includes('--live') ? ['marti'] : [];
+const setName = process.argv[process.argv.indexOf('--pinset') + 1];
+const pins = process.argv.includes('--pinset')
+  ? (parsePinSets(pinsets, c)[setName ?? ''] ?? [])
+  : [];
+if (pins.length > 0 && live.length > 0)
+  throw new Error('--pinset runs a projection only (M2 step 6)');
 const K = c.tuning.fog.stepTicks;
 
 const t0 = performance.now();
@@ -71,7 +79,7 @@ while (fog.tick < c.world.ticks) {
     s = r.state;
     lanternMs += performance.now() - tickStart;
     if (fog.tick + K <= s.tick) fog = fogStep(setup, fog, held, false, s);
-  } else fog = fogStep(setup, fog);
+  } else fog = fogStep(setup, fog, undefined, true, null, pins);
   const now = live.length > 0 ? s.tick : fog.tick;
   if (now > from && now <= to) windowMs += performance.now() - tickStart;
   maxStates = Math.max(maxStates, states(fog));
@@ -83,7 +91,7 @@ while (fog.tick < c.world.ticks) {
 const total = performance.now() - t1;
 const { calls, hits } = setup.decisions;
 console.log(
-  `${live.length > 0 ? 'Marti live' : 'all fogged'}; knobs ${c.tuning.fog.minStatePpm}/${c.tuning.fog.bands}${c.tuning.fog.boredomWhole ? ' whole' : ''}; ` +
+  `${live.length > 0 ? 'Marti live' : 'all fogged'}${setName && pins.length > 0 ? ` (${setName})` : ''}; knobs ${c.tuning.fog.minStatePpm}/${c.tuning.fog.bands}${c.tuning.fog.boredomWhole ? ' whole' : ''}; ` +
     `setup ${Math.round(t1 - t0)} ms; day ${Math.round(total)} ms` +
     (live.length > 0 ? ` (lantern ${Math.round(lanternMs)} ms)` : '') +
     `; 08:00-12:00 ${Math.round(windowMs)} ms = ${Math.round(((to - from) * 1000) / Math.max(1, windowMs))} ticks/s; ` +

@@ -245,4 +245,28 @@ Options seen: (2) remove the knob, or keep it as play's speed; (3) update M5 whe
 Chosen for now: the knob stays unused; M5 is unchanged until you say.
 Answer: Tagir, 2026-11-22: (1) Tagir copies the row; (2) remove `player.playSpeedsTps` (done); (3) M5 corrected now; "jump to the edge" kept as a playtest option behind `flags.jumpToEdge`, off by default.
 
+## M2-10 — Offers that exist with a probability below 1 in the fog            (status: open)
+Where: `src/sim/fog.ts` (`caseCtx`, `// QUESTION(M2-10)`); `03` §13.6 ("`attract` and `repel` add offers to the decision function")
+Question: In the fog a running effect from a pin exists with the probability that the pin fired. Places and
+powers always fire, but an object pin fires with P(the object is visible), and a pin on a cat puts its
+effect where the cat might stand. How should the shared decision function see an offer that exists with
+P < 1?
+Options seen: (a) the offer counts when its P reaches `fog.gateThresholdPpm`, like a gate; (b) the deciding
+mass splits by P: that share decides with the offer, the rest without it (two decisions per state while
+such an effect runs).
+Chosen for now: (a). No Chapter 1 pin set has such an effect (the lure and the place cards fire for sure),
+so calibration does not depend on the choice.
+Answer:
+
+## M2-11 — Promoting a lasting effect to a link            (status: open)
+Where: `03` §13.5 ("promoted to a link if a slot is free"), knob `fog.linkFloorPpm`
+Question: A fact, flag or `heard` that something reads becomes a link once its probability passes
+`fog.linkFloorPpm`, if a link slot is free. In Chapter 1 both `fog.maxLinks` slots (2) are taken at load by
+`crewArrived` and `martiOut`, so promotion can never happen. Build it now?
+Options seen: (a) build it now: needs link kinds for flags (with their `until`) and `heard`, besides facts
+and storylet states, and a per-fog link list instead of the one fixed at load; (b) build it when a chapter
+has a free slot.
+Chosen for now: (b). Contributor heaps are built (they also serve links on demand, `03` §15.3, M3).
+Answer:
+
 <!-- Gate notes and answers go above this line. -->

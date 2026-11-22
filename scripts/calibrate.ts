@@ -1,17 +1,20 @@
 // Calibration (07 §3): the fog's predicted probability of each event against how often it happens
 // in the reference simulation, bucket by bucket.
-//   npm run calibrate -- [--seeds N] [--quick]       FOG=minStatePpm,bands, WHOLE=1 to override knobs
+//   npm run calibrate -- [--seeds N] [--quick] [--pinset NAME]
+//                                    FOG=minStatePpm,bands, WHOLE=1 to override knobs
 // For each seed: the whole-day projection (no cat live, conditioning off) gives p for each event;
 // one reality, a single history in stream 100000 + seed with the seed's stats, gives the outcome.
-// Pin set `untouched` only, until the fog applies pins on fogged targets (M2 step 4).
+// Both run the pin set (default `untouched`). A projection holds no evidence, so the odds "as seen
+// from" 07 §3's tick (140 for road_both, 20 for untouched) are its odds by the day's end.
 import { parseArgs } from 'node:util';
 import { CHAPTER1_FILES, TUNING_FILE } from '../src/content/chapter1';
-import { loadChapter, loadTuning } from '../src/content/load';
+import pinsets from '../src/content/data/pinsets.json';
+import { loadChapter, loadTuning, parsePinSets } from '../src/content/load';
 import { fogSetup, fogStep, initialFog, WAVE_TOTAL } from '../src/sim/fog';
 import { runHistory } from '../src/sim/history';
 
 const { values } = parseArgs({
-  options: { seeds: { type: 'string' }, quick: { type: 'boolean' } },
+  options: { seeds: { type: 'string' }, quick: { type: 'boolean' }, pinset: { type: 'string' } },
 });
 const tuning = loadTuning(TUNING_FILE);
 const [minState, bands] = (process.env['FOG'] ?? '').split(',').map(Number);
@@ -21,6 +24,9 @@ if (process.env['WHOLE'] === '1') tuning.fog.boredomWhole = true; // docs/questi
 const c = loadChapter(CHAPTER1_FILES, tuning);
 const cal = c.tuning.calibration;
 const seeds = Number(values.seeds ?? (values.quick ? cal.seedsQuick : cal.seeds));
+const setName = values.pinset ?? 'untouched';
+const pins = parsePinSets(pinsets, c)[setName];
+if (!pins) throw new Error(`no pin set ${setName}`);
 const events = [
   'crewArrived',
   'roadBlocked',
@@ -38,8 +44,8 @@ for (let seed = 1; seed <= seeds; seed++) {
     setup,
     c.cats.map((x) => x.id),
   );
-  while (fog.tick < c.world.ticks) fog = fogStep(setup, fog);
-  const reality = runHistory(c, seed, 100_000 + seed);
+  while (fog.tick < c.world.ticks) fog = fogStep(setup, fog, undefined, true, null, pins);
+  const reality = runHistory(c, seed, 100_000 + seed, pins);
   const end = reality.states[reality.states.length - 1];
   for (const event of events) {
     const p = fog.cases.reduce(
@@ -53,7 +59,7 @@ for (let seed = 1; seed <= seeds; seed++) {
 
 const pct = (x: number) => `${(x / 10_000).toFixed(1)}%`.padStart(7);
 console.log(
-  `knobs ${c.tuning.fog.minStatePpm}/${c.tuning.fog.bands}${c.tuning.fog.boredomWhole ? ' whole' : ''}; ${seeds} seeds, ${pairs.length} pairs; ` +
+  `${setName}; knobs ${c.tuning.fog.minStatePpm}/${c.tuning.fog.bands}${c.tuning.fog.boredomWhole ? ' whole' : ''}; ${seeds} seeds, ${pairs.length} pairs; ` +
     `tolerance ${pct(cal.tolerancePpm)}, at least ${cal.minPerBucket} pairs a bucket`,
 );
 console.log('bucket      pairs   mean p  observed   diff');
