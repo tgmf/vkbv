@@ -346,7 +346,7 @@ cat's drives and its boredom.
 A cat's `activities` list (cast.json) names the activities it may choose.
 
 **Decision key.** The canonical JSON of: the cat; its current activity and place; the
-band index (edges at `tuning.fog.bands` equal bands of each gauge's range) of every
+band index (the bands of §13.2, with the saturated top band) of every
 gauge read by the gates and score terms of the current activity and of the candidates,
 `boredom` included; the value of every other condition those gates and score terms
 read (0 or 1 000 000 for live things; for fog quantities, ppm rounded down to a
@@ -733,9 +733,13 @@ interface ChainState {
   count down, in steps (`ceil(ticks / stepTicks)`): walking uses the path of §3, its
   position interpolated along the path as in §3; interrupts and `delay` spread their
   sampled duration uniformly over `leftSteps`.
-- **Bands.** A gauge that changes during the day (hooks, pressure) is banded:
-  its range is cut into `tuning.fog.bands` equal bands; its value in conditions is the
-  band's midpoint. At most `tuning.fog.maxBandedGauges` gauges per cat are banded:
+- **Bands.** A gauge that changes during the day (hooks, pressure) is banded: its range
+  is cut into `tuning.fog.bands` bands, `n − 1` equal bands from the gauge's floor up to
+  `tuning.fog.saturatedBandFrom` (950) and one narrow **saturated band** from there to
+  1 000; its value in conditions is the band's own midpoint, so a gauge at its cap reads
+  about 975 (decided 2026-11-22, `docs/questions.md` M2-7). A change of `add` walks the
+  mass across each whole band it covers, then moves `trunc(rest × 1 000 000 / width)` ppm
+  of it one band further, using each band's own width. At most `tuning.fog.maxBandedGauges` gauges per cat are banded:
   those read by the scores or gates of the cat's activities and of storylets it can
   hold a role in, in hooks.json order. Boredom is banded in addition and does not count
   toward that limit. The cat's other changing gauges and all traits

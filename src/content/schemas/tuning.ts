@@ -26,6 +26,11 @@ export const TuningSchema = z.strictObject({
     boredomWhole: bool(
       'Fog boredom moves whole bands: each chain state carries its exact boredom, so no mass splits (docs/questions.md M2-7; off = 03 §13.2 as written)',
     ),
+    saturatedBandFrom: int(
+      'Banded gauges: n − 1 equal bands below this value, one saturated band from it to 1 000 (03 §13.2)',
+    )
+      .min(1)
+      .max(1000),
     ppmQuantum: int(
       'Fog probabilities in decision keys and fog decisions are rounded down to this (03 §8.2)',
     ).min(1),

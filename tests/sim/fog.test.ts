@@ -1,6 +1,6 @@
 // The fog's cat chains (03 §13.2, §13.3, §18).
 import { describe, expect, it } from 'vitest';
-import { choices } from '../../src/sim/cats';
+import { bandEdges, bandWidthOf, BOREDOM, choices } from '../../src/sim/cats';
 import {
   bandMid,
   bandOf,
@@ -117,8 +117,9 @@ describe('chains', () => {
 
 describe('bands (03 §13.2)', () => {
   it('a hook rule moves trunc(add × 1e6 / bandWidth) ppm to the next band', () => {
-    // Tiny world: hooks floor 20, 4 bands of width trunc(981 / 4) = 245. boxPull rises 10 per tick
-    // while the cat stands at a box; over a 5-tick step that is 50, so 204 081 ppm move up a band.
+    // Tiny world: hooks floor 20, 4 bands: 3 equal ones up to fog.saturatedBandFrom (950), edges
+    // 20 / 330 / 640 / 950, and a saturated band 950-1000. boxPull rises 10 per tick while the cat
+    // stands at a box; over a 5-tick step that is 50, so trunc(50e6 / 310) = 161 290 ppm move up.
     const setup = fogSetup(tiny, 1);
     expect(setup.banded['hero']).toContain('boxPull');
     const fog = initialFog(setup, ['hero']);
@@ -142,14 +143,23 @@ describe('bands (03 §13.2)', () => {
         p: 1_000_000,
       },
     ];
-    // The step covers ticks 1-5: the rise adds 50, so 204 081 ppm move up a band. Then the decay
-    // (−1 every 3 ticks: tick 3) moves trunc(1e6 / 245) = 4 081 ppm of that band back down.
+    // The step covers ticks 1-5: the rise adds 50, so 161 290 ppm move up a band. Then the decay
+    // (−1 every 3 ticks: tick 3) moves trunc(1e6 / 310) = 3 225 ppm of that band back down.
     const next = fogStep(setup, { tick: 1, cases: [fc] });
     const up = next.cases[0]?.cats['hero']?.chain.filter((e) => e.s.bands['boxPull'] === b + 1);
     expect(up?.reduce((a, e) => a + e.p, 0)).toBe(
-      Math.trunc((204_081 * (1_000_000 - 4_081)) / 1_000_000),
+      Math.trunc((161_290 * (1_000_000 - 3_225)) / 1_000_000),
     );
-    expect(bandMid(tiny, b)).toBe(20 + Math.trunc(981 / 8));
+    expect(bandMid(tiny, b)).toBe(Math.trunc((20 + 330 - 1) / 2));
+  });
+
+  it('the saturated top band: narrow, at the cap, read at its own midpoint (03 §13.2)', () => {
+    expect(bandEdges(tiny, 'boxPull')).toEqual([20, 330, 640, 950, 1001]);
+    expect(bandEdges(tiny, BOREDOM)).toEqual([0, 316, 633, 950, 1001]);
+    expect(bandOf(tiny, 949)).toBe(2);
+    expect(bandOf(tiny, 950)).toBe(3);
+    expect(bandMid(tiny, 3)).toBe(975); // a tired cat in the fog reads about the cap
+    expect(bandWidthOf(tiny, BOREDOM, 3)).toBe(51);
   });
 });
 

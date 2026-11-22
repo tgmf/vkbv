@@ -443,9 +443,38 @@ export const BOREDOM = '$boredom';
 
 /** The band of a gauge value: `fog.bands` equal bands of its range (03 §8.2, §13.2). */
 export function gaugeBand(c: Content, gauge: string, v: number): number {
+  const edges = bandEdges(c, gauge);
+  let b = 0;
+  while (b + 1 < c.tuning.fog.bands && v >= (edges[b + 1] ?? 1001)) b++;
+  return b;
+}
+
+/**
+ * The lower edges of a gauge's bands, plus 1 001 at the end (03 §13.2): n − 1 equal bands from the
+ * gauge's floor (0 for boredom and traits, the hooks floor for hooks) up to
+ * `fog.saturatedBandFrom`, and one narrow saturated band from there to the cap.
+ */
+export function bandEdges(c: Content, gauge: string): number[] {
   const floor = gauge === BOREDOM || TRAITS.includes(gauge) ? 0 : c.hooksFloor;
-  const span = 1001 - floor;
-  return Math.min(c.tuning.fog.bands - 1, Math.trunc(((v - floor) * c.tuning.fog.bands) / span));
+  const n = c.tuning.fog.bands;
+  if (n === 1) return [floor, 1001];
+  const sat = c.tuning.fog.saturatedBandFrom;
+  const edges: number[] = [];
+  for (let b = 0; b < n; b++) edges.push(floor + Math.trunc((b * (sat - floor)) / (n - 1)));
+  edges.push(1001);
+  return edges;
+}
+
+/** A band's midpoint, where the fog reads a banded gauge (03 §13.2). */
+export function bandMidOf(c: Content, gauge: string, b: number): number {
+  const edges = bandEdges(c, gauge);
+  return Math.trunc(((edges[b] ?? 0) + (edges[b + 1] ?? 1001) - 1) / 2);
+}
+
+/** A band's width in gauge units. */
+export function bandWidthOf(c: Content, gauge: string, b: number): number {
+  const edges = bandEdges(c, gauge);
+  return (edges[b + 1] ?? 1001) - (edges[b] ?? 0);
 }
 
 /** Running attract/repel effects that reach the cat now: its offers (03 §9.3). */

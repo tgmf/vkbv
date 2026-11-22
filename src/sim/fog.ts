@@ -3,6 +3,8 @@ import type { StoryletDef } from '../content/schemas/chapter';
 import type { Condition, Effect, Score } from '../content/schemas/dsl';
 import {
   BOREDOM,
+  bandMidOf,
+  bandWidthOf,
   boredomRate,
   choices,
   clampBase,
@@ -212,21 +214,15 @@ export function fogSetup(c: Content, seed: number): FogSetup {
 
 // --- bands --------------------------------------------------------------------------------------
 
-const span = (c: Content) => 1001 - c.hooksFloor;
-/** The width of one band of a gauge's range (boredom and traits start at 0, hooks at the floor). */
-const widthOf = (c: Content, g: string): number =>
-  Math.trunc((g === BOREDOM ? 1001 : span(c)) / c.tuning.fog.bands);
-/** The midpoint of band b of a gauge (03 §13.2). */
-const midOf = (c: Content, g: string, b: number): number =>
-  g === BOREDOM ? Math.trunc(((2 * b + 1) * 1001) / (2 * c.tuning.fog.bands)) : bandMid(c, b);
-export const bandOf = (c: Content, v: number): number =>
-  Math.min(c.tuning.fog.bands - 1, Math.trunc(((v - c.hooksFloor) * c.tuning.fog.bands) / span(c)));
-export const bandMid = (c: Content, b: number): number =>
-  c.hooksFloor + Math.trunc(((2 * b + 1) * span(c)) / (2 * c.tuning.fog.bands));
+/** The band of a hook value (03 §13.2: equal bands up to `fog.saturatedBandFrom`, then one more). */
+export const bandOf = (c: Content, v: number): number => gaugeBand(c, '', v);
+/** The midpoint of a hook band. */
+export const bandMid = (c: Content, b: number): number => bandMidOf(c, '', b);
 
 /**
- * A gauge change of `add` on one state (03 §13.2): `trunc(|add| × 1e6 / bandWidth)` ppm of the mass,
- * scaled by `ppm`, moves toward `limit` (whole bands first, then the fraction).
+ * A gauge change of `add` on one state (03 §13.2), scaled by `ppm`: the mass walks toward `limit`,
+ * crossing each whole band whose width the change covers, then `trunc(rest × 1e6 / width)` ppm of
+ * it moves one band further. Bands may differ in width (the saturated top band is narrow).
  */
 function bandMove(
   c: Content,
@@ -242,17 +238,23 @@ function bandMove(
   const dir = add > 0 ? 1 : -1;
   const lim = limit ?? (dir > 0 ? c.tuning.fog.bands - 1 : 0);
   if ((dir > 0 && b >= lim) || (dir < 0 && b <= lim)) return [e];
-  const frac = times(Math.trunc((Math.abs(add) * PPM) / widthOf(c, g)), ppm);
-  const whole = Math.trunc(frac / PPM);
-  const rem = frac % PPM;
-  const to = (n: number) => (dir > 0 ? Math.min(lim, b + n) : Math.max(lim, b - n));
-  const at = (n: number, p: number): Entry => ({
-    s: { ...e.s, bands: { ...e.s.bands, [g]: to(n) } },
+  const top = c.tuning.fog.bands - 1;
+  const width = (x: number) => bandWidthOf(c, g, Math.min(top, x)); // a virtual band past the top is as wide as the top
+  let rest = Math.abs(add) * ppm; // gauge units in millionths
+  let cur = b;
+  while (cur !== lim && rest >= width(cur) * PPM) {
+    rest -= width(cur) * PPM;
+    cur += dir;
+  }
+  const at = (to: number, p: number): Entry => ({
+    s: { ...e.s, bands: { ...e.s.bands, [g]: to } },
     p,
-    ...((e.d === true || (mark && n > 0)) && { d: true }),
+    ...((e.d === true || (mark && to !== b)) && { d: true }),
   });
-  const stay = times(e.p, PPM - rem);
-  return rem > 0 ? [at(whole, stay), at(whole + 1, e.p - stay)] : [at(whole, e.p)];
+  if (cur === lim) return [at(cur, e.p)];
+  const frac = Math.min(PPM, Math.trunc(rest / width(cur)));
+  const stay = times(e.p, PPM - frac);
+  return frac > 0 ? [at(cur, stay), at(cur + dir, e.p - stay)] : [at(cur, e.p)];
 }
 
 /** A gauge set to `v` on a fraction `ppm` of one state's mass. */
@@ -324,7 +326,7 @@ export function standIn(
     pos,
     route,
     activity: s.activity,
-    boredom: s.bored ?? midOf(c, BOREDOM, s.bands[BOREDOM] ?? 0),
+    boredom: s.bored ?? bandMidOf(c, BOREDOM, s.bands[BOREDOM] ?? 0),
     forcedLeft: 0,
     lastKey: -1,
     activityStart: 0,

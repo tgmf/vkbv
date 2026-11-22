@@ -11,6 +11,7 @@
     "stepTicks": 5,
     "minStatePpm": 100,
     "bands": 4,
+    "saturatedBandFrom": 950,
     "ppmQuantum": 50000,
     "boredomWhole": false,
     "maxBandedGauges": 3,
