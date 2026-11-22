@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addCounter,
   addFactChance,
+  contribute,
   counterOf,
   clearFlag,
   flagChance,
@@ -13,7 +14,66 @@ import {
 } from '../../src/sim/fog-quantities';
 import { fogSetup, fogStep, initialFog, linkKey, WAVE_TOTAL, type Fog } from '../../src/sim/fog';
 import { runHistory } from '../../src/sim/history';
-import { ch1, ch1Coarse, tiny } from './helpers';
+import { cardPin, ch1, ch1Coarse, tiny } from './helpers';
+
+describe('contributor heaps (03 §13.5)', () => {
+  const a = { source: 'sl:s.x', cats: ['pal'], place: 'street.b' };
+  const b = { source: 'act:work', cats: ['bystander'], place: 'street.c' };
+  const d = { source: 'ev:shout', cats: ['pal'], place: 'street.a' };
+
+  it('lists each source once, widening its window; keeps the top N by ppm, ties by source', () => {
+    const q = initialQuantities(tiny);
+    contribute(q, 'fact:f', a, 10, 200_000, 2);
+    contribute(q, 'fact:f', b, 12, 300_000, 2);
+    contribute(q, 'fact:f', a, 15, 200_000, 2);
+    expect(q.heaps['fact:f']).toEqual([
+      { ...a, from: 10, to: 15, ppm: or(200_000, 200_000) },
+      { ...b, from: 12, to: 12, ppm: 300_000 },
+    ]);
+    contribute(q, 'fact:f', d, 16, 300_000, 2); // ties with b: the smaller source key stays
+    expect(q.heaps['fact:f']?.map((x) => x.source)).toEqual(['sl:s.x', 'act:work']);
+    contribute(q, 'fact:f', b, 17, 900_000, 2, 'max');
+    expect(q.heaps['fact:f']?.[0]).toEqual({ ...b, from: 12, to: 17, ppm: 900_000 });
+  });
+
+  it('merging cases mixes each source by weight', () => {
+    const x = initialQuantities(tiny);
+    const y = initialQuantities(tiny);
+    contribute(x, 'heard:hero:shout', a, 10, 400_000, 4);
+    contribute(y, 'heard:hero:shout', a, 20, 800_000, 4);
+    contribute(y, 'heard:hero:shout', b, 21, 100_000, 4);
+    const m = mixQuantities(tiny, [
+      { w: 3, q: x },
+      { w: 1, q: y },
+    ]);
+    expect(m.heaps['heard:hero:shout']).toEqual([
+      { ...a, from: 10, to: 20, ppm: 500_000 },
+      { ...b, from: 21, to: 21, ppm: 25_000 },
+    ]);
+  });
+
+  it('the fog records pins, perception and storylet effects as sources', () => {
+    const setup = fogSetup(tiny, 1);
+    const pin = cardPin('mark', { place: 'street.b' }, 2);
+    let fog = initialFog(setup, ['hero', 'pal', 'bystander']);
+    for (let i = 0; i < 8; i++) fog = fogStep(setup, fog, undefined, true, null, [pin]);
+    const heaps = fog.cases[0]?.q.heaps ?? {};
+    expect(heaps['flag:marked@street.b']).toEqual([
+      { source: `pin:${pin.id}`, cats: [], place: 'street.b', from: 2, to: 2, ppm: 1_000_000 },
+    ]);
+    // shift.chosen sets busy@<boss's node> for pal; its entering events are heard
+    expect(heaps['flag:busy@street.c']?.[0]).toMatchObject({
+      source: 'sl:shift.chosen',
+      cats: ['pal', 'bystander'], // the roles' cats, each once
+    });
+    expect(heaps['heard:pal:storylet:shift.chosen']?.[0]).toMatchObject({
+      source: 'ev:storylet:shift.chosen',
+      cats: ['pal'],
+    });
+    for (const list of Object.values(heaps))
+      expect(list.length).toBeLessThanOrEqual(tiny.tuning.fog.contributors);
+  });
+});
 
 describe('fog quantities (03 §13.6)', () => {
   it('a once-storylet state adds its disjoint entering masses; other sources combine as independent', () => {

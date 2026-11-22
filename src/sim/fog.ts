@@ -20,6 +20,7 @@ import { cats as catsOf, chance, flagKey } from './conditions';
 import {
   addCounter,
   addFactChance,
+  contribute,
   raiseFactPart,
   setFact,
   addHeard,
@@ -742,7 +743,7 @@ function nodeMass(setup: FogSetup, cc: CaseCtx, id: CatId): [NodeId, number][] {
  * World effects with probability `m` (03 §13.6): facts and flags gain `m`, counters a Bernoulli term,
  * events `m` at their place, triggers activate with `m`; effects on fogged cats are queued for the
  * chains. `here` is where `self` stands (an activity's own state). Effects on live cats are left to
- * the lantern (decisions.md, M2).
+ * the lantern (decisions.md, M2). Facts and flags record `by` in their contributor heaps (03 §13.5).
  */
 function fogEffects(
   setup: FogSetup,
@@ -752,12 +753,18 @@ function fogEffects(
   scope: Scope,
   m: number,
   sink: Sink,
-  here: NodeId | null = null,
-  source = '',
-  via: Via | null = null,
+  here: NodeId | null,
+  source: string,
+  via: Via | null,
+  by: { source: string; cats: CatId[] },
 ): void {
   const { c } = setup;
   const ctx = cc.ctx;
+  const size = c.tuning.fog.contributors;
+  // where the effect happens, for the heap: the activity's place, or where its cat most likely is
+  const who = scope.self ?? scope.origin;
+  const likely = who ? (ctx.fog?.likely(who) ?? ctx.s.cats[who]) : undefined;
+  const place = here ?? (likely ? catNode(likely) : null);
   const fogged = (id: CatId) => cc.standIns[id] !== undefined;
   const atSelf = (id: CatId | null | undefined): [NodeId, number][] =>
     !id ? [] : id === scope.self && here !== null ? [[here, PPM]] : nodeMass(setup, cc, id);
@@ -808,12 +815,16 @@ function fogEffects(
       for (const [node, p] of nodes) {
         const key = flagKey(e.flag, node);
         if (value === 0) clearFlag(q, key, times(mass, p));
-        else setFlag(q, key, times(mass, p), e.ttl === undefined ? null : ctx.t + e.ttl);
+        else {
+          setFlag(q, key, times(mass, p), e.ttl === undefined ? null : ctx.t + e.ttl);
+          contribute(q, `flag:${key}`, { ...by, place: node }, ctx.t, times(mass, p), size);
+        }
       }
     } else if ('counter' in e) {
       addCounter(q, e.counter, e.add, mass);
     } else if ('fact' in e) {
       addFactChance(q, e.fact, mass, source);
+      contribute(q, `fact:${e.fact}`, { ...by, place }, ctx.t, mass, size);
     } else {
       const never: never = e;
       throw new Error(`unknown effect ${JSON.stringify(never)}`);
@@ -1259,6 +1270,8 @@ function pinPrims(
         for (const [node, pp] of where) {
           const key = p.at === '$target' ? `${p.flag}@${node}` : p.flag;
           setFlag(q, key, times(m, pp), p.ticks === undefined ? null : u + p.ticks);
+          const by = { source: `pin:${pin.id}`, cats: cat ? [cat] : [], place: node };
+          contribute(q, `flag:${key}`, by, u, times(m, pp), c.tuning.fog.contributors);
           if (p.ticks !== undefined) effect('flag', node, pp, { left: p.ticks });
         }
         break;
@@ -1348,7 +1361,13 @@ function enterMass(
   const onEnter = need(def.states, state, 'storylet state').onEnter ?? [];
   // a once-storylet enters a state by disjoint masses, so its facts add up (03 §13.6)
   const source = def.once ? `sl:${def.id}.${state}` : '';
-  fogEffects(setup, cc, q, onEnter, scope, m, sink, null, source, via);
+  const by = {
+    source: `sl:${def.id}.${state}`,
+    cats: Object.values(roles)
+      .flat()
+      .filter((x, i, all) => all.indexOf(x) === i),
+  };
+  fogEffects(setup, cc, q, onEnter, scope, m, sink, null, source, via, by);
   for (const [node, p] of nodeMass(setup, cc, scope.origin ?? ''))
     sink.events.push({
       name: `storylet:${def.id}.${state}`,
@@ -1696,7 +1715,11 @@ function catStep(
         } else if ('counter' in w) {
           const k = `${w.counter}|${w.add * n}`;
           counted[k] = (counted[k] ?? 0) + first.p;
-        } else fogEffects(setup, cc, q, [w], scope, first.p, sink, s0.place);
+        } else
+          fogEffects(setup, cc, q, [w], scope, first.p, sink, s0.place, '', null, {
+            source: `act:${s0.activity}`,
+            cats: [id],
+          });
       }
       const rate = boredomRate(c, s0.activity) * K;
       const storylet = s0.control === 'storylet' && s0.activity !== 'goTo';
@@ -1781,7 +1804,11 @@ function catStep(
             leaving = leaving.flatMap((x) =>
               f.set !== undefined ? bandSet(c, x, g, f.set, pm) : bandMove(c, x, g, f.add ?? 0, pm),
             );
-          } else fogEffects(setup, cc, q, [f], scope, moving, sink, s.place);
+          } else
+            fogEffects(setup, cc, q, [f], scope, moving, sink, s.place, '', null, {
+              source: `act:${s.activity}`,
+              cats: [id],
+            });
         }
         const fin = (sink.finished[id] ??= {});
         fin[s.activity] = (fin[s.activity] ?? 0) + moving;
@@ -1819,8 +1846,9 @@ function catStep(
  * `factIfPerceivedBy`, through the place perception table. A cat hearing a socialSpread event for
  * the first time re-emits it next step from where it stands, while hops are left (03 §9.3).
  */
-function perceive(setup: FogSetup, fc: FogCase, events: readonly FogEvent[]): void {
+function perceive(setup: FogSetup, fc: FogCase, events: readonly FogEvent[], t: number): void {
   const { c, table } = setup;
+  const size = c.tuning.fog.contributors;
   const weather = fc.weather === 'rain' ? 'rain' : 'dry';
   const index = (n: NodeId) => setup.nodeIndex[n] ?? -1;
   for (const def of c.cats) {
@@ -1854,6 +1882,9 @@ function perceive(setup: FogSetup, fc: FogCase, events: readonly FogEvent[]): vo
       if (m === 0) continue;
       const before = fc.q.heard[def.id]?.[ev.name] ?? 0;
       addHeard(fc.q, def.id, ev.name, m);
+      // heard from whoever emitted it, where (03 §13.5)
+      const by = { source: `ev:${ev.name}`, cats: ev.source ? [ev.source] : [], place: ev.node };
+      contribute(fc.q, `heard:${def.id}:${ev.name}`, by, t, m, size);
       const first = (fc.q.heard[def.id]?.[ev.name] ?? 0) - before;
       if (ev.hops > 0 && first > 0)
         for (const [n, mass] of byNode) {
@@ -1866,7 +1897,10 @@ function perceive(setup: FogSetup, fc: FogCase, events: readonly FogEvent[]): vo
             ];
         }
       const fact = ev.factIfPerceivedBy?.[def.id];
-      if (fact) addFactChance(fc.q, fact, m);
+      if (fact) {
+        addFactChance(fc.q, fact, m);
+        contribute(fc.q, `fact:${fact}`, { ...by, cats: [...by.cats, def.id] }, t, m, size);
+      }
       for (const h of c.hooks) {
         if (!(h.id in def.hooks)) continue;
         for (const r of h.rise) {
@@ -1907,6 +1941,8 @@ function detectorsStep(
     q.detectors[id] = best;
     const est = best.reduce((a, x) => times(a, x), PPM);
     raiseFactPart(q, d.emits, `det:${id}`, est);
+    const by = { source: `det:${id}`, cats: detectorCats(c, d), place: null };
+    contribute(q, `fact:${d.emits}`, by, cc.ctx.t, est, c.tuning.fog.contributors, 'max');
   }
 }
 
@@ -2020,7 +2056,7 @@ function finishStep(setup: FogSetup, cc: CaseCtx, fc: FogCase, sink: Sink): FogC
     const cat = fc.cats[def.id];
     if (cat) fc.cats[def.id] = { chain: normalise(c, cat.chain), mean: cat.mean, conds: cat.conds };
   }
-  perceive(setup, fc, sink.events);
+  perceive(setup, fc, sink.events, cc.ctx.t);
   detectorsStep(setup, cc, fc.q, sink.events);
   return fc;
 }
@@ -2052,6 +2088,7 @@ function cloneQ(q: Quantities): Quantities {
     effects: [...q.effects],
     echoes: [...q.echoes],
     mods: [...q.mods],
+    heaps: { ...q.heaps },
   };
 }
 

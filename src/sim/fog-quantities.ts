@@ -33,6 +33,20 @@ export interface FogMod {
   hold: boolean;
 }
 
+/** What set a fact, flag or `heard` (03 §13.5): a storylet state or effect, its cats, where. */
+export interface Source {
+  source: string; // `sl:<storylet>.<state>`, `act:<activity>`, `pin:<id>`, `ev:<event>`, `det:<id>`
+  cats: CatId[];
+  place: string | null;
+}
+
+/** One entry of a contributor heap: a source, the ticks it contributed in, and the ppm it added. */
+export interface Contributor extends Source {
+  from: number;
+  to: number;
+  ppm: number;
+}
+
 export interface Quantities {
   facts: Record<string, number>; // P(set by now): its parts combined as independent
   /** A fact's sources: '' for independent contributions; a storylet state's entering masses add. */
@@ -48,6 +62,8 @@ export interface Quantities {
   effects: FogEffect[]; // in creation order
   echoes: FogEvent[]; // socialSpread hops to emit at the next step (03 §9.3)
   mods: FogMod[]; // in creation order
+  /** Per `fact:<f>`, `flag:<key>` and `heard:<cat>:<event>`: its top sources (03 §13.5). */
+  heaps: Record<string, Contributor[]>;
 }
 
 /** An event emitted in the fog this step: P(emitted at that node). */
@@ -91,6 +107,7 @@ export function initialQuantities(c: Content): Quantities {
     effects: [],
     echoes: [],
     mods: [],
+    heaps: {},
   };
 }
 
@@ -198,6 +215,7 @@ export function mixQuantities(
     effects: [],
     echoes: [],
     mods: [],
+    heaps: {},
   };
   for (const k of keys((q) => q.facts)) out.facts[k] = avg((q) => q.facts[k] ?? 0);
   for (const k of keys((q) => q.factParts)) {
@@ -284,12 +302,65 @@ export function mixQuantities(
     (x) => x.p,
     (x, p) => ({ ...x, p }),
   );
+  for (const k of keys((q) => q.heaps)) {
+    const merged: Contributor[] = [];
+    for (const x of parts)
+      for (const e of x.q.heaps[k] ?? []) {
+        const id = sourceKey(e);
+        if (merged.some((y) => sourceKey(y) === id)) continue;
+        const same = parts.flatMap((y) => y.q.heaps[k]?.filter((z) => sourceKey(z) === id) ?? []);
+        merged.push({
+          source: e.source,
+          cats: e.cats,
+          place: e.place,
+          from: Math.min(...same.map((z) => z.from)),
+          to: Math.max(...same.map((z) => z.to)),
+          ppm: avg((q) => q.heaps[k]?.find((z) => sourceKey(z) === id)?.ppm ?? 0),
+        });
+      }
+    out.heaps[k] = topSources(merged, c.tuning.fog.contributors);
+  }
   out.mods = mixList(
     (q) => q.mods,
     (x) => x.mass,
     (x, mass) => ({ ...x, mass }),
   );
   return out;
+}
+
+const sourceKey = (x: Source): string => JSON.stringify([x.source, x.cats, x.place]);
+
+/** The `size` largest contributors by ppm, ties by source (03 §13.5). */
+function topSources(list: Contributor[], size: number): Contributor[] {
+  const keyed = list.map((x) => ({ x, k: sourceKey(x) }));
+  keyed.sort((a, b) => b.x.ppm - a.x.ppm || (a.k < b.k ? -1 : a.k > b.k ? 1 : 0));
+  return keyed.slice(0, size).map((y) => y.x);
+}
+
+/**
+ * Records that `by` added `m` ppm to quantity `key` at tick t, in its contributor heap of `size`
+ * (03 §13.5): the same source widens its window and combines as independent (`'or'`), or keeps its
+ * highest estimate (`'max'`, a detector's).
+ */
+export function contribute(
+  q: Quantities,
+  key: string,
+  by: Source,
+  t: number,
+  m: number,
+  size: number,
+  combine: 'or' | 'max' = 'or',
+): void {
+  if (m <= 0 || size <= 0) return;
+  const id = sourceKey(by);
+  const list = [...(q.heaps[key] ?? [])];
+  const i = list.findIndex((x) => sourceKey(x) === id);
+  const was = list[i];
+  if (was)
+    list[i] = { ...was, to: t, ppm: combine === 'or' ? or(was.ppm, m) : Math.max(was.ppm, m) };
+  else
+    list.push({ source: by.source, cats: [...by.cats], place: by.place, from: t, to: t, ppm: m });
+  q.heaps[key] = topSources(list, size);
 }
 
 /** Scales a distribution to sum to 1 000 000; the remainder goes to the first key. */
