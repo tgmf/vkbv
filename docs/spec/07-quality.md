@@ -64,7 +64,9 @@ that the fog, an approximation, stays close to the reference simulation.
    lantern holds it, otherwise its probability in the fog;
 2. run one **reality**: the reference simulation, a single history (`03` §12.4) in
    stream `100000 + seed`, and record whether each event happened. Its starting stats
-   are the seed's (`03` §5); only its behaviour rolls use that stream.
+   are the seed's (`03` §5), and its weather is the run's: the weather's branch points
+   are drawn as the lantern draws them (scope `s0:branch`), so the run's odds and the
+   reality share the world the run made concrete. Only its other rolls use that stream.
 
 Two checks:
 
@@ -74,7 +76,8 @@ Two checks:
   single seed's pair says nothing. The full run (`calibration.seeds`) must pass it; the
   quick run prints it (with 60 seeds the sampling error alone is near the tolerance).
 - **Buckets**, fog events only: an event is a fog event in a seed's run when no
-  storylet that sets it (`03` §12.2) ran live in that run's lantern. Group those
+  storylet that sets it (`03` §12.2) has a role for a followed protagonist or ran live
+  in that run's lantern. Group those
   `(p, outcome)` pairs into ten buckets by `p`. For every bucket with at least
   `calibration.minPerBucket` pairs, the mean of `p` and the share of outcomes that
   happened must differ by at most `calibration.tolerancePpm`.

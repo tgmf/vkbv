@@ -1,6 +1,7 @@
 // World quantities in the fog, per case (spec 03 §13.6). Every value is an integer: ppm, or a
 // counter's expected value and variance.
-import { PPM } from './math';
+import { isqrt, PPM } from './math';
+import { PHI } from './phi-table';
 import type { CatId, Content, RunningEffect } from './types';
 
 /** One contribution to a flag: P(it set the flag) and when that setting expires. */
@@ -150,6 +151,47 @@ export function addCounter(q: Quantities, name: string, add: number, m: number):
   q.counters[name] = {
     mean: cur.mean + add * m,
     variance: cur.variance + add * add * times(m, PPM - m),
+  };
+}
+
+/** Φ(k / 100) in ppm for any integer k (the committed table, mirrored, clamped at ±4). */
+const phiAt = (k: number): number =>
+  k >= 0 ? (PHI[Math.min(k, 400)] ?? PPM) : PPM - (PHI[Math.min(-k, 400)] ?? PPM);
+
+/**
+ * Conditions a counter on `X ≥ atLeast` holding (or not), as a race link splits a case (03 §13.5):
+ * the normal's truncated moments, from the PHI table and its differences for the density, integers
+ * only. With β = (atLeast − ½ − μ)/σ and λ the density over the kept tail: above, μ + σλ and
+ * σ²(1 + βλ − λ²); below, μ − σλ and σ²(1 − βλ − λ²). A kept tail under 0.1% pins the counter at
+ * the threshold.
+ */
+export function conditionCounter(
+  q: Quantities,
+  name: string,
+  atLeast: number,
+  holds: boolean,
+): void {
+  const cur = q.counters[name];
+  if (!cur) return;
+  const sdK = isqrt(cur.variance); // σ in thousandths of a unit (variance is units² × 1e6)
+  const edge = atLeast * PPM - PPM / 2; // X ≥ atLeast ⇔ X > atLeast − ½
+  if (sdK === 0) return; // an exact value is already on its side
+  const k = Math.max(-400, Math.min(400, Math.trunc((edge - cur.mean) / (sdK * 10)))); // β × 100
+  const below = phiAt(k);
+  const tail = holds ? PPM - below : below;
+  if (tail < 1000) {
+    q.counters[name] = { mean: holds ? atLeast * PPM : (atLeast - 1) * PPM, variance: 0 };
+    return;
+  }
+  const density = (phiAt(k + 1) - phiAt(k - 1)) * 50; // φ(β) in ppm
+  const lam = Math.trunc((density * PPM) / tail); // λ in ppm
+  const shift = Math.trunc((sdK * lam) / 1000); // σλ in millionths of a unit
+  const lamSq = Math.trunc(lam / 1000) ** 2; // λ² in ppm
+  const beta = Math.trunc((k * lam) / 100); // βλ in ppm
+  const factor = Math.min(PPM, Math.max(0, holds ? PPM + beta - lamSq : PPM - beta - lamSq));
+  q.counters[name] = {
+    mean: holds ? cur.mean + shift : cur.mean - shift,
+    variance: Math.trunc((Math.trunc(cur.variance / 1000) * factor) / 1000),
   };
 }
 

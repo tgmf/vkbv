@@ -20,6 +20,7 @@ import { cats as catsOf, chance, flagKey } from './conditions';
 import {
   addCounter,
   addFactChance,
+  conditionCounter,
   contribute,
   raiseFactPart,
   setFact,
@@ -44,6 +45,7 @@ import { mulPm, PPM } from './math';
 import {
   buildPerceptionTable,
   buildReaders,
+  gateCounter,
   requirementFacts,
   storyletCats,
   tablePerceives,
@@ -2259,6 +2261,24 @@ function caseStep(
   rest[fire.state] = (rest[fire.state] ?? 0) - fire.m;
   if ((rest[fire.state] ?? 0) <= 0) delete rest[fire.state];
   sl.p = renormalise(rest);
+  // a race on a counter (03 §13.5): each case holds its own side of the threshold
+  const race = Object.values(def.states)
+    .flatMap((st) => st.exits)
+    .find((e) => e.to === fire.state && e.kind === 'auto' && gateCounter(e.gate) !== null);
+  const leaf = race ? gateCounter(race.gate) : null;
+  const bound =
+    leaf?.gte !== undefined
+      ? { atLeast: leaf.gte, yes: true }
+      : leaf?.lt !== undefined
+        ? { atLeast: leaf.lt, yes: false }
+        : null;
+  if (leaf && bound) {
+    // the fog holds its share of the counter; the lantern's cats added the rest
+    const start = setup.c.world.counters[leaf.counter]?.start ?? 0;
+    const added = (step.live?.counters[leaf.counter] ?? start) - start;
+    conditionCounter(yes.q, leaf.counter, bound.atLeast - added, bound.yes);
+    conditionCounter(no.q, leaf.counter, bound.atLeast - added, !bound.yes);
+  }
   return [
     ...(yes.weight > 0 ? [finishStep(setup, ccYes, yes, yesSink, held, step.live !== null)] : []),
     ...(no.weight > 0 ? [finishStep(setup, cc2, no, sink, held, step.live !== null)] : []),

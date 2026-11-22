@@ -17,12 +17,14 @@ describe('readers index', () => {
     expect(kinds('fact:martiOut')).toContain('anchor:requirements');
   });
 
-  it('picks the Chapter 1 links: most reading cats first, the anchor tree counts as one', () => {
-    // crewArrived: 4 cats. martiOut: 2 cats + the tree, tied at 3 with roadworks_day.on_break and
-    // crewChatterHeard; it is found first. rainStarted is the weather case, never a link.
+  it('picks the Chapter 1 links: the road race first, then the most reading cats', () => {
+    // roadDone: set entering roadworks_day.finished through an auto exit gated on the roadwork
+    // counter (a race, one link per counter). crewArrived: 4 cats. martiOut is set only by a
+    // storylet that binds Marti, who is never fogged: a lantern fact, never a link. rainStarted is
+    // the weather case.
     expect(buildReaders(ch1).links).toEqual([
+      { kind: 'fact', fact: 'roadDone' },
       { kind: 'fact', fact: 'crewArrived' },
-      { kind: 'fact', fact: 'martiOut' },
     ]);
   });
 

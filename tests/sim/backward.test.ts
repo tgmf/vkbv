@@ -27,21 +27,20 @@ import { cardPin, ch1Coarse, powerPin, tiny, TINY_DIR, tuning } from './helpers'
 const CATS = ['hero', 'pal', 'bystander'];
 const glow = powerPin('glow', 'home.room', 0);
 
-/** The tiny world 5 steps into a glow on the hero's room: two cases, heroOut 0 and 1 (a link). */
+/** The tiny world 5 steps in: two cases, pal's workDone 0 and 1 (a link). */
 function split(): { setup: ReturnType<typeof fogSetup>; fog: Fog } {
   const setup = fogSetup(tiny, 1);
   let fog = initialFog(setup, CATS);
-  for (let i = 0; i < 5; i++) fog = fogStep(setup, fog, undefined, true, null, [glow]);
+  for (let i = 0; i < 5; i++) fog = fogStep(setup, fog);
   return { setup, fog };
 }
 
-/** Every hero state, over the cases, napping in his room. */
-const napping = (fog: Fog): ChainState[] => {
+/** Every pal state, over the cases, still at work. */
+const working = (fog: Fog): ChainState[] => {
   const out: ChainState[] = [];
   for (const fc of fog.cases)
-    for (const e of fc.cats['hero']?.chain ?? [])
-      if (e.s.activity === 'nap' && e.s.place === 'home.room' && e.s.walk === null)
-        if (!out.some((s) => stateKey(s) === stateKey(e.s))) out.push(e.s);
+    for (const e of fc.cats['pal']?.chain ?? [])
+      if (e.s.activity === 'work' && !out.some((x) => stateKey(x) === stateKey(e.s))) out.push(e.s);
   return out;
 };
 
@@ -57,14 +56,14 @@ const bayes = (w: number[], l: number[]): number[] => {
 describe('evidence over cases and chains (03 §14 steps 1-2)', () => {
   it('case weights after evidence equal Bayes’ rule by hand (one link)', () => {
     const { setup, fog } = split();
-    expect(fog.cases.map((fc) => fc.links['fact:heroOut'])).toEqual([0, 1]);
-    const ev: Evidence = { kind: 'cat', cat: 'hero', states: napping(fog), holds: true };
+    expect(fog.cases.map((fc) => fc.links['fact:workDone'])).toEqual([0, 1]);
+    // pal is seen not at work: still possible where his work is not done, certain where it is
+    const ev: Evidence = { kind: 'cat', cat: 'pal', states: working(fog), holds: false };
     const w = fog.cases.map((fc) => fc.weight);
     const l = fog.cases.map((fc) => likelihood(fc, ev));
-    // the hero naps for sure where he did not go out, and only partly where he did
-    expect(l[0]).toBe(1_000_000);
-    expect(l[1]).toBeGreaterThan(0);
-    expect(l[1]).toBeLessThan(1_000_000);
+    expect(l[0]).toBeGreaterThan(0);
+    expect(l[0]).toBeLessThan(1_000_000);
+    expect(l[1]).toBe(1_000_000);
     const after = applyEvidence(setup, fog, ev);
     if (!after) throw new Error('impossible evidence');
     const got = after.cases.map((fc) => fc.weight);
@@ -75,39 +74,39 @@ describe('evidence over cases and chains (03 §14 steps 1-2)', () => {
     const tol = Math.ceil(WAVE_TOTAL / kept) + 1;
     got.forEach((x, i) => expect(Math.abs(x - (want[i] ?? 0))).toBeLessThanOrEqual(tol));
     expect(sum(got)).toBe(WAVE_TOTAL);
-    // the hero's chain keeps only the napping states, renormalised; the other cats are untouched
-    const keys = napping(fog).map(stateKey);
+    // pal's chain keeps only states not at work, renormalised; the other cats are untouched
+    const keys = working(fog).map(stateKey);
     for (const [i, fc] of after.cases.entries()) {
-      const chain = fc.cats['hero']?.chain ?? [];
-      expect(chain.every((e) => keys.includes(stateKey(e.s)))).toBe(true);
+      const chain = fc.cats['pal']?.chain ?? [];
+      expect(chain.some((e) => keys.includes(stateKey(e.s)))).toBe(false);
       expect(sum(chain.map((e) => e.p))).toBe(1_000_000);
-      expect(fc.cats['pal']).toEqual(fog.cases[i]?.cats['pal']);
+      expect(fc.cats['hero']).toEqual(fog.cases[i]?.cats['hero']);
     }
   });
 
-  it('a watched fact keeps the cases that agree; negative evidence removes the states seen', () => {
+  it('a watched fact keeps the cases that agree; evidence on a cat keeps the states seen', () => {
     const { setup, fog } = split();
-    const out = applyEvidence(setup, fog, { kind: 'fact', fact: 'heroOut', holds: true });
+    const done = applyEvidence(setup, fog, { kind: 'fact', fact: 'workDone', holds: true });
     expect(
-      out?.cases.map((fc) => [fc.weight, fc.links['fact:heroOut'], fc.q.facts['heroOut']]),
+      done?.cases.map((fc) => [fc.weight, fc.links['fact:workDone'], fc.q.facts['workDone']]),
     ).toEqual([[WAVE_TOTAL, 1, 1_000_000]]);
-    const states = napping(fog);
-    const not = applyEvidence(setup, fog, { kind: 'cat', cat: 'hero', states, holds: false });
-    // where he surely napped, not seeing him napping is impossible: that case is gone
-    expect(not?.cases.map((fc) => fc.links['fact:heroOut'])).toEqual([1]);
+    // pal seen at work: only the case where his work is not done allows it
+    const states = working(fog);
+    const seen = applyEvidence(setup, fog, { kind: 'cat', cat: 'pal', states, holds: true });
+    expect(seen?.cases.map((fc) => fc.links['fact:workDone'])).toEqual([0]);
     const keys = states.map(stateKey);
-    expect(not?.cases[0]?.cats['hero']?.chain.some((e) => keys.includes(stateKey(e.s)))).toBe(
-      false,
+    expect(seen?.cases[0]?.cats['pal']?.chain.every((e) => keys.includes(stateKey(e.s)))).toBe(
+      true,
     );
     const st = applyEvidence(setup, fog, {
       kind: 'state',
-      storylet: 'lured',
-      state: 'out',
+      storylet: 'shift',
+      state: 'idle',
       holds: false,
     });
     for (const fc of st?.cases ?? []) {
-      const p = fc.q.storylets['lured']?.p ?? {};
-      expect(p['out']).toBeUndefined();
+      const p = fc.q.storylets['shift']?.p ?? {};
+      expect(p['idle']).toBeUndefined();
       expect(sum(Object.values(p))).toBe(1_000_000);
     }
   });
@@ -127,13 +126,13 @@ describe('evidence over cases and chains (03 §14 steps 1-2)', () => {
     const { setup, fog } = split();
     let f = applyEvidence(setup, fog, {
       kind: 'cat',
-      cat: 'hero',
-      states: napping(fog),
-      holds: true,
+      cat: 'pal',
+      states: working(fog),
+      holds: false,
     });
     if (!f) throw new Error('impossible evidence');
     for (let i = 0; i < 6; i++) {
-      f = fogStep(setup, f, undefined, true, null, [glow]);
+      f = fogStep(setup, f);
       expect(sum(f.cases.map((fc) => fc.weight))).toBe(WAVE_TOTAL);
       for (const fc of f.cases)
         for (const cat of Object.values(fc.cats))
@@ -156,7 +155,7 @@ describe('the anchor treated as already seen, strain (03 §14)', () => {
     const p = projectToEnd(setup, initialFog(setup, CATS), pins);
     const raw = p.fog.cases;
     const pa = raw.map((fc) => fc.q.facts['anchor.met'] ?? 0);
-    expect(pa.some((x) => x === 0) && pa.some((x) => x > 0)).toBe(true);
+    expect(new Set(pa).size).toBeGreaterThan(1); // the cases differ in their chance
     expect(p.anchor).toBe(anchorChance(setup, p.fog));
     expect(p.anchor).toBe(
       sum(raw.map((fc, i) => Math.trunc((fc.weight * (pa[i] ?? 0)) / WAVE_TOTAL))),
@@ -171,7 +170,12 @@ describe('the anchor treated as already seen, strain (03 §14)', () => {
     expect(got.length).toBe(reach.length);
     got.forEach((x, i) => expect(Math.abs(x - (want[i] ?? 0))).toBeLessThanOrEqual(2));
     expect(sum(got)).toBe(WAVE_TOTAL);
-    expect(sum(got)).toBeGreaterThan(sum(reach.map((fc) => fc.weight)));
+    // the case most likely to reach the anchor gains weight
+    const best = pa.indexOf(Math.max(...pa));
+    const bestCase = raw[best];
+    expect(
+      p.conditioned.cases[bestCase ? reach.indexOf(bestCase) : -1]?.weight ?? 0,
+    ).toBeGreaterThan(bestCase?.weight ?? 0);
   });
 
   it('with the knob off, or when no case reaches the anchor, the weights stay raw', () => {

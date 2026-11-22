@@ -4,6 +4,7 @@ import type { Condition, Score } from '../content/schemas/dsl';
 import { detectorCats } from './sifting';
 import { rangeBetween, type Sense, type Weather } from './perception';
 import type { CatId, Content } from './types';
+import { need } from './types';
 
 /** Something that reads a fact, flag or storylet state, and the cats it belongs to. */
 export interface Reader {
@@ -123,28 +124,95 @@ export function buildReaders(c: Content): Readers {
   return { of, order, links: selectLinks(c, of, order) };
 }
 
+/** The followed protagonists: never fogged (03 §13.1). The demo follows the one without a locked thread. */
+export const followedCats = (c: Content): CatId[] =>
+  c.cats.filter((x) => x.kind === 'protagonist' && !x.lockedThread).map((x) => x.id);
+
+/** For each fact, the storylets that set it (03 §12.2: an effect `fact`, or `factIfPerceivedBy`). */
+export function factSetters(c: Content): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const sl of c.storylets)
+    for (const st of Object.values(sl.states))
+      for (const e of st.onEnter ?? []) {
+        const set =
+          'fact' in e ? [e.fact] : 'emit' in e ? Object.values(e.factIfPerceivedBy ?? {}) : [];
+        for (const f of set) if (!(out[f] ??= []).includes(sl.id)) out[f].push(sl.id);
+      }
+  return out;
+}
+
+/** The counters a condition compares (`{ counter, … }` leaves). */
+function counterLeaves(cond: Condition, out: Extract<Condition, { counter: string }>[]): void {
+  if ('all' in cond) cond.all.forEach((x) => counterLeaves(x, out));
+  else if ('any' in cond) cond.any.forEach((x) => counterLeaves(x, out));
+  else if ('not' in cond) counterLeaves(cond.not, out);
+  else if ('counter' in cond) out.push(cond);
+}
+
+/** The one counter comparison a gate makes, if it makes exactly one. */
+export function gateCounter(
+  gate: Condition | undefined,
+): Extract<Condition, { counter: string }> | null {
+  if (!gate) return null;
+  const out: Extract<Condition, { counter: string }>[] = [];
+  counterLeaves(gate, out);
+  return out.length === 1 ? (out[0] ?? null) : null;
+}
+
 /**
- * Links: facts and storylet states read by at least two different cats or by the anchor's
- * requirement tree, ranked by the number of readers (distinct cats, plus one for the tree), ties
- * by first-seen order; at most `fog.maxLinks`. The weather's own facts are the weather case.
+ * Links (03 §13.5). First, one per counter **race**: a fact set for sure on entering a storylet
+ * state through an auto exit gated on that counter (the first found, in file order), so each case
+ * holds its own side of the threshold (Tagir, 2026-11-23). Then facts and storylet states read by
+ * at least two different cats or by the anchor's requirement tree, ranked by the number of readers
+ * (distinct cats, plus one for the tree), ties by first-seen order. Never the weather's own facts,
+ * and never a fact only storylets binding a followed protagonist set: the lantern holds those.
+ * At most `fog.maxLinks`.
  */
 function selectLinks(c: Content, of: Record<QuantityKey, Reader[]>, order: QuantityKey[]): Link[] {
+  const followed = followedCats(c);
+  const setters = factSetters(c);
+  const lanternFact = (fact: string) => {
+    const by = setters[fact] ?? [];
+    return (
+      by.length > 0 &&
+      by.every((id) =>
+        storyletCats(c, need(c.storylet, id, 'storylet')).some((x) => followed.includes(x)),
+      )
+    );
+  };
+  const races: QuantityKey[] = [];
+  const raced: string[] = [];
+  for (const sl of c.storylets)
+    for (const st of Object.values(sl.states))
+      for (const e of st.exits) {
+        const leaf = e.kind === 'auto' ? gateCounter(e.gate) : null;
+        if (!leaf || raced.includes(leaf.counter)) continue;
+        const fact = (sl.states[e.to]?.onEnter ?? []).find(
+          (x): x is Extract<typeof x, { fact: string }> => 'fact' in x && x.chance === undefined,
+        )?.fact;
+        if (fact === undefined || lanternFact(fact)) continue;
+        raced.push(leaf.counter);
+        races.push(`fact:${fact}`);
+      }
   const ranked: { key: QuantityKey; n: number; i: number }[] = [];
   order.forEach((key, i) => {
     if (!key.startsWith('fact:') && !key.startsWith('state:')) return;
     if (c.world.engineFacts.includes(key.slice(5))) return;
+    if (races.includes(key) || (key.startsWith('fact:') && lanternFact(key.slice(5)))) return;
     const readers = of[key] ?? [];
     const cats = new Set<CatId>(readers.flatMap((r) => r.cats)).size;
     const tree = readers.some((r) => r.kind === 'anchor') ? 1 : 0;
     if (cats >= 2 || tree === 1) ranked.push({ key, n: cats + tree, i });
   });
   ranked.sort((a, b) => b.n - a.n || a.i - b.i);
-  return ranked.slice(0, c.tuning.fog.maxLinks).map(({ key }): Link => {
-    if (key.startsWith('fact:')) return { kind: 'fact', fact: key.slice(5) };
-    const rest = key.slice(6);
-    const dot = rest.lastIndexOf('.');
-    return { kind: 'state', storylet: rest.slice(0, dot), state: rest.slice(dot + 1) };
-  });
+  return [...races, ...ranked.map((x) => x.key)]
+    .slice(0, c.tuning.fog.maxLinks)
+    .map((key): Link => {
+      if (key.startsWith('fact:')) return { kind: 'fact', fact: key.slice(5) };
+      const rest = key.slice(6);
+      const dot = rest.lastIndexOf('.');
+      return { kind: 'state', storylet: rest.slice(0, dot), state: rest.slice(dot + 1) };
+    });
 }
 
 /**

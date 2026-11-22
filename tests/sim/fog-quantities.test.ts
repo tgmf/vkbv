@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addCounter,
   addFactChance,
+  conditionCounter,
   contribute,
   counterOf,
   clearFlag,
@@ -72,6 +73,39 @@ describe('contributor heaps (03 §13.5)', () => {
     });
     for (const list of Object.values(heaps))
       expect(list.length).toBeLessThanOrEqual(tiny.tuning.fog.contributors);
+  });
+});
+
+describe('a counter conditioned on its threshold (03 §13.5, a race link)', () => {
+  // X ~ N(100, 10²) units; condition on X ≥ 100 (continuity: X > 99.5). β = −0.05:
+  // Φ(β) = 480 061 ppm, φ(β) ≈ 398 400 ppm (the table's differences), so above λ ≈ 0.766 and
+  // below λ ≈ 0.830 (by hand from the PHI table).
+  const q0 = () => {
+    const q = initialQuantities(tiny);
+    q.counters['n'] = { mean: 100_000_000, variance: 100_000_000 }; // millionths: 100, 10²
+    return q;
+  };
+
+  it('the side that holds: mean μ + σλ, variance σ²(1 + βλ − λ²)', () => {
+    const q = q0();
+    conditionCounter(q, 'n', 100, true);
+    const c = q.counters['n'];
+    expect(Math.abs((c?.mean ?? 0) - 107_660_000)).toBeLessThan(50_000); // 100 + 10 × 0.766
+    expect(Math.abs((c?.variance ?? 0) - 37_500_000)).toBeLessThan(500_000); // 100 × 0.375
+  });
+
+  it('the side that fails: mean μ − σλ, variance σ²(1 − βλ − λ²)', () => {
+    const q = q0();
+    conditionCounter(q, 'n', 100, false);
+    const c = q.counters['n'];
+    expect(Math.abs((c?.mean ?? 0) - 91_700_000)).toBeLessThan(50_000); // 100 − 10 × 0.830
+    expect(Math.abs((c?.variance ?? 0) - 35_200_000)).toBeLessThan(500_000); // 100 × 0.352
+  });
+
+  it('an almost impossible side pins the counter at the threshold', () => {
+    const q = q0();
+    conditionCounter(q, 'n', 200, true); // 10 σ above: under 0.1%
+    expect(q.counters['n']).toEqual({ mean: 200_000_000, variance: 0 });
   });
 });
 
