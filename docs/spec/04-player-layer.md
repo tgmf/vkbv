@@ -66,10 +66,11 @@ for k in 0 .. tuning.vetting.maxCandidates - 1:
   solvable: at least one solution's run reaches the anchor (the lantern holds the
        anchor fact) and, in that run, every fact of tuning.vetting.requireFacts has a
        chance by the end (03 §13.1) of at least tuning.vetting.minPpm
-  story: over all the solutions' runs, the share of authored storylets entered is at
-       least tuning.vetting.minStoryletShare; a storylet counts when the lantern ran
-       it, or when a state other than its start has a chance in the fog of at least
-       tuning.vetting.minPpm
+  story: over all the solutions' runs, the number of authored storylets entered is at
+       least min(tuning.vetting.minStorylets, ceil(authored × tuning.vetting.
+       minStoryletSharePerMille / 1000)) (Tagir: "min(2, 10%)"); a storylet counts when
+       the lantern ran it, or when a state other than its start has a chance in the fog
+       of at least tuning.vetting.minPpm
   pass if solvable and story
 take the first candidate that passes; if none does, take the requested seed
 ```

@@ -362,8 +362,14 @@ Answer: Tagir, 2026-11-23: the wording was wrong: an untouched timeline can do n
 be solvable with the player's actions and have at least a portion of its authored storylets reachable
 with them. Chosen: reference solutions (recorded solutions run as whole-day runs; solvable if one reaches
 the anchor; story if their runs enter at least `vetting.minStoryletShare` of the authored storylets).
-Spec updated: `04` §2, `05` §4. Its start value of `vetting.minStoryletShare` is Tagir's to set. The
-glossary's "Seed vetting" row ("checked once with no player input") needs the same change in the
+Spec updated: `04` §2, `05` §4. Tagir: the story threshold is "min(2, 10%)" (`vetting.minStorylets` 2,
+`vetting.minStoryletSharePerMille` 100); the recorded solutions stay the three pin sets for now (they can
+be wildly different). The glossary's "Seed vetting" row is rewritten at Tagir's request; copy it into the
 master glossary.
+Note: a run that reaches the anchor has entered all 7 main storylets, so "story" always holds once a seed
+is solvable; counting side storylets only would make it bite.
+Fray (same day): Tagir pointed out that the anchor's reachability cannot be computed (it depends on the
+player's future actions). The fray never computes it: it is the chapter's point of no return
+(`fraysIf`). `03` §16 and the glossary's "Fray" row reworded to say so.
 
 <!-- Gate notes and answers go above this line. -->

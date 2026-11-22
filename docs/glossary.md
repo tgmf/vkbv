@@ -82,7 +82,7 @@ One English and one Russian form per name, taken from the character and encyclop
 | Following | Choosing which thread the camera and collapse focus on. |  |
 | Repeat by default | Scrolling back and playing again re-fires every pin, and watched facts hold, so the same day replays unless the player changes something. |  |
 | Seed | The number that fixes all randomness of a world. Carried in the URL. |  |
-| Seed vetting | At the start, the seed's world is checked once with no player input for enough reachable story (authored storylets, the anchor). A failing seed is replaced deterministically by the next candidate. | Never adjusted again during play. A bookmarked seed always gives the same vetted world. |
+| Seed vetting | A seed is offered only if it is solvable with the player's actions and makes enough authored story reachable. Checked by running the chapter's recorded solutions on it (Marti live): it passes if one reaches the anchor and their runs enter enough authored storylets. A failing seed is replaced deterministically by the next candidate. | Decided 2026-11-23. A sufficient check, not a proof: a rejected seed may be solvable otherwise. Seeds are vetted offline; a typed or bookmarked seed is vetted live. Never adjusted again during play; a bookmarked seed always gives the same vetted world. |
 | Bookmark | A moment saved as a URL: seed + log + playhead + player state (specials used, journal, revealed map, frontier, payouts already paid). |  |
 | Log | Everything the player has put on the timeline (pins, powers). The saved state; everything else is recomputed from seed + log. |  |
 
@@ -252,7 +252,7 @@ Terms borrowed from research on curated emergent narrative (Ryan; Kreminski's Fe
 
 | Term | Definition | Notes |
 | --- | --- | --- |
-| Fray | The first tick from which the anchor's probability is zero. The playhead stops there. | Anchor-level failure. Chapter 1: Rokko leaves when the rain stops. |
+| Fray | The first tick from which the anchor can no longer happen whatever the player does: the chapter's point of no return (`fraysIf`) has passed, or almost surely has. The playhead stops there. | Anchor-level failure. Chapter 1: Rokko leaves when the rain stops. Never computed from the anchor's own probability, which depends on the player's future actions. An unwatched, merely likely point of no return does not end the timeline. |
 | Break | A watched, paid event that no longer happens after an edit. | Event-level. Costs only the frontier progress it gave. |
 | Break alert | Warning, shown before an edit lands, that it would break a paid event. Information only, no penalty. |  |
 | Changed, unwatched | A quiet mark on a thread for a watched but unpaid event that shifted after an edit. | No alert. |

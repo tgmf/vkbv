@@ -1055,9 +1055,12 @@ fact ever lies past the lantern edge. (Tagir, 2026-11-22; replaces option (a) of
 
 ## 16. Fray and frames
 
-**Fray.** (Tagir, 2026-11-23, `docs/questions.md` M2-16: the lantern frays on the fog's
-chance of reaching the anchor, not on a gate.) The chance the anchor can still be
-reached at tick `t` is P(alive) = 1 000 000 − P(dead), where P(dead) is the fog's
+**Fray.** (Tagir, 2026-11-23, `docs/questions.md` M2-16.) Whether the anchor can still
+be reached depends on everything the player might yet do, so it is never computed.
+The fray is instead the chapter's **point of no return**: its `fraysIf` (Chapter 1:
+Rokko has left or run home, and they have not met), a fact about the world that no
+player action undoes (content must keep it so). P(alive) = 1 000 000 − P(dead), where
+P(dead) is the fog's
 probability, over its cases by weight, that `fraysIf` has held without the anchor fact
 by `t` (§13.6, the running maximum per case), each case reading what the lantern holds
 as fact. The lantern frays at the first tick where P(alive) is below
