@@ -2,7 +2,9 @@
 // concrete state, inside the fog. One tick: the lantern's step (reading the fog), the fog's step when
 // a step boundary passes (reading the lantern), then the lantern edge: placement or negative evidence
 // for every fogged cat, release of cats unseen for long, storylets moving between fog and lantern.
-// Fog events drawn into the lantern (03 §15.1, last paragraph) come with Gaze and imposed facts.
+// Fog events a protagonist would perceive are drawn into the lantern (03 §15.1): drawn ones happen
+// (and a fog-held storylet that emitted one runs live from there, its unperceived roles staying in the
+// fog), the rest are negative evidence.
 import { applyEvidence } from './backward';
 import { bandEdges, BOREDOM } from './cats';
 import {
@@ -17,13 +19,13 @@ import {
   type Fog,
   type FogSetup,
 } from './fog';
-import { INACTIVE } from './fog-quantities';
+import { INACTIVE, type FogEvent } from './fog-quantities';
 import { sample } from './math';
 import { perceives } from './perception';
 import { storyletCats } from './readers';
 import { rand } from './rng';
-import { catNode, catPos } from './space';
-import { step } from './step';
+import { catNode, catPos, nodePos } from './space';
+import { step, type StepResult } from './step';
 import { uniformStreams } from './history';
 import type { CatId, CatState, Pin, SimEvent, SimState } from './types';
 import { need } from './types';
@@ -40,11 +42,16 @@ export interface LanternState {
   unseen: Record<CatId, number>;
 }
 
-/** The wave: the lantern inside the fog, and the lantern's events the fog has not perceived yet. */
+/**
+ * The wave: the lantern inside the fog; the lantern's events and its storylets' effects on fogged
+ * cats that the fog has not taken in yet; fog events drawn for the lantern's next tick.
+ */
 export interface Wave {
   lantern: LanternState;
   fog: Fog;
   events: SimEvent[];
+  fogFx: NonNullable<StepResult['fogFx']>;
+  incoming: SimEvent[];
   localCauses: number;
 }
 
@@ -86,6 +93,8 @@ export function initialWave(setup: FogSetup, followed: readonly CatId[], live = 
     lantern: { sim: setup.base, live: liveCats, dwell: {}, heldStorylets: held, unseen },
     fog,
     events: [],
+    fogFx: [],
+    incoming: [],
     localCauses: 0,
   };
 }
@@ -180,6 +189,7 @@ export function advance(
       held: lan.heldStorylets,
       dwell: Object.keys(lan.dwell).filter((id) => (lan.dwell[id] ?? 0) > 0),
       fog: lanternReader(setup, wave.fog, t0),
+      incoming: wave.incoming,
     },
     setup.decisions,
   );
@@ -191,14 +201,44 @@ export function advance(
   let live = [...lan.live];
   let held = [...lan.heldStorylets];
   const unseen = { ...lan.unseen };
-  let events = [...wave.events, ...r.events];
+  // the fog already holds the events it gave the lantern
+  let events = [...wave.events, ...r.events.filter((e) => !wave.incoming.includes(e))];
+  let fogFx = [...wave.fogFx, ...(r.fogFx ?? [])];
+  const incoming: SimEvent[] = [];
   let fog = wave.fog;
   let localCauses = wave.localCauses;
 
   // 2. the fog's step when a step boundary passes, reading the lantern; then release (03 §13.4)
   if (fog.tick + K <= t) {
-    fog = fogStep(setup, fog, held, false, sim, pins, events);
+    fog = fogStep(setup, fog, held, false, sim, pins, events, fogFx);
     events = [];
+    fogFx = [];
+    // the step's fog events each protagonist would perceive: drawn, collapsed or ruled out
+    for (const P of followed) {
+      const drawn = drawEvents(setup, fog, sim, held, P, t);
+      fog = drawn.fog;
+      incoming.push(...drawn.incoming);
+      for (const [id, state] of drawn.live) {
+        // the storylet runs live from the state that emitted what P perceived (03 §13.4)
+        if (!fogRuns(sim, held, id)) continue;
+        const roles =
+          fog.cases.find((fc) => fc.q.storylets[id]?.roles)?.q.storylets[id]?.roles ?? {};
+        const after = applyEvidence(setup, fog, {
+          kind: 'state',
+          storylet: id,
+          state,
+          holds: true,
+        });
+        if (after) fog = after;
+        const def = need(c.storylet, id, 'storylet');
+        const ended = (def.states[state]?.exits.length ?? 0) === 0;
+        sim = {
+          ...sim,
+          storylets: { ...sim.storylets, [id]: { state, enteredAt: t, roles, ended } },
+        };
+        held = held.filter((x) => x !== id);
+      }
+    }
     for (const id of live) {
       if (followed.includes(id) || (unseen[id] ?? 0) < c.tuning.lantern.releaseAfterTicks) continue;
       const cs = need(sim.cats, id, 'cat');
@@ -354,9 +394,104 @@ export function advance(
     lantern: { sim, live, dwell, heldStorylets: held, unseen },
     fog,
     events,
+    fogFx,
+    incoming,
     localCauses,
   };
 }
+
+/**
+ * Whether protagonist P would perceive a fog event (03 §4): everyone perceives global events; P those
+ * addressed to it and every event of a storylet it holds a role in (QUESTION M1-2); otherwise by
+ * range, a sound by hearing. A storylet's own state events reach only its role holders.
+ */
+function perceivable(setup: FogSetup, fog: Fog, sim: SimState, P: CatId, e: FogEvent): boolean {
+  if (e.global || e.to === P) return true;
+  if (e.storylet !== null) {
+    const run = sim.storylets[e.storylet];
+    const roles =
+      run && run.state !== null
+        ? run.roles
+        : (fog.cases.find((fc) => fc.q.storylets[e.storylet ?? '']?.roles)?.q.storylets[e.storylet]
+            ?.roles ?? {});
+    if (Object.values(roles).some((list) => list.includes(P))) return true;
+  }
+  if (e.name.startsWith('storylet:')) return false;
+  const src = { pos: nodePos(setup.c, e.node), node: e.node, radiusM: e.radiusM };
+  return perceives(setup.c, sim, P, src, e.radiusM === null ? 'sight' : 'hearing');
+}
+
+/**
+ * The fog's last-step events P would perceive, each name and place drawn once with its chance over
+ * the cases (03 §15.1, purpose `event:<name>:<node>`): a drawn one becomes evidence and, unless it is
+ * a storylet's state event, an event of the lantern's next tick; the rest are negative evidence. Also
+ * returns the fog-held storylets that emitted what was drawn, with the state that emitted it.
+ */
+export function drawEvents(
+  setup: FogSetup,
+  fog: Fog,
+  sim: SimState,
+  held: readonly string[],
+  P: CatId,
+  t: number,
+): { fog: Fog; incoming: SimEvent[]; live: [string, string][] } {
+  const { c, seed } = setup;
+  const keys: string[] = [];
+  const best: Record<string, FogEvent> = {};
+  const q: Record<string, number> = {};
+  for (const fc of fog.cases)
+    for (const e of fc.q.stepEvents) {
+      if (!perceivable(setup, fog, sim, P, e)) continue;
+      const k = `${e.name}|${e.node}`;
+      if (!keys.includes(k)) keys.push(k);
+      const m = Math.trunc((e.p * fc.weight) / WAVE_TOTAL);
+      q[k] = Math.min(1_000_000, (q[k] ?? 0) + m);
+      const b = best[k];
+      if (!b || e.p > b.p) best[k] = e;
+    }
+  let f = fog;
+  const incoming: SimEvent[] = [];
+  const live: [string, string][] = [];
+  for (const k of keys) {
+    const e = best[k];
+    const p = q[k] ?? 0;
+    if (!e || p === 0) continue;
+    const happened = rand(seed, 'obs', t, `event:${e.name}:${e.node}`, 1_000_000) < p;
+    const after = applyEvidence(setup, f, {
+      kind: 'event',
+      name: e.name,
+      node: e.node,
+      holds: happened,
+    });
+    if (after) f = after;
+    if (!happened) continue;
+    if (e.storylet !== null && e.state !== null && fogRuns(sim, held, e.storylet))
+      live.push([e.storylet, e.state]);
+    if (e.name.startsWith('storylet:')) continue;
+    incoming.push({
+      tick: t,
+      type: 'emit',
+      name: e.name,
+      pos: nodePos(c, e.node),
+      node: e.node,
+      radiusM: e.radiusM,
+      source: e.source,
+      to: e.to,
+      storylet: e.storylet,
+      global: e.global,
+      hops: e.hops,
+      factIfPerceivedBy: e.factIfPerceivedBy,
+    });
+  }
+  return { fog: f, incoming, live };
+}
+
+/**
+ * Whether a storylet's present is the fog's: it holds it, or the lantern's own copy is inactive (a
+ * fog effect set it going, e.g. a fog-held storylet's `trigger`).
+ */
+const fogRuns = (sim: SimState, held: readonly string[], id: string): boolean =>
+  held.includes(id) || (sim.storylets[id]?.state ?? null) === null;
 
 /** Storylets in file order. */
 const inStorylets = (setup: FogSetup, ids: readonly string[]): string[] =>

@@ -310,6 +310,38 @@ Options seen: (a) find the source (compare fogged Marti hour by hour around the 
 (b) accept until the lantern carries Marti in play (the projection is only for vetting, calibration and
 balance).
 Chosen for now: none; (a) is next.
+Update 2026-11-23 (with M2-15, Marti never fogged): investigated with Marti live, 100 seeds, road_both,
+against the reference. Cause: Marti never heard the fog-held `crew_chatter` (crewChatterHeard 0% vs 100%,
+questionItch 632 vs 898 at the lure), because fog events never reached the lantern and fog-held storylet
+effects on a live cat were dropped. Fixed (`03` §13.4, §15.1): fog events a protagonist would perceive are
+drawn into the lantern and a fog-held storylet that emitted one runs live. martiOut is now 67% vs 66%;
+crewChatterHeard 87% vs 100% (the fog's crew break), itch 852 vs 898. The fogged-Marti gap no longer
+matters (M2-15). New finding: M2-16.
+Answer:
+
+## M2-15 — Marti is never fogged            (status: answered, spec to update)
+Where: `03` §13.1 (the whole-day projection: "no cat live, Marti in the fog"), `04` §2 (vetting),
+`07` §3 (calibration: "no cat live, protagonists in the fog"), `05` §5.2 (balance)
+Question: Should any whole-day run hold Marti in the fog?
+Answer: Tagir, 2026-11-23: no. Marti is always observed/collapsed; every whole-day run (vetting,
+calibration, balance) starts with him simulated live in the lantern (stream 0), the other cats in the
+fog. Consequences to settle in the spec: Marti's own events are 0 or 1 per seed in such a run, so
+calibration checks them as rates over seeds against the reference, and the fog's other events as
+probabilities; vetting reads Marti's requirement facts from the lantern run. martiOut is investigated
+as live-vs-reference rates (M2-14).
+
+## M2-16 — The lantern frays on a fog probability            (status: open)
+Where: `03` §16 ("the lantern frays at the tick `fraysIf` holds in it (a gate, §13.3)"); `src/sim/step.ts`
+phase 8; `docs/handoff/M2.md` (Marti live, road_both)
+Question: Chapter 1's `fraysIf` is "Rokko left or ran home, and no meeting". With Marti live and Rokko in
+the fog, the gate holds once the fog's P(Rokko left or ran home) passes 50%, and the timeline ends there
+(seeds 3, 5, 10 under road_both: 13:05–13:20), although Marti has seen neither and Rokko is still there in
+up to half the cases. Nothing was collapsed. Should the lantern fray only on what it holds as fact?
+Options seen: (a) as specified: a gate on the fog's odds; (b) the lantern frays when `fraysIf` holds on
+the lantern's own state only (fog quantities read as 0), i.e. only once the facts are collapsed; (c) the
+lantern frays when the fog's P(anchor still reachable) falls below `fog.frayBelowPpm` (the glossary's
+"probability is zero").
+Chosen for now: (a), unchanged.
 Answer:
 
 <!-- Gate notes and answers go above this line. -->

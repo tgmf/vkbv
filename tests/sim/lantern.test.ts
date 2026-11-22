@@ -15,7 +15,9 @@ import {
 } from '../../src/sim/fog';
 import { hashState } from '../../src/sim/hash';
 import { initialState, runHistory } from '../../src/sim/history';
-import { advance, initialWave, lanternFray, type Wave } from '../../src/sim/lantern';
+import { advance, drawEvents, initialWave, lanternFray, type Wave } from '../../src/sim/lantern';
+import { runEffects } from '../../src/sim/effects';
+import type { FogEvent } from '../../src/sim/fog-quantities';
 import { sample } from '../../src/sim/math';
 import { perceives } from '../../src/sim/perception';
 import { rand } from '../../src/sim/rng';
@@ -114,6 +116,122 @@ describe('pins between lantern and fog (03 §13.6, §14)', () => {
       expect(fc.cats['pal']?.chain.every((e) => e.s.interrupt?.action === 'jump')).toBe(true);
       expect(fc.cats['bystander']?.chain.every((e) => e.s.bands[BOREDOM] === 0)).toBe(true);
     }
+  });
+});
+
+describe('fog events the protagonist perceives (03 §13.4, §15.1)', () => {
+  const event = (more: Partial<FogEvent>): FogEvent => ({
+    name: 'shout',
+    node: 'home.room',
+    p: 1_000_000,
+    radiusM: 40,
+    source: 'pal',
+    to: null,
+    global: false,
+    factIfPerceivedBy: { hero: 'heardShout' },
+    hops: 0,
+    storylet: 'shift',
+    state: 'hz',
+    ...more,
+  });
+  /** The wave at a fog step boundary, with these events as the fog's last-step events. */
+  const at = (events: FogEvent[]) => {
+    const setup = fogSetup(tiny, 1);
+    let w = initialWave(setup, ['hero']);
+    while (w.lantern.sim.tick < 5) w = advance(setup, w, [], ['hero']);
+    const fog = {
+      ...w.fog,
+      cases: w.fog.cases.map((fc) => ({ ...fc, q: { ...fc.q, stepEvents: events } })),
+    };
+    return { setup, w: { ...w, fog } };
+  };
+
+  it('a perceivable event is drawn: it happens in the lantern and its held storylet runs live', () => {
+    const { setup, w } = at([event({})]); // pal's shout, heard where the hero stands
+    const t = w.lantern.sim.tick;
+    const d = drawEvents(setup, w.fog, w.lantern.sim, w.lantern.heldStorylets, 'hero', t);
+    expect(d.incoming.map((e) => (e.type === 'emit' ? e.name : e.type))).toEqual(['shout']);
+    expect(d.live).toEqual([['shift', 'hz']]);
+    // next tick the hero hears it and gets its fact
+    const next = advance(setup, { ...w, fog: d.fog, incoming: d.incoming }, [], ['hero']);
+    expect(next.lantern.sim.facts).toContain('heardShout');
+    expect(next.lantern.sim.cats['hero']?.heard).toContain('shout');
+  });
+
+  it('a role holder perceives its storylet’s state events wherever it is (03 §4, M1-2)', () => {
+    const rite = event({
+      name: 'storylet:rite.a',
+      node: 'street.c',
+      radiusM: null,
+      storylet: 'rite',
+      state: 'a',
+      factIfPerceivedBy: null,
+    });
+    const { setup, w } = at([rite]);
+    const fog = {
+      ...w.fog,
+      cases: w.fog.cases.map((fc) => ({
+        ...fc,
+        q: {
+          ...fc.q,
+          storylets: {
+            ...fc.q.storylets,
+            rite: { p: { a: 1_000_000 }, roles: { hero: ['hero'] } },
+          },
+        },
+      })),
+    };
+    const d = drawEvents(
+      setup,
+      fog,
+      w.lantern.sim,
+      w.lantern.heldStorylets,
+      'hero',
+      w.lantern.sim.tick,
+    );
+    expect(d.live).toEqual([['rite', 'a']]);
+    expect(d.incoming).toEqual([]); // a state event is the fog's bookkeeping, not an emitted event
+  });
+
+  it('an event out of range is not drawn; one not drawn is negative evidence', () => {
+    const far = event({ node: 'street.c', radiusM: 5 }); // 42 m away, a 5 m sound
+    const { setup, w } = at([far]);
+    const d = drawEvents(
+      setup,
+      w.fog,
+      w.lantern.sim,
+      w.lantern.heldStorylets,
+      'hero',
+      w.lantern.sim.tick,
+    );
+    expect(d.incoming).toEqual([]);
+    expect(d.fog).toBe(w.fog); // nothing perceivable: no evidence at all
+    const { setup: s2, w: w2 } = at([event({ p: 1 })]); // perceivable, but almost surely not drawn
+    const d2 = drawEvents(
+      s2,
+      w2.fog,
+      w2.lantern.sim,
+      w2.lantern.heldStorylets,
+      'hero',
+      w2.lantern.sim.tick,
+    );
+    expect(d2.incoming).toEqual([]);
+    expect(d2.fog).not.toBe(w2.fog); // the evidence "it did not happen" was applied
+  });
+
+  it('a live storylet’s effects on a fogged cat go to the fog, not to its stale lantern copy', () => {
+    const ctx = makeCtx(tiny);
+    ctx.live = ['hero'];
+    ctx.fogFx = [];
+    const before = structuredClone(ctx.s.cats['pal']);
+    runEffects(ctx, [{ interrupt: ['pal', 'stretch', 10] }], { storylet: 'shift' });
+    expect(ctx.s.cats['pal']).toEqual(before);
+    expect(ctx.fogFx.map((x) => x.cat)).toEqual(['pal']);
+    const setup = fogSetup(tiny, 1);
+    const fog = fogStep(setup, initialFog(setup, ['pal']), [], false, ctx.s, [], [], ctx.fogFx);
+    // stretch for 10 ticks: two steps, one left after this one
+    for (const fc of fog.cases)
+      expect(fc.cats['pal']?.chain.every((e) => e.s.interrupt?.action === 'stretch')).toBe(true);
   });
 });
 

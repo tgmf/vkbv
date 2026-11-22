@@ -828,6 +828,8 @@ interface Via {
 
 interface Sink {
   events: FogEvent[];
+  /** How many of `events` came from the lantern; the rest are the fog's own. */
+  own: number;
   catFx: { cat: CatId; mass: number; effect: Effect; scope: Scope; via: Via | null }[];
   finished: Record<CatId, Record<string, number>>;
 }
@@ -911,6 +913,7 @@ function fogEffects(
           factIfPerceivedBy: e.factIfPerceivedBy ?? null,
           hops: 0,
           storylet: scope.storylet ?? null,
+          state: via?.to ?? null,
         });
     } else if ('trigger' in e) {
       activateMass(setup, cc, q, need(c.storylet, e.trigger, 'storylet'), mass, sink);
@@ -1355,6 +1358,7 @@ function pinPrims(
             factIfPerceivedBy: null,
             hops: p.hops,
             storylet: null,
+            state: null,
           });
         break;
       case 'delay': {
@@ -1521,7 +1525,8 @@ function enterMass(
       global: false,
       factIfPerceivedBy: null,
       hops: 0,
-      storylet: null,
+      storylet: def.id,
+      state,
     });
 }
 
@@ -2055,7 +2060,11 @@ function perceive(setup: FogSetup, fc: FogCase, events: readonly FogEvent[], t: 
     for (const ev of events) {
       const j = index(ev.node);
       // a cat also perceives every event of a storylet it holds a role in (03 §4, QUESTION M1-2)
-      const roles = ev.storylet === null ? null : fc.q.storylets[ev.storylet]?.roles;
+      // (a storylet's own state events are the fog's bookkeeping, not emitted events)
+      const roles =
+        ev.storylet === null || ev.name.startsWith('storylet:')
+          ? null
+          : fc.q.storylets[ev.storylet]?.roles;
       const always =
         ev.global ||
         ev.to === def.id ||
@@ -2082,7 +2091,16 @@ function perceive(setup: FogSetup, fc: FogCase, events: readonly FogEvent[], t: 
           if (p > 0 && node !== undefined)
             fc.q.echoes = [
               ...fc.q.echoes,
-              { ...ev, node, p, source: def.id, to: null, hops: ev.hops - 1, storylet: null },
+              {
+                ...ev,
+                node,
+                p,
+                source: def.id,
+                to: null,
+                hops: ev.hops - 1,
+                storylet: null,
+                state: null,
+              },
             ];
         }
       const fact = ev.factIfPerceivedBy?.[def.id];
@@ -2191,11 +2209,17 @@ function caseStep(
   step: StepMemo,
   pins: readonly Pin[],
   lanternEvents: readonly FogEvent[],
+  lanternFx: NonNullable<Ctx['fogFx']>,
 ): FogCase[] {
   const { c } = setup;
   const K = c.tuning.fog.stepTicks;
   const q = cloneQ(fc.q);
-  const sink: Sink = { events: [...lanternEvents], catFx: [], finished: {} };
+  const sink: Sink = {
+    events: [...lanternEvents],
+    own: lanternEvents.length,
+    catFx: lanternFx.map((x) => ({ ...x, mass: PPM, via: null })),
+    finished: {},
+  };
   const due =
     q.echoes.length > 0 ||
     q.mods.length > 0 ||
@@ -2278,6 +2302,7 @@ function finishStep(
   }
   perceive(setup, fc, sink.events, cc.ctx.t);
   detectorsStep(setup, cc, fc.q, sink.events);
+  fc.q.stepEvents = sink.events.slice(sink.own); // what the lantern may perceive (03 §15.1)
   // dead: the running maximum of P(fraysIf holds) at the step's end (03 §12.2, §13.6)
   fc.q.dead = Math.max(fc.q.dead, chance(cc.ctx, c.anchor.fraysIf, {}));
   return fc;
@@ -2312,6 +2337,7 @@ function cloneQ(q: Quantities): Quantities {
     mods: [...q.mods],
     heaps: { ...q.heaps },
     dead: q.dead,
+    stepEvents: q.stepEvents,
   };
 }
 
@@ -2524,8 +2550,9 @@ export function mergeCases(setup: FogSetup, cases: readonly FogCase[]): FogCase[
  * storylets the fog runs (all of them in a projection). The weather changes by case only in a
  * projection (`projection: true`); up to the lantern edge it is the lantern's, read from `live`
  * with the live cats. Without a lantern (`live` null) the fog applies `pins` itself; with one,
- * the pins are shared (`firePins`), and `events` (the lantern's events of the step's ticks) reach
- * the fogged cats (03 §14).
+ * the pins are shared (`firePins`), `events` (the lantern's events of the step's ticks) reach
+ * the fogged cats, and `fx` (the lantern's storylet effects on fogged cats) act on their chains
+ * (03 §13.4, §14).
  */
 export function fogStep(
   setup: FogSetup,
@@ -2535,6 +2562,7 @@ export function fogStep(
   live: SimState | null = null,
   pins: readonly Pin[] = [],
   events: readonly SimEvent[] = [],
+  fx: NonNullable<Ctx['fogFx']> = [],
 ): Fog {
   const t = fog.tick;
   // up to the lantern edge the weather is the lantern's: one weather case (03 §13.5)
@@ -2551,7 +2579,9 @@ export function fogStep(
   const step = newStepMemo(live, held);
   const ordered = [...pins].sort((a, b) => a.tick - b.tick || a.seq - b.seq);
   const heardFrom = events.flatMap(asFogEvent);
-  const stepped = split1.flatMap((fc) => caseStep(setup, fc, t, held, step, ordered, heardFrom));
+  const stepped = split1.flatMap((fc) =>
+    caseStep(setup, fc, t, held, step, ordered, heardFrom, fx),
+  );
   const cases = mergeCases(setup, linkSplit(setup, stepped));
   return { tick: t + setup.c.tuning.fog.stepTicks, cases };
 }
@@ -2571,6 +2601,7 @@ function asFogEvent(e: SimEvent): FogEvent[] {
         factIfPerceivedBy: e.factIfPerceivedBy,
         hops: e.hops,
         storylet: e.storylet,
+        state: null,
       },
     ];
   if (e.type === 'voice')
@@ -2586,6 +2617,7 @@ function asFogEvent(e: SimEvent): FogEvent[] {
         factIfPerceivedBy: null,
         hops: 0,
         storylet: null,
+        state: null,
       },
     ];
   return [];

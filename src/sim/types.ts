@@ -1,6 +1,6 @@
 // Simulation types (spec 03 §5, §6, §11). Everything here is plain JSON with integer numbers.
 import type { PlaceSelector } from '../content/schemas/chapter';
-import type { Condition } from '../content/schemas/dsl';
+import type { Condition, Effect } from '../content/schemas/dsl';
 import type { Content } from '../content/schemas/content';
 import type { PathMemo } from './space';
 
@@ -191,6 +191,11 @@ export interface Ctx {
   held?: readonly string[];
   /** Placed cats still dwelling (03 §15.1): phase 6 makes no free decision for them. */
   dwell?: readonly CatId[];
+  /**
+   * In the lantern: effects of its storylets on fogged cats, collected for the fog (03 §13.4); a
+   * storylet that went live with roles still fogged acts on them through the fog.
+   */
+  fogFx?: { cat: CatId; effect: Effect; scope: Scope }[];
   /** Set while the fog evaluates content: reads of fogged cats and fog quantities (03 §13.3). */
   fog?: FogReader;
   /** While a fog decision runs: fog leaves are rounded down to this many ppm (03 §8.2). */
@@ -270,6 +275,8 @@ export interface LanternArgs {
   dwell?: readonly CatId[];
   /** The fog as the lantern reads it: fogged cats and fog quantities as ppm (03 §13.3, §14). */
   fog?: FogReader;
+  /** Fog events a protagonist perceived, drawn into the lantern: perceived in phase 7 (03 §15.1). */
+  incoming?: readonly SimEvent[];
 }
 
 /** Who `self` and `@role` mean while evaluating content. */

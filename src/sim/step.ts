@@ -31,6 +31,8 @@ export interface StepResult {
   state: SimState | null; // null when it stopped at a branch point
   events: SimEvent[];
   branchPoint?: BranchPoint;
+  /** In the lantern: storylet effects on fogged cats, for the fog (03 §13.4). */
+  fogFx?: NonNullable<Ctx['fogFx']>;
 }
 
 /**
@@ -80,6 +82,7 @@ export function step(
     ...(lantern && { live: lantern.live, held: lantern.held }),
     ...(lantern?.dwell && { dwell: lantern.dwell }),
     ...(lantern?.fog && { fog: lantern.fog }),
+    ...(lantern && { fogFx: [] }),
   };
   try {
     pinsAndEffects(ctx); // 1
@@ -88,6 +91,7 @@ export function step(
     storyletsPhase(ctx); // 4
     siftingPhase(ctx); // 5
     decisionsPhase(ctx); // 6
+    ctx.events.push(...(lantern?.incoming ?? [])); // fog events the lantern drew (03 §15.1)
     perception(ctx); // 7
     anchor(ctx); // 8
   } catch (e) {
@@ -95,7 +99,7 @@ export function step(
     throw e;
   }
   ctx.s.tick = ctx.t + 1;
-  return { state: ctx.s, events: ctx.events };
+  return { state: ctx.s, events: ctx.events, ...(ctx.fogFx && { fogFx: ctx.fogFx }) };
 }
 
 /**

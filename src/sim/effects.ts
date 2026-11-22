@@ -14,7 +14,7 @@ import { rand } from './rng';
 import { catNode, catPos, nodePos } from './space';
 import { activate } from './storylets';
 import type { CatId, Ctx, NodeId, Pos, Scope } from './types';
-import { worldScope } from './types';
+import { isLive, worldScope } from './types';
 
 export function addFact(ctx: Ctx, fact: string): void {
   if (insertSorted(ctx.s.facts, fact)) ctx.events.push({ tick: ctx.t, type: 'fact', fact });
@@ -51,9 +51,9 @@ export function emitNamed(
   });
 }
 
-/** Where a cat stands, as an event position. */
+/** Where a cat stands, as an event position (a fogged cat: where it most likely stands). */
 export function catSpot(ctx: Ctx, id: CatId): { pos: Pos; node: NodeId } {
-  const cs = catState(ctx, id);
+  const cs = (!isLive(ctx, id) && ctx.fog?.likely(id)) || catState(ctx, id);
   return { pos: catPos(ctx.c, cs), node: catNode(cs) };
 }
 
@@ -70,6 +70,18 @@ export function runEffects(ctx: Ctx, list: readonly Effect[], scope: Scope): voi
   }
 }
 
+/**
+ * The cats an effect acts on in this step. In the lantern, those in the fog are handed to the fog
+ * with the effect (03 §13.4): a storylet live with some roles still fogged acts on them there.
+ */
+function targets(ctx: Ctx, scope: Scope, who: string, e: Effect): CatId[] {
+  return cats(ctx, scope, who).filter((id) => {
+    if (isLive(ctx, id)) return true;
+    ctx.fogFx?.push({ cat: id, effect: e, scope });
+    return false;
+  });
+}
+
 function apply(ctx: Ctx, e: Effect, scope: Scope): void {
   const { s, t } = ctx;
   if ('goTo' in e) {
@@ -78,15 +90,15 @@ function apply(ctx: Ctx, e: Effect, scope: Scope): void {
       via: e.route === 'via' ? e.via : undefined,
       edgesTagged: e.route === 'edgesTagged' ? e.tag : undefined,
     };
-    for (const id of cats(ctx, scope, who)) goTo(ctx, id, node, 'storylet', opts);
+    for (const id of targets(ctx, scope, who, e)) goTo(ctx, id, node, 'storylet', opts);
   } else if ('startActivity' in e) {
-    for (const id of cats(ctx, scope, e.startActivity[0]))
+    for (const id of targets(ctx, scope, e.startActivity[0], e))
       startActivity(ctx, id, e.startActivity[1], 'storylet');
   } else if ('stop' in e) {
-    for (const id of cats(ctx, scope, e.stop)) stopCat(catState(ctx, id));
+    for (const id of targets(ctx, scope, e.stop, e)) stopCat(catState(ctx, id));
   } else if ('interrupt' in e) {
     const [who, action, ticks] = e.interrupt;
-    for (const id of cats(ctx, scope, who))
+    for (const id of targets(ctx, scope, who, e))
       setInterrupt(ctx, id, action, ticks, scope.storylet ?? 'effect');
   } else if ('emit' in e) {
     const source = (e.from ? cat(ctx, scope, e.from) : null) ?? scope.self ?? scope.origin ?? null;
@@ -114,7 +126,7 @@ function apply(ctx: Ctx, e: Effect, scope: Scope): void {
   } else if ('gauge' in e) {
     const dot = e.gauge.indexOf('.');
     const g = e.gauge.slice(dot + 1);
-    for (const id of cats(ctx, scope, e.gauge.slice(0, dot))) {
+    for (const id of targets(ctx, scope, e.gauge.slice(0, dot), e)) {
       const cs = catState(ctx, id);
       const base = cs.base[g];
       if (base === undefined) continue;

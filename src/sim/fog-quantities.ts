@@ -66,6 +66,8 @@ export interface Quantities {
   heaps: Record<string, Contributor[]>;
   /** P(the anchor's `fraysIf` has held without the anchor by now): dead (03 §12.2, §13.6). */
   dead: number;
+  /** The fog's own events of its last step, for the lantern's perception (03 §15.1). */
+  stepEvents: FogEvent[];
 }
 
 /** An event emitted in the fog this step: P(emitted at that node). */
@@ -80,6 +82,7 @@ export interface FogEvent {
   factIfPerceivedBy: Record<CatId, string> | null;
   hops: number; // socialSpread hops left: perceivers re-emit it next step while above 0
   storylet: string | null; // the storylet whose effect emitted it: its role holders perceive it (03 §4)
+  state: string | null; // the storylet state whose onEnter emitted it
 }
 
 export const INACTIVE = 'inactive';
@@ -112,6 +115,7 @@ export function initialQuantities(c: Content): Quantities {
     mods: [],
     heaps: {},
     dead: 0,
+    stepEvents: [],
   };
 }
 
@@ -221,6 +225,7 @@ export function mixQuantities(
     mods: [],
     heaps: {},
     dead: avg((q) => q.dead),
+    stepEvents: [],
   };
   for (const k of keys((q) => q.facts)) out.facts[k] = avg((q) => q.facts[k] ?? 0);
   for (const k of keys((q) => q.factParts)) {
@@ -325,6 +330,11 @@ export function mixQuantities(
       }
     out.heaps[k] = topSources(merged, c.tuning.fog.contributors);
   }
+  out.stepEvents = mixList(
+    (q) => q.stepEvents,
+    (x) => x.p,
+    (x, p) => ({ ...x, p }),
+  );
   out.mods = mixList(
     (q) => q.mods,
     (x) => x.mass,

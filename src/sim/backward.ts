@@ -18,12 +18,14 @@ import type { CatId, Pin } from './types';
 
 /**
  * What was seen (03 §14): a fogged cat in one of `states` (a placement, a Gaze sample) or in none of
- * them (negative evidence), a fact set or not, a storylet in a state or not.
+ * them (negative evidence), a fact set or not, a storylet in a state or not, an event of the fog's
+ * last step at a node or not (03 §15.1). Who emitted the event stays open.
  */
 export type Evidence =
   | { kind: 'cat'; cat: CatId; states: readonly ChainState[]; holds: boolean }
   | { kind: 'fact'; fact: string; holds: boolean }
-  | { kind: 'state'; storylet: string; state: string; holds: boolean };
+  | { kind: 'state'; storylet: string; state: string; holds: boolean }
+  | { kind: 'event'; name: string; node: string; holds: boolean };
 
 /** P(the evidence | the case), in ppm. A cat not in the fog is the lantern's: evidence about it is 1. */
 export function likelihood(fc: FogCase, ev: Evidence): number {
@@ -39,12 +41,21 @@ export function likelihood(fc: FogCase, ev: Evidence): number {
       return as(fc.q.facts[ev.fact] ?? 0);
     case 'state':
       return as(fc.q.storylets[ev.storylet]?.p[ev.state] ?? 0);
+    case 'event':
+      return as(eventChance(fc, ev.name, ev.node));
     default: {
       const never: never = ev;
       throw new Error(`unknown evidence ${JSON.stringify(never)}`);
     }
   }
 }
+
+/** P(the fog's last step emitted the event at that node) in one case (its sources are exclusive). */
+export const eventChance = (fc: FogCase, name: string, node: string): number =>
+  Math.min(
+    PPM,
+    fc.q.stepEvents.reduce((a, e) => a + (e.name === name && e.node === node ? e.p : 0), 0),
+  );
 
 /** floor(a × WAVE_TOTAL / total) exactly, for 0 ≤ a ≤ total ≤ WAVE_TOTAL (products stay below 2^53). */
 function toWave(a: number, total: number): number {
@@ -93,6 +104,8 @@ function condition(setup: FogSetup, fc: FogCase, ev: Evidence): FogCase {
         q: { ...fc.q, storylets: { ...fc.q.storylets, [ev.storylet]: { ...sl, p } } },
       };
     }
+    case 'event':
+      return fc; // the cases agree with it now; which cat emitted it stays open
     default: {
       const never: never = ev;
       throw new Error(`unknown evidence ${JSON.stringify(never)}`);
