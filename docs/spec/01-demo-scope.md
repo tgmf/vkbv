@@ -12,8 +12,9 @@ A single-page browser game, playable in 15 to 25 minutes on first try. Chapter 1
 - **Cast:** the content in `05`: Marti (the protagonist), Rokko, the tea keeper, the
   road crew and the townscats of the test slice.
 - **Goal (the anchor):** Marti meets Rokko under the upturned boat on the beach while
-  it rains. Left alone, Marti never leaves his flat and the timeline frays when Rokko
-  leaves.
+  it rains. Rokko waits there until, a couple of hours after the rain stops, he takes
+  the boat out to sea; the player has to get Marti there before that. Left alone, Marti
+  never leaves his flat and the timeline frays when the boat leaves (Tagir, 2026-11-23).
 - **The world is a wave.** Everything not yet watched is drawn as ghosts. Marti and
   the cats he perceives form the **lantern**, simulated tick by tick; everything else
   is the **fog**, computed as probabilities (`03` §13). Only what Marti perceives
@@ -64,8 +65,8 @@ everything below must emerge from the rules in `03` to `05`.
    arrives.
 3. The player inspects the five objects in the flat and gets five cards, tries some on
    Marti. Little happens, but the charge payouts start to grow.
-4. The player plays on, faster. Some time between 11:00 and 13:00 it rains; when the
-   rain stops, Rokko leaves the beach and the timeline frays.
+4. The player plays on, faster. Some time between 11:00 and 13:00 it rains; a couple of
+   hours after the rain stops, Rokko takes the boat out to sea and the timeline frays.
 5. The rain's start made the lure affordable. The player scrolls back and places it at
    the front door; the day re-runs up to the new story and stops. Playing on, Marti goes
    to the door and turns back. The player learns to prime him (an empty kettle, light

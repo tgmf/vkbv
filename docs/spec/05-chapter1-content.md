@@ -25,7 +25,7 @@ If the content seems wrong or unbalanced, measure it (§5), report it in
 | `powers.json` | Lure (100 charge) and Gaze (40 charge, 6 m, 5 ticks) |
 | `storylets.json` | 16 storylets: 8 required, 2 special-effect ones, 6 chaos |
 | `detectors.json` | 7 patterns: soaked, near miss, waited under the awning, streets empty, and others |
-| `anchor.json` | Requirement tree with weights summing to 100; frays when Rokko leaves before the meeting |
+| `anchor.json` | Requirement tree with weights summing to 100; frays when Rokko takes the boat out to sea (a couple of hours after the rain stops) before the meeting. Content to change: `docs/questions.md` M2-18 |
 | `economy.json` | Charge payouts per storylet state and per detector; the charge floor at rain start; cards from exploring |
 | `text/en.json`, `text/ru.json` | Every content text key in both languages |
 

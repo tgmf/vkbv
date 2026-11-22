@@ -1057,9 +1057,12 @@ fact ever lies past the lantern edge. (Tagir, 2026-11-22; replaces option (a) of
 
 **Fray.** (Tagir, 2026-11-23, `docs/questions.md` M2-16.) Whether the anchor can still
 be reached depends on everything the player might yet do, so it is never computed.
-The fray is instead the chapter's **point of no return**: its `fraysIf` (Chapter 1:
-Rokko has left or run home, and they have not met), a fact about the world that no
-player action undoes (content must keep it so). P(alive) = 1 000 000 − P(dead), where
+The fray is instead the chapter's **point of no return**: its `fraysIf` (Chapter 1: the
+boat has left for the sea with Rokko, a couple of hours after the rain stops, and they
+have not met), a fact about the world that no player action undoes (content must keep
+it so). Rokko is unwatched until Marti meets him, so his waiting is never declared
+over before then; a point of no return timed from the weather is held by the lantern
+as fact (its weather is concrete). P(alive) = 1 000 000 − P(dead), where
 P(dead) is the fog's
 probability, over its cases by weight, that `fraysIf` has held without the anchor fact
 by `t` (§13.6, the running maximum per case), each case reading what the lantern holds

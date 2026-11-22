@@ -372,4 +372,24 @@ Fray (same day): Tagir pointed out that the anchor's reachability cannot be comp
 player's future actions). The fray never computes it: it is the chapter's point of no return
 (`fraysIf`). `03` §16 and the glossary's "Fray" row reworded to say so.
 
+## M2-18 — Chapter 1's point of no return: the boat leaves            (status: spec updated, content to change)
+Where: `src/content/data/ch1/anchor.json` (`fraysIf`), `storylets.json` (Rokko's leaving), `world.json`
+(`ticks`), `05` §5.2 (B7)
+Decision: Tagir, 2026-11-23: Rokko does not go home. He waits, and a couple of hours after the rain is
+over (closer to midnight) he leaves with the boat for the sea. The player has to get Marti there before
+that. Rokko is unwatched until they meet, so the fog never declares his waiting over; a departure timed
+from the rain's stop is a world fact the lantern holds concretely, so the fray is exact.
+Spec updated: `01` §1 and §3, `03` §16, `05` §1, glossary "Fray".
+Content changes this needs (Tagir's files, not made by the coding model):
+1. `anchor.json` `fraysIf`: the boat has left (a new fact) and no meeting, instead of
+   `rokkoLeft`/`rokkoRanHome`.
+2. `storylets.json`: Rokko's leaving (`rokkoLeft`, `rokkoRanHome`, his `goTo` to the netmaker's attic,
+   lines ~324–329) replaced by the boat leaving a fixed time after `rainStopped` (a world timing the
+   lantern holds, not Rokko's free choice).
+3. The timing: the rain stops between 13:20 and 17:00, so "a couple of hours after" is about
+   15:20–19:00; "closer to midnight" would need a longer delay and a longer day than `world.ticks` 900
+   (05:40–20:40).
+4. B7 (`late_lure` at 17:30 frays on 45 of 50 seeds) may no longer hold with a later departure.
+Answer:
+
 <!-- Gate notes and answers go above this line. -->

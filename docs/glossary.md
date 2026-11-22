@@ -252,7 +252,7 @@ Terms borrowed from research on curated emergent narrative (Ryan; Kreminski's Fe
 
 | Term | Definition | Notes |
 | --- | --- | --- |
-| Fray | The first tick from which the anchor can no longer happen whatever the player does: the chapter's point of no return (`fraysIf`) has passed, or almost surely has. The playhead stops there. | Anchor-level failure. Chapter 1: Rokko leaves when the rain stops. Never computed from the anchor's own probability, which depends on the player's future actions. An unwatched, merely likely point of no return does not end the timeline. |
+| Fray | The first tick from which the anchor can no longer happen whatever the player does: the chapter's point of no return (`fraysIf`) has passed, or almost surely has. The playhead stops there. | Anchor-level failure. Chapter 1: a couple of hours after the rain stops, Rokko takes the boat out to sea; the player has to get Marti there first. Never computed from the anchor's own probability, which depends on the player's future actions. An unwatched, merely likely point of no return does not end the timeline. |
 | Break | A watched, paid event that no longer happens after an edit. | Event-level. Costs only the frontier progress it gave. |
 | Break alert | Warning, shown before an edit lands, that it would break a paid event. Information only, no penalty. |  |
 | Changed, unwatched | A quiet mark on a thread for a watched but unpaid event that shifted after an edit. | No alert. |
