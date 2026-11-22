@@ -3,6 +3,7 @@
     {
       "id": "lure", "nameKey": "power.lure.name", "textKey": "power.lure.text",
       "cost": 100, "targets": ["place"], "radiusM": 25, "ticks": 30,
+      "availableWhen": { "fact": "rainStarted" },
       "affects": { "kinds": ["protagonist"], "orTemperatureTenthsGte": 22 },
       "effects": [
         { "prim": "attract", "radiusM": 25, "strength": 3, "ticks": 30, "scale": { "primeCount": "marti", "add": 2 } },

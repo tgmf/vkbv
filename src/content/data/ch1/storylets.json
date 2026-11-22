@@ -65,8 +65,8 @@
                 { "if": { "clock": ["09:00", "09:40"] }, "add": 4 },
                 { "gauge": "@foreman.sunbeamTax", "per": 300, "add": 1 }
               ] } },
-            { "to": "finished", "kind": "auto", "gate": { "counter": "roadwork", "gte": 800 } },
-            { "to": "abandoned", "kind": "auto", "gate": { "all": [{ "weather": "rain" }, { "counter": "roadwork", "lt": 800 }] } }
+            { "to": "finished", "kind": "auto", "gate": { "counter": "roadwork", "gte": 1740 } },
+            { "to": "abandoned", "kind": "auto", "gate": { "all": [{ "weather": "rain" }, { "counter": "roadwork", "lt": 1740 }] } }
           ]
         },
         "on_break": {
@@ -74,7 +74,7 @@
           "onEnter": [{ "startActivity": ["@crew", "tea_break"] }],
           "exits": [
             { "to": "working", "kind": "hazard", "perMille": 60 },
-            { "to": "abandoned", "kind": "auto", "gate": { "all": [{ "weather": "rain" }, { "counter": "roadwork", "lt": 800 }] } }
+            { "to": "abandoned", "kind": "auto", "gate": { "all": [{ "weather": "rain" }, { "counter": "roadwork", "lt": 1740 }] } }
           ]
         },
         "finished": {

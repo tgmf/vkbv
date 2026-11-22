@@ -30,7 +30,7 @@
     ]
   },
   "counters": {
-    "roadwork": { "start": 0, "target": 800, "note": "worker-minutes; one per working crew cat per tick" }
+    "roadwork": { "start": 0, "target": 1740, "note": "worker-minutes; one per working crew cat per tick" }
   },
   "tags": [
     "indoor", "sheltered", "outdoor", "kettle", "sunny", "box", "shore", "home", "shop", "curio", "chain", "window"

@@ -43,6 +43,8 @@ content now.
 | File | Addition | Why |
 | --- | --- | --- |
 | `world.json` → `perception` | `"openWindowSightPerMille": 0` | `03` §4 needs a sight multiplier for open windows; 0 keeps the town unseen from the flat |
+| `powers.json` → lure | `"availableWhen": { "fact": "rainStarted" }` | the lure is available only once it rains (`04` §3.2; Tagir, 2026-11-23) |
+| `world.json`, `storylets.json`, `detectors.json`, `anchor.json` | rain around 17:00–22:00, the day to 00:40, the boat leaving 120 dry ticks after the rain (`boat_sails`), Rokko sailing with it, roadwork 1740 | Tagir, 2026-11-23 (`docs/questions.md` M2-18) |
 
 ## 3. Keys the engine reads differently or not at all
 
@@ -127,7 +129,8 @@ them pass. Properties that hold become tests. For those that do not, Tagir decid
 file.
 
 Clock to tick: `tick = minutes since 05:40`. 06:00 = 20, 08:00 = 140, 11:00 = 320,
-13:00 = 440, 13:05 = 445, 17:00 = 680, 17:30 = 710.
+15:10 = 570, 17:00 = 680, 17:20 = 700, 17:30 = 710, 17:35 = 715, 19:00 = 800,
+23:58 = 1098. The rain has surely started by 17:30 (tick 710).
 
 ### 5.1 Pin sets
 
@@ -136,13 +139,16 @@ Pins are written `card@target@tick` or `power@place@tick`.
 | Name | Pins |
 | --- | --- |
 | `untouched` | none |
-| `lure_unprimed` | `lure@flat.door@445` |
-| `lure_one_prime` | `irresistible_junk@odds_jar@430` (special); `lure@flat.door@445` |
-| `lure_primed` | `empty_teapot@kettle@300`; `irresistible_junk@odds_jar@430` (special); `lure@flat.door@445` |
+| `lure_unprimed` | `lure@flat.door@715` |
+| `lure_one_prime` | `irresistible_junk@odds_jar@700` (special); `lure@flat.door@715` |
+| `lure_primed` | `empty_teapot@kettle@570`; `irresistible_junk@odds_jar@700` (special); `lure@flat.door@715` |
 | `road_tea` | `lure_primed` plus `tea_break@town.roadworks@180` |
 | `road_box` | `lure_primed` plus `box@town.roadworks@200` |
 | `road_both` | `lure_primed` plus `tea_break@town.roadworks@180`, `box@town.roadworks@200` |
-| `late_lure` | `road_both` with the lure moved to `@710` |
+| `late_lure` | `road_both` with the lure moved to `@1098` (23:58, just before the boat can leave) |
+
+Retimed 2026-11-23 for the rain around 17:00 (Tagir): the lure after the rain has surely
+started, its primes kept as far before it as before.
 | `cards_on_marti` | `tea_break@marti@100`; `something_shiny@marti@200` |
 
 ### 5.2 Properties
@@ -156,9 +162,9 @@ them. "Frays" is the lantern's fray (`03` §16).
 | Id | Property | Kind |
 | --- | --- | --- |
 | B1 | `untouched`: Marti is in region `flat` at every tick of the whole-day run | structural, a test from M2 |
-| B2 | `lure_unprimed`: P(`martiOut` by 14:30) ≤ 15% | balance |
-| B3 | `lure_one_prime`: P(`martiOut` by 14:30) ≤ 35% | balance |
-| B4 | `lure_primed`: P(`martiOut` by 14:30) ≥ 60% | balance |
+| B2 | `lure_unprimed`: P(`martiOut` by 19:00) ≤ 15% | balance |
+| B3 | `lure_one_prime`: P(`martiOut` by 19:00) ≤ 35% | balance |
+| B4 | `lure_primed`: P(`martiOut` by 19:00) ≥ 60% | balance |
 | B5 | Over the non-empty subsets of {`tea_break@town.roadworks@180`, `box@town.roadworks@200`, `sudden_flea@gavrila@220`, `something_shiny@town.roadworks@240`}, added to `lure_primed`: no single pin gives P(`roadBlocked` at rain start) ≥ 50%; at least 3 subsets do | balance |
 | B6 | `road_tea`, `road_box`, `road_both`: the timeline does not fray on at least 45 of 50 seeds | balance |
 | B7 | `late_lure` frays on at least 45 of 50 seeds (the window closes) | balance |

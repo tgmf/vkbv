@@ -123,7 +123,10 @@ cannot be withdrawn or moved: it stays and fires whenever its target is there.
 ### 3.2 Powers
 
 `usePower(powerId, place)`: allowed when `charge >= power.cost`, the place is in
-`revealed`, `playhead <= lanternEdge`, and the power targets `place`. Subtract the
+`revealed`, `playhead <= lanternEdge`, the power targets `place`, and its
+`availableWhen` (if any) holds in the lantern at the playhead. Chapter 1's lure is
+available only once the rain has started: Marti leaves only after the rain starts
+(Tagir, 2026-11-23). Subtract the
 cost and add a power pin at the playhead. Charge is **never refunded**: withdrawing a
 power pin returns nothing, and moving it (`movePin`) costs the full cost again and is
 refused when charge is short. A power pin that fizzles keeps what was paid.

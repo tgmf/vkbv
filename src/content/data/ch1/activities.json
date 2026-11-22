@@ -65,7 +65,7 @@
     },
     {
       "id": "work_road", "at": { "node": "town.roadworks" }, "ticks": [20, 40],
-      "gate": { "all": [{ "weather": "dry" }, { "fact": "crewArrived" }, { "counter": "roadwork", "lt": 800 }] },
+      "gate": { "all": [{ "weather": "dry" }, { "fact": "crewArrived" }, { "counter": "roadwork", "lt": 1740 }] },
       "score": { "base": 5, "terms": [{ "gauge": "self.C", "per": 300, "add": 1 }] },
       "while": [{ "counter": "roadwork", "add": 1 }]
     },

@@ -397,7 +397,7 @@ describe('Chapter 1 with pins (03 §18)', () => {
       ch1Coarse.cats.map((x) => x.id),
     );
     let fired = 0;
-    while (fog.tick < 540) {
+    while (fog.tick < 780) {
       fog = fogStep(setup, fog, undefined, true, null, pins);
       expect(fog.cases.reduce((a, fc) => a + fc.weight, 0)).toBe(WAVE_TOTAL);
       for (const fc of fog.cases)
@@ -407,7 +407,7 @@ describe('Chapter 1 with pins (03 §18)', () => {
     for (const fc of fog.cases)
       fired = Math.max(fired, ...pins.map((p) => fc.q.pins[p.id]?.fired ?? 0));
     expect(fired).toBe(1_000_000);
-    // the lure at 445 brings the fogged Marti to the door; its gate { power: lure, near: @marti }
+    // the lure at 715 (after the rain has started) brings the fogged Marti to the door; its gate { power: lure, near: @marti }
     // opens door_lure's choice and the walk out can follow
     const share = (get: (fc: FogCase) => number) =>
       fog.cases.reduce((a, fc) => a + Math.trunc((get(fc) * fc.weight) / WAVE_TOTAL), 0);

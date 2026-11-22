@@ -404,5 +404,12 @@ Open follow-ups (Tagir's content):
   blocked and `blocked_road` (a main storylet) rarely happens;
 - the charge floor comes at rain start (17:00), so the lure is affordable late in the day;
 - B2–B7 and calibration need measuring again once the pin sets are retimed.
+Follow-ups answered (Tagir, same day): the lure is available only at rain, since Marti leaves only after
+the rain starts (`powers.json` lure `availableWhen: { fact: rainStarted }`, `04` §3.2); the roadworks are
+longer: 1740 units instead of 800, the work done by the rain's start in 43% of reference days (the old
+untouched blocked rate; 100 seeds, 1473–1969 units at rain start). Pin sets retimed (`05` §5.1): the
+lure at 17:35 (715), its primes kept as far before it (570, 700), `late_lure` at 23:58 (1098); B2–B4
+read "by 19:00". Check, 8 seeds of road_both: anchor reached 3 with Marti live, 2 in the reference;
+the road blocked in 6 of 8 reference days.
 
 <!-- Gate notes and answers go above this line. -->

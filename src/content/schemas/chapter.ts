@@ -207,6 +207,8 @@ export const PowerSchema = obj({
   affects: obj({ kinds: z.array(id), orTemperatureTenthsGte: int.optional() }).optional(),
   effects: z.array(Prim),
   leadTo: z.unknown().optional(), // out of the demo (05 §3)
+  /** The power can be placed only while this holds at the playhead (04 §3.2). */
+  availableWhen: Condition.optional(),
   pressure: int.min(0),
 });
 export const PowersSchema = z.strictObject({ powers: z.array(PowerSchema) });
