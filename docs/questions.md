@@ -284,4 +284,32 @@ stays about 27% all day. Whether a projection frays (B6, B7) is clear either way
 the end.
 Answer:
 
+## M2-13 — Exactness on the tiny world: a deterministic cat is exact, a stochastic one is not yet            (status: open)
+Where: M2 acceptance ("with one fogged cat and no links, the fog's marginals match an exact enumeration
+of single histories within `fog.exactTolerancePpm`"); `tests/sim/lantern.test.ts`
+Question: Single histories sample choices as counter-based noise, so they cannot be enumerated; the test
+uses many streams of the fogged cat (Tagir, 2026-11-22). With the fog's approximations switched off
+(1-tick steps, exact boredom, 490 bands, no state floor) the fogged bystander matches its single
+histories exactly (0 ppm at every tick checked, 200 streams). The hero, whose choices vary, does not: at
+06:08 the fog gives wander 84.3% against 88.7% over 4 000 streams (sampling sd about 0.5%); later ticks
+are within 5–6 points, two departure ticks differ more. Something in a stochastic decision or in how the
+live cats around a fogged one behave still differs from the lantern.
+Options seen: (a) investigate before M2 is done (start: the hero's first decision, 06:05, fog vs lantern
+inputs); (b) accept the bystander test as the acceptance check and leave the hero as a known gap.
+Chosen for now: (b) in the test; (a) recommended.
+Answer:
+
+## M2-14 — martiOut under road_both after the walking fix            (status: open)
+Where: `07` §3; `src/sim/fog.ts` (`pathTicks`); `docs/handoff/M2.md`
+Question: Fogged cats walked one tick per edge faster than live ones (the lantern starts each edge the tick
+after it stands at its first node); fixed in step 6. With it, 60-seed calibration: `untouched` passes
+(road blocked 45.6% vs 43.3%); `road_both` misses one bucket (40–50%: 46.8% predicted vs 62.3%
+observed) because martiOut falls from 62.5% to 56.9% against 71.7% observed, and the anchor to 2.4% vs
+6.7%. Road blocked under road_both is 62.8% vs 60.0%.
+Options seen: (a) find the source (compare fogged Marti hour by hour around the lure, as for M2-8);
+(b) accept until the lantern carries Marti in play (the projection is only for vetting, calibration and
+balance).
+Chosen for now: none; (a) is next.
+Answer:
+
 <!-- Gate notes and answers go above this line. -->
