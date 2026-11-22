@@ -695,7 +695,7 @@ export function decide(ctx: Ctx, id: CatId): void {
 }
 
 /** The nearest place (by path minutes) outside a repel effect's radius. */
-function nearestOutside(ctx: Ctx, id: CatId, e: RunningEffect): NodeId | null {
+export function nearestOutside(ctx: Ctx, id: CatId, e: RunningEffect): NodeId | null {
   const cs = catState(ctx, id);
   const { dist } = reach(ctx.c, planFrom(cs), cs.knowsClosed, undefined, ctx.memo);
   const centre = nodePos(ctx.c, e.place);

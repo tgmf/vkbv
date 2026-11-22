@@ -144,7 +144,8 @@ describe('bands (03 §13.2)', () => {
           walk: null,
           bands: { ...hero.chain[0]?.s.bands, boxPull: b },
           interrupt: null,
-          control: 'forced',
+          control: 'forced', // a card's delay with steps left: it stays put and decides nothing
+          forced: 2,
         },
         p: 1_000_000,
       },

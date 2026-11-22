@@ -1,7 +1,7 @@
 // World quantities in the fog, per case (spec 03 §13.6). Every value is an integer: ppm, or a
 // counter's expected value and variance.
 import { PPM } from './math';
-import type { CatId, Content } from './types';
+import type { CatId, Content, RunningEffect } from './types';
 
 /** One contribution to a flag: P(it set the flag) and when that setting expires. */
 export interface FlagPart {
@@ -15,6 +15,24 @@ export interface FogStorylet {
   roles: Record<string, CatId[]> | null; // bound at first activation
 }
 
+/** A running effect a pin created in the fog, with P(it exists) in this case (03 §13.6). */
+export interface FogEffect extends RunningEffect {
+  p: number;
+}
+
+/**
+ * A temporary gauge mod on a fogged cat, waiting to shift back (03 §13.2): `left` gauge units still to
+ * undo over `leftSteps` fog steps, on a fraction `mass` of the chain. `hold`: all at once at the end.
+ */
+export interface FogMod {
+  cat: CatId;
+  gauge: string;
+  left: number;
+  leftSteps: number;
+  mass: number;
+  hold: boolean;
+}
+
 export interface Quantities {
   facts: Record<string, number>; // P(set by now): its parts combined as independent
   /** A fact's sources: '' for independent contributions; a storylet state's entering masses add. */
@@ -25,6 +43,11 @@ export interface Quantities {
   storylets: Record<string, FogStorylet>;
   heard: Record<CatId, Record<string, number>>; // P(the cat has perceived the event)
   detectors: Record<string, number[]>; // per kernel clause, the highest ppm reached so far
+  /** Each pin seen so far: P(fired by now) and P(it fizzled at its tick) (03 §11, §13.6). */
+  pins: Record<string, { fired: number; fizzled: number }>;
+  effects: FogEffect[]; // in creation order
+  echoes: FogEvent[]; // socialSpread hops to emit at the next step (03 §9.3)
+  mods: FogMod[]; // in creation order
 }
 
 /** An event emitted in the fog this step: P(emitted at that node). */
@@ -37,6 +60,7 @@ export interface FogEvent {
   to: CatId | null;
   global: boolean;
   factIfPerceivedBy: Record<CatId, string> | null;
+  hops: number; // socialSpread hops left: perceivers re-emit it next step while above 0
 }
 
 export const INACTIVE = 'inactive';
@@ -55,7 +79,19 @@ export function initialQuantities(c: Content): Quantities {
     counters[k] = { mean: v.start * PPM, variance: 0 };
   const storylets: Record<string, FogStorylet> = {};
   for (const sl of c.storylets) storylets[sl.id] = { p: { [INACTIVE]: PPM }, roles: null };
-  return { facts: {}, factParts: {}, flags, counters, storylets, heard: {}, detectors: {} };
+  return {
+    facts: {},
+    factParts: {},
+    flags,
+    counters,
+    storylets,
+    heard: {},
+    detectors: {},
+    pins: {},
+    effects: [],
+    echoes: [],
+    mods: [],
+  };
 }
 
 /** P(the flag is set at tick t): any unexpired contribution. */
@@ -158,6 +194,10 @@ export function mixQuantities(
     storylets: {},
     heard: {},
     detectors: {},
+    pins: {},
+    effects: [],
+    echoes: [],
+    mods: [],
   };
   for (const k of keys((q) => q.facts)) out.facts[k] = avg((q) => q.facts[k] ?? 0);
   for (const k of keys((q) => q.factParts)) {
@@ -208,6 +248,47 @@ export function mixQuantities(
     const n = Math.max(...parts.map((x) => x.q.detectors[d]?.length ?? 0));
     out.detectors[d] = Array.from({ length: n }, (_, i) => avg((q) => q.detectors[d]?.[i] ?? 0));
   }
+  for (const k of keys((q) => q.pins))
+    out.pins[k] = {
+      fired: avg((q) => q.pins[k]?.fired ?? 0),
+      fizzled: avg((q) => q.pins[k]?.fizzled ?? 0),
+    };
+  // listed records (effects, echoes, mods): the same record in several cases mixes its probability
+  const mixList = <T>(
+    get: (q: Quantities) => T[],
+    prob: (x: T) => number,
+    set: (x: T, p: number) => T,
+  ) => {
+    const seen: string[] = [];
+    const list: T[] = [];
+    for (const x of parts)
+      for (const r of get(x.q)) {
+        const k = JSON.stringify(set(r, 0));
+        if (seen.includes(k)) continue;
+        seen.push(k);
+        const p = avg((q) => {
+          const same = get(q).find((y) => JSON.stringify(set(y, 0)) === k);
+          return same ? prob(same) : 0;
+        });
+        if (p > 0) list.push(set(r, p));
+      }
+    return list;
+  };
+  out.effects = mixList(
+    (q) => q.effects,
+    (x) => x.p,
+    (x, p) => ({ ...x, p }),
+  );
+  out.echoes = mixList(
+    (q) => q.echoes,
+    (x) => x.p,
+    (x, p) => ({ ...x, p }),
+  );
+  out.mods = mixList(
+    (q) => q.mods,
+    (x) => x.mass,
+    (x, mass) => ({ ...x, mass }),
+  );
   return out;
 }
 
