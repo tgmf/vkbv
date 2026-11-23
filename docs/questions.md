@@ -412,4 +412,33 @@ lure at 17:35 (715), its primes kept as far before it (570, 700), `late_lure` at
 read "by 19:00". Check, 8 seeds of road_both: anchor reached 3 with Marti live, 2 in the reference;
 the road blocked in 6 of 8 reference days.
 
+## M2-19 — totalPressure without the fogged cats            (status: open)
+Where: `03` §15.2 ("`totalPressure`: the summed pressure of all live cats plus the expected pressure of
+the fogged ones"); `src/sim/observe.ts` (`watch`), marked `QUESTION(M2-19)`
+Question: the fog does not track pressure (decisions.md, M2: pressure and `touchedBy` of fogged cats are
+not computed), so a watched fact has no expected pressure for fogged cats.
+Options seen: (a) the live cats' sum only; (b) a mean-field pressure per fogged cat (pressure from pins
+landing on its chain, decaying as in `03` §11), mixed over the cases.
+Chosen for now: (a). It only matters once payouts and the UI read `totalPressure` (M3).
+Answer:
+
+## M2-20 — What an imposed fact compares            (status: open)
+Where: `03` §15.5; `src/sim/observe.ts` (`imposed`), `src/sim/lantern.ts` (`advance`), marked
+`QUESTION(M2-20)`
+Question: §15.5 compares the lantern's view with the watched fact part by part. Three parts are
+simplified:
+1. a live cat the edit changed (it was placed before the fact's tick and no longer stands or acts as
+   watched): §15.5 re-derives "its chain from the tick it diverged"; the lantern keeps no such chain, so
+   the fact reopens;
+2. cats the re-run shows that the fact did not: ignored (the fact said nothing about them);
+3. the parts are P's own position, activity and interrupt and each seen cat's node and activity; the
+   fact's storylet states, detectors, events and facts are not compared (they follow from the cats in the
+   cases tested so far).
+Options seen for 1: (a) reopen (chosen for now); (b) keep each live cat's fog chain from its placement
+on, so an edit can force it back. Measured on the tiny world with the approximations off (seeds 1–8, a
+`scare` at street.a at tick 2 as the edit, 40 ticks of the hero's facts each): 31 facts that the edit
+changed held by forcing a cat back, 59 reopened (54 of them on seeds 1, 2 and 8, where the edited cat was
+already live or the watched state had no mass left).
+Answer:
+
 <!-- Gate notes and answers go above this line. -->
