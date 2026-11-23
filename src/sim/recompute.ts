@@ -78,7 +78,7 @@ export function editTick(
 }
 
 /** The number of fog states over every cat and case. */
-const fogStates = (fog: Fog): number =>
+export const fogStateCount = (fog: Fog): number =>
   fog.cases.reduce(
     (a, fc) => a + Object.values(fc.cats).reduce((b, x) => b + x.chain.length, 0),
     0,
@@ -146,7 +146,7 @@ export function* rerun(
     frames.push(frame);
     stats.cases.push(w.fog.cases.length);
     stats.live.push(w.lantern.live.length);
-    stats.states.push(fogStates(w.fog));
+    stats.states.push(fogStateCount(w.fog));
     if (t % every === 0 && t > from) checkpoints.push(w);
   };
 
@@ -240,27 +240,36 @@ export function rerunAll(setup: FogSetup, prev: Timeline | null, req: RerunReque
 /**
  * The whole-day run (03 §13.1): the followed protagonists live from tick 0, every other cat in the
  * fog, the pins applied, nobody watching, no frontier limit; to the lantern's fray, the anchor's
- * end or the chapter's end. Seed vetting, calibration and the balance measures read it.
+ * end or the chapter's end. Seed vetting, calibration and the balance measures read it. `each`, if
+ * given, sees every wave from tick 0 to the last (`npm run sim -- --fog`).
  */
-export function wholeDayRun(setup: FogSetup, pins: readonly Pin[]): Wave {
+export function wholeDayRun(setup: FogSetup, pins: readonly Pin[], each?: (w: Wave) => void): Wave {
   const { c } = setup;
   const followed = followedCats(c);
   let w = initialWave(setup, followed);
+  each?.(w);
   while (w.fray === null && w.lantern.sim.tick < c.world.ticks) {
     const reached = w.lantern.sim.anchor.reachedAt;
     if (reached !== null && w.lantern.sim.tick > reached + c.tuning.end.afterAnchorTicks) break;
     w = advance(setup, w, pins, followed);
+    each?.(w);
   }
   return w;
 }
 
 /**
- * A projection from a wave (03 §13.1): the fog alone to the chapter's end, every live cat a point
- * mass at its live state, and what the lantern holds (facts, flags, counters, its storylets' states)
- * fixed in every case. Running effects of the lantern are not carried over (an approximation; only
- * strain reads this, in the debug panel).
+ * A projection from a wave (03 §13.1): the fog alone to the chapter's end, from `projectionFog`.
+ * Only strain reads it, in the debug panel.
  */
-export function projectFrom(setup: FogSetup, wave: Wave, pins: readonly Pin[]): Projection {
+export const projectFrom = (setup: FogSetup, wave: Wave, pins: readonly Pin[]): Projection =>
+  projectToEnd(setup, projectionFog(setup, wave), pins);
+
+/**
+ * Where a projection from a wave starts (03 §13.1): every live cat a point mass at its live state,
+ * and what the lantern holds (facts, flags, counters, its storylets' states) fixed in every case.
+ * Running effects of the lantern are not carried over (an approximation).
+ */
+export function projectionFog(setup: FogSetup, wave: Wave): Fog {
   const { c } = setup;
   const { sim, live, heldStorylets } = wave.lantern;
   const cases = wave.fog.cases.map((fc) => {
@@ -293,5 +302,5 @@ export function projectFrom(setup: FogSetup, wave: Wave, pins: readonly Pin[]): 
     }
     return { ...fc, cats, q };
   });
-  return projectToEnd(setup, { tick: wave.fog.tick, cases }, pins);
+  return { tick: wave.fog.tick, cases };
 }

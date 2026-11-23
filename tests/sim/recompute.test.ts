@@ -1,7 +1,7 @@
 // The re-run (03 §17, 04 §6): the frontier limit, the fray and the end, checkpoints, facts past the
 // edge, the 03 §18 invariants about re-runs; the whole-day run and the projection from the edge.
 import { describe, expect, it } from 'vitest';
-import { anchorChance } from '../../src/sim/backward';
+import { anchorChance, projectToEnd } from '../../src/sim/backward';
 import { fogSetup, type FogSetup } from '../../src/sim/fog';
 import { frameOf } from '../../src/sim/frames';
 import { canonicalJson, hashState } from '../../src/sim/hash';
@@ -11,6 +11,7 @@ import { watch } from '../../src/sim/observe';
 import {
   editTick,
   projectFrom,
+  projectionFog,
   rerun,
   rerunAll,
   wholeDayRun,
@@ -353,6 +354,22 @@ describe('the whole-day run and the projection from the edge (03 §13.1, §14)',
       expect(r.result.end.kind).toBe('fray');
       expect(w.fray).toBe(r.result.end.tick);
     }
+  });
+
+  it('shows every wave and every projected fog to `each`, changing nothing', () => {
+    const setup = fogSetup(tiny, 1);
+    const pins = [glowAt(0)];
+    const ticks: number[] = [];
+    const w = wholeDayRun(setup, pins, (x) => ticks.push(x.lantern.sim.tick));
+    expect(canonicalJson(w)).toBe(canonicalJson(wholeDayRun(setup, pins)));
+    expect(ticks).toEqual(Array.from({ length: w.lantern.sim.tick + 1 }, (_, t) => t));
+    const start = projectionFog(setup, initialWave(setup, ['hero']));
+    const fogTicks: number[] = [];
+    const p = projectToEnd(setup, start, pins, (f) => fogTicks.push(f.tick));
+    expect(canonicalJson(p)).toBe(canonicalJson(projectToEnd(setup, start, pins)));
+    const k = tiny.tuning.fog.stepTicks;
+    expect(fogTicks).toEqual(fogTicks.map((_, i) => start.tick + (i + 1) * k));
+    expect(fogTicks.at(-1)).toBe(p.fog.tick);
   });
 
   it('projects with every live cat a point mass and the lantern’s facts fixed; strain is its P(anchor)', () => {

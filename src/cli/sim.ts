@@ -1,5 +1,8 @@
 // `npm run sim -- --seed 1 [--stream 0] [--pinset name | --pins f.json] [--content dir] [--from t] [--to t] [--cat id]`
 // Runs one history headless and prints one line per event, then the end and the final state hash.
+// `--fog [--strain]`: the wave instead, a whole-day run hour by hour (`--strain` adds strain each hour:
+// minutes on Chapter 1); `--projection`: the fog alone from tick 0 (fog-report.ts). Both ignore
+// --stream, --from, --to and --cat.
 import { parseArgs } from 'node:util';
 import { CHAPTER1_FILES, PINSETS_FILE, TUNING_FILE } from '../content/chapter1';
 import { ContentError, loadChapter, loadTuning, parsePinSets } from '../content/load';
@@ -9,6 +12,7 @@ import { hhmm } from '../sim/space';
 import { traceLine } from '../sim/trace';
 import type { Pin, SimEvent } from '../sim/types';
 import { readChapterDir, readJson } from './files';
+import { fogReport } from './fog-report';
 
 const { values } = parseArgs({
   options: {
@@ -20,13 +24,11 @@ const { values } = parseArgs({
     from: { type: 'string' },
     to: { type: 'string' },
     cat: { type: 'string' },
-    waves: { type: 'boolean', default: false },
+    fog: { type: 'boolean', default: false },
+    projection: { type: 'boolean', default: false },
+    strain: { type: 'boolean', default: false },
   },
 });
-if (values.waves) {
-  console.log('--waves is not available until M2.');
-  process.exit(0);
-}
 
 let c;
 try {
@@ -50,6 +52,12 @@ const pins = values.pinset
     : [];
 const from = values.from === undefined ? 0 : Number(values.from);
 const to = values.to === undefined ? Infinity : Number(values.to);
+
+if (values.fog || values.projection) {
+  for (const line of fogReport(c, seed, pins, values.fog ? 'fog' : 'projection', values.strain))
+    console.log(line);
+  process.exit(0);
+}
 
 const mentions = (e: SimEvent, cat: string) => JSON.stringify(e).includes(`"${cat}"`);
 

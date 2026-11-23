@@ -6,8 +6,8 @@
 // (docs/questions.md M2-21): frames carry the fog's filtered odds.
 import type { Requirement } from '../content/schemas/chapter';
 import { fogStates, WAVE_TOTAL, type Fog, type FogSetup } from './fog';
-import { or, times } from './fog-quantities';
-import type { Wave } from './lantern';
+import { INACTIVE, or, times } from './fog-quantities';
+import type { LanternState, Wave } from './lantern';
 import { PPM } from './math';
 import { catNode, catPos } from './space';
 import type { CatId, Content, Frame, Ghost, SimEvent, SimState } from './types';
@@ -68,6 +68,39 @@ function itemChance(sim: SimState, fog: Fog, r: Requirement): number {
   if ('fact' in r) return factChance(sim, fog, r.fact);
   if ('all' in r) return r.all.reduce((a, x) => times(a, itemChance(sim, fog, x)), PPM);
   return r.any.reduce((a, x) => or(a, itemChance(sim, fog, x)), 0);
+}
+
+/** Each requirement item's probability at this tick (04 §6), in `requirementItems` order. */
+export const requirementChances = (c: Content, sim: SimState, fog: Fog): number[] =>
+  requirementItems(c).map((r) => itemChance(sim, fog, r));
+
+/**
+ * P(each storylet is in each state) at this tick, `INACTIVE` included: a storylet the lantern runs
+ * (not in `heldStorylets`) is in its lantern state at 1 000 000; one the fog holds (or every one,
+ * without a lantern) is its mixture over the cases. Storylets in file order, states in INACTIVE, then
+ * file order; a state with no chance is left out.
+ */
+export function storyletChances(
+  c: Content,
+  fog: Fog,
+  lantern: LanternState | null,
+): Record<string, Record<string, number>> {
+  const out: Record<string, Record<string, number>> = {};
+  for (const sl of c.storylets) {
+    const p: Record<string, number> = {};
+    if (lantern && !lantern.heldStorylets.includes(sl.id)) {
+      p[lantern.sim.storylets[sl.id]?.state ?? INACTIVE] = PPM;
+    } else
+      for (const st of [INACTIVE, ...Object.keys(sl.states)]) {
+        const x = fog.cases.reduce(
+          (a, fc) => a + Math.trunc(((fc.q.storylets[sl.id]?.p[st] ?? 0) * fc.weight) / WAVE_TOTAL),
+          0,
+        );
+        if (x > 0) p[st] = x;
+      }
+    out[sl.id] = p;
+  }
+  return out;
 }
 
 /** progress (04 §6): the weights of the items whose probability reaches `frontier.countAtPpm`. */
@@ -140,7 +173,7 @@ export function frameOf(
         const m = Math.trunc((e.p * fc.weight) / WAVE_TOTAL);
         happens[e.name] = Math.min(PPM, (happens[e.name] ?? 0) + m);
       }
-  const requirements = requirementItems(c).map((r) => itemChance(sim, wave.fog, r));
+  const requirements = requirementChances(c, sim, wave.fog);
   return {
     tick: sim.tick,
     cats,

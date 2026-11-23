@@ -160,8 +160,16 @@ export interface Projection {
   fray: number | null;
 }
 
-/** Advances a fog to the chapter's end with the pins, no lantern (03 §13.1). */
-export function projectToEnd(setup: FogSetup, fog: Fog, pins: readonly Pin[] = []): Projection {
+/**
+ * Advances a fog to the chapter's end with the pins, no lantern (03 §13.1). `each`, if given, sees the
+ * fog after every step (`npm run sim -- --projection`).
+ */
+export function projectToEnd(
+  setup: FogSetup,
+  fog: Fog,
+  pins: readonly Pin[] = [],
+  each?: (f: Fog) => void,
+): Projection {
   const { c } = setup;
   const below = c.tuning.fog.frayBelowPpm;
   let f = fog;
@@ -169,6 +177,7 @@ export function projectToEnd(setup: FogSetup, fog: Fog, pins: readonly Pin[] = [
   while (f.tick < c.world.ticks) {
     const t = f.tick;
     f = fogStep(setup, f, undefined, true, null, pins);
+    each?.(f);
     if (fray === null && aliveChance(f) < below) fray = t;
   }
   const anchor = anchorChance(setup, f);

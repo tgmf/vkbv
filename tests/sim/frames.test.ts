@@ -1,7 +1,14 @@
 // Frames (03 §16): ghosts per cat, events, rain, requirement odds and progress (04 §6).
 import { describe, expect, it } from 'vitest';
 import { fogSetup } from '../../src/sim/fog';
-import { factChance, frameOf, progressOf, requirementItems } from '../../src/sim/frames';
+import {
+  factChance,
+  frameOf,
+  progressOf,
+  requirementChances,
+  requirementItems,
+  storyletChances,
+} from '../../src/sim/frames';
 import { advance, initialWave, type Wave } from '../../src/sim/lantern';
 import { PPM } from '../../src/sim/math';
 import { catNode, catPos } from '../../src/sim/space';
@@ -117,5 +124,29 @@ describe('frames (03 §16)', () => {
       for (const p of Object.values(f.happens)) expect(p).toBeLessThanOrEqual(PPM);
     }
     expect(seen).toBeGreaterThan(0);
+  });
+
+  it('storylet chances: each storylet’s states sum to 1 000 000; one the lantern runs is certain', () => {
+    const { waves, frames } = framed(1, 60);
+    let lanternRun = 0;
+    for (const [t, w] of waves.entries()) {
+      const chances = storyletChances(tiny, w.fog, w.lantern);
+      for (const sl of tiny.storylets) {
+        const p = Object.values(chances[sl.id] ?? {});
+        const sum = p.reduce((a, x) => a + x, 0);
+        expect(sum).toBeLessThanOrEqual(PPM);
+        expect(sum).toBeGreaterThan(PPM - 100); // truncation, per case and state
+        if (!w.lantern.heldStorylets.includes(sl.id)) {
+          expect(p).toEqual([PPM]);
+          lanternRun += 1;
+        }
+      }
+      // without a lantern every storylet is the fog's mixture; requirements are the frame's
+      for (const p of Object.values(storyletChances(tiny, w.fog, null)))
+        expect(Object.values(p).reduce((a, x) => a + x, 0)).toBeLessThanOrEqual(PPM);
+      const f = frames[t];
+      if (f) expect(requirementChances(tiny, w.lantern.sim, w.fog)).toEqual(f.requirements);
+    }
+    expect(lanternRun).toBeGreaterThan(0);
   });
 });
