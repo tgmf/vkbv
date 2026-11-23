@@ -15,6 +15,7 @@
     "saturatedBandFrom": 950,
     "ppmQuantum": 50000,
     "boredomWhole": false,
+    "counterByChain": false,
     "maxBandedGauges": 3,
     "gateThresholdPpm": 500000,
     "maxLinks": 2,

@@ -483,4 +483,27 @@ Follow-up (open): M2-8's answer says road blocked must pass calibration before M
 recorded and not chased. Which holds? If M2-8's: its next step is option (c), threshold counters as a
 spread of values behind a knob (an algorithm change, so it waits for you).
 
+## M2-24 — A storylet state and the flag its own onEnter set            (status: open)
+Where: `03` §13.6 (storylets and flags in the fog); `src/sim/fog.ts`; found 2026-11-24 on the tiny world
+Question: the fog holds a flag as P(set) per case, independent of the storylet state that set it.
+Tiny `shift`: entering `chosen` sets `busy` at the boss for 10 ticks, and `chosen`'s only exit (auto,
+back to `idle`) waits for `not busy`. In single histories `shift` stays in `chosen` 10 ticks. In the fog
+half the storylet enters `chosen`, so `busy` is 50%, so the exit sends half of `chosen` back each tick
+(50%, 25%, 12.5% …); `idle` keeps the boss the actor of an open choice, so 98% of pal's free decisions
+are blocked and pal keeps working. Probably most of M2-13's stochastic mismatch. No Chapter 1 storylet
+has a state whose exits read what its own onEnter set (checked), so the road is not affected.
+Options seen: (a) for the mass in a storylet state, read what that state's own onEnter set for sure as
+certain (with its ttl from the entering tick); (b) leave it until content needs it.
+Answer:
+
+## M2-25 — A fogged walker does not notice an edge that closes            (status: open)
+Where: `03` §13.2 (walks in chains); `src/sim/fog.ts`; found 2026-11-24 on the tiny world
+Question: a fogged cat walks a path fixed when it started; an edge whose `when` stops holding meanwhile
+does not block it. In single histories the cat is `blocked` at the edge and decides again (tiny: the
+gate closes when `workDone`; 21% of pal's histories turn back at tick 26, the fog's none do). In Chapter 1
+the only such edge is `roadworks_pass`, closed by `roadBlocked`, after the race.
+Options seen: (a) at each step, mass about to cross an edge whose `when` fails (in ppm) stops there,
+learns the edge closed and decides; (b) leave it until content needs it.
+Answer:
+
 <!-- Gate notes and answers go above this line. -->

@@ -29,6 +29,9 @@ export const TuningSchema = z.strictObject({
     boredomWhole: bool(
       'Fog boredom moves whole bands: each chain state carries its exact boredom, so no mass splits (docs/questions.md M2-7; off = 03 §13.2 as written)',
     ),
+    counterByChain: bool(
+      "Each chain state carries what its mass has added to counters through activities' `while` effects (mean and variance), so a counter's spread keeps how long cats keep at an activity (docs/questions.md M2-8, M2-23); off: each step's work is an independent term (03 §13.6 as written)",
+    ),
     saturatedBandFrom: int(
       'Banded gauges: n − 1 equal bands below this value, one saturated band from it to 1 000 (03 §13.2)',
     )

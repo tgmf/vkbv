@@ -118,6 +118,66 @@ export interface Entry {
    */
   d?: boolean;
   k?: boolean;
+  /** With `fog.counterByChain`: what this state's mass has added to counters (`Work`). */
+  w?: Work;
+}
+
+/**
+ * What a chain state's mass has added to counters through activities' `while` effects
+ * (`fog.counterByChain`, docs/questions.md M2-8): by counter, the mean in thousandths of a unit and
+ * the variance in units² × 1000, so mixing states keeps every product below 2^53.
+ */
+export type Work = Record<string, [number, number]>;
+
+/** Entries made from `from` carry the work its mass has done (the first stamp wins). */
+const carry = (from: Entry, outs: Entry[]): Entry[] => {
+  const w = from.w;
+  return w ? outs.map((x) => (x.w ? x : { ...x, w })) : outs;
+};
+
+/**
+ * The mixture of the work of `parts` (mass p each), per counter: the mean, and the mean variance
+ * plus the spread of the means. Undefined when no part carries work.
+ */
+function mixWork(parts: readonly { p: number; w?: Work }[]): Work | undefined {
+  const names: string[] = [];
+  for (const x of parts)
+    for (const k of Object.keys(x.w ?? {})) if (!names.includes(k)) names.push(k);
+  if (names.length === 0) return undefined;
+  names.sort();
+  const total = parts.reduce((a, x) => a + x.p, 0);
+  if (total <= 0) return undefined;
+  const out: Work = {};
+  for (const k of names) {
+    const mean = Math.trunc(parts.reduce((a, x) => a + x.p * (x.w?.[k]?.[0] ?? 0), 0) / total);
+    const variance = Math.trunc(
+      parts.reduce((a, x) => {
+        const [m, v] = x.w?.[k] ?? [0, 0];
+        const d = m - mean; // thousandths: d² / 1000 is units² × 1000
+        return a + x.p * (v + Math.trunc((d * d) / 1000));
+      }, 0) / total,
+    );
+    out[k] = [mean, variance];
+  }
+  return out;
+}
+
+/**
+ * Moves a case's counters by the change of one cat's work mixture between two chains of it
+ * (`fog.counterByChain`): its mean and its variance (never below 0), in the counters' units.
+ */
+function workDelta(q: Quantities, before: readonly Entry[], after: readonly Entry[]): void {
+  const a = mixWork(before) ?? {};
+  const b = mixWork(after) ?? {};
+  for (const k of Object.keys(b).sort()) {
+    const [m0, v0] = a[k] ?? [0, 0];
+    const [m1, v1] = b[k] ?? [0, 0];
+    const cur = q.counters[k] ?? { mean: 0, variance: 0 };
+    q.counters[k] = {
+      mean: cur.mean + (m1 - m0) * 1000,
+      variance: Math.max(0, cur.variance + (v1 - v0) * 1000),
+    };
+  }
 }
 
 /** A fogged cat in one case: its chain and its mean-field gauges (expected values). */
@@ -800,6 +860,9 @@ const readsGauge = (cond: Condition): boolean =>
 export function normalise(c: Content, chain: readonly Entry[]): Entry[] {
   const byKey: Record<string, Entry> = {};
   const keys: string[] = [];
+  // with work on the states (fog.counterByChain), equal states mix their work
+  const work = chain.some((e) => e.w !== undefined);
+  const parts: Record<string, Entry[]> = {};
   for (const e of chain) {
     if (e.p <= 0) continue;
     const k = keyOf(e.s);
@@ -809,13 +872,22 @@ export function normalise(c: Content, chain: readonly Entry[]): Entry[] {
       byKey[k] = { s: e.s, p: e.p };
       keys.push(k);
     }
+    if (work) (parts[k] ??= []).push(e);
   }
   keys.sort();
-  let kept = keys.map((k) => need(byKey, k, 'state'));
+  let kept = keys.map((k) => {
+    const e = need(byKey, k, 'state');
+    const w = work ? mixWork(parts[k] ?? []) : undefined;
+    return w ? { ...e, w } : e;
+  });
   const floor = c.tuning.fog.minStatePpm;
   if (kept.some((e) => e.p >= floor)) kept = kept.filter((e) => e.p >= floor);
   const total = kept.reduce((a, e) => a + e.p, 0);
-  const out = kept.map((e) => ({ s: e.s, p: Math.trunc((e.p * PPM) / total) }));
+  const out = kept.map((e): Entry => ({
+    s: e.s,
+    p: Math.trunc((e.p * PPM) / total),
+    ...(e.w && { w: e.w }),
+  }));
   const first = out[0];
   if (first) first.p += PPM - out.reduce((a, e) => a + e.p, 0);
   return out;
@@ -987,7 +1059,10 @@ function catEffect(
         },
       ];
     out.chain = fc.chain.flatMap((x) =>
-      e.set !== undefined ? bandSet(c, x, g, e.set, mass) : bandMove(c, x, g, e.add ?? 0, mass),
+      carry(
+        x,
+        e.set !== undefined ? bandSet(c, x, g, e.set, mass) : bandMove(c, x, g, e.add ?? 0, mass),
+      ),
     );
     return out;
   }
@@ -1010,6 +1085,7 @@ function catEffect(
       chain.push(x);
       continue;
     }
+    const from = chain.length;
     const moved = times(x.p, share);
     if (moved < x.p) chain.push({ ...x, p: x.p - moved });
     if (moved === 0) continue;
@@ -1056,6 +1132,7 @@ function catEffect(
         p: moved,
       });
     } else chain.push({ s: x.s, p: moved });
+    if (x.w) chain.splice(from, chain.length - from, ...carry(x, chain.slice(from)));
   }
   return { chain, mean: fc.mean, conds: fc.conds };
 }
@@ -1306,12 +1383,12 @@ function pinPrims(
         if (p.set !== undefined) {
           const set = p.set;
           meanEffect(c, { mean }, g, null, set, m);
-          chain = chain.flatMap((x) => bandSet(c, x, g, set, m, mark));
+          chain = chain.flatMap((x) => carry(x, bandSet(c, x, g, set, m, mark)));
         } else {
           const add = mulPm(p.add ?? 0, keep(cat));
           if (add === 0) break;
           meanEffect(c, { mean }, g, add, null, m);
-          chain = chain.flatMap((x) => bandMove(c, x, g, add, m, undefined, mark));
+          chain = chain.flatMap((x) => carry(x, bandMove(c, x, g, add, m, undefined, mark)));
           // a temporary mod shifts back: a decaying one in equal parts, a held one at its end
           const mod = { cat, gauge: g, left: add, mass: m };
           if (p.decayPerTick !== undefined)
@@ -1455,7 +1532,7 @@ function shiftBack(setup: FogSetup, fc: FogCase): void {
       meanEffect(c, { mean }, mod.gauge, -back, null, mod.mass);
       const mark = need(setup.reads, mod.cat, 'cat').includes(mod.gauge);
       const chain = cat.chain.flatMap((x) =>
-        bandMove(c, x, mod.gauge, -back, mod.mass, undefined, mark),
+        carry(x, bandMove(c, x, mod.gauge, -back, mod.mass, undefined, mark)),
       );
       fc.cats[mod.cat] = { ...cat, chain, mean };
     }
@@ -1776,7 +1853,9 @@ function hooksStep(cc: CaseCtx, setup: FogSetup, id: CatId, fc: FogCat, t: numbe
         return r.toward ? (dir > 0 ? Math.min(l, initBand) : Math.max(l, initBand)) : l;
       };
       const mark = need(setup.reads, id, 'cat').includes(h.id);
-      chain = chain.flatMap((e) => bandMove(c, e, h.id, add, whenPpm(e, r.when), lim(add), mark));
+      chain = chain.flatMap((e) =>
+        carry(e, bandMove(c, e, h.id, add, whenPpm(e, r.when), lim(add), mark)),
+      );
     }
   }
   return { chain, mean, conds: fc.conds };
@@ -1899,7 +1978,10 @@ function catStep(
   // offers born this step: the mass they reach decides at once (03 §9.3)
   const fresh = effects.filter((x) => (x.kind === 'attract' || x.kind === 'repel') && x.born >= t);
 
+  const byChain = c.tuning.fog.counterByChain;
   for (const lead of hooked.chain) {
+    const from = out.length;
+    const worked: Record<string, number> = {}; // counter → units this lead's mass added this step
     let first = lead;
     // `attracted` lasts until its attract effect ends (03 §9.3): the cat stands, free
     if (
@@ -1953,8 +2035,11 @@ function catStep(
             );
           }
         } else if ('counter' in w) {
-          const k = `${w.counter}|${w.add * n}`;
-          counted[k] = (counted[k] ?? 0) + first.p;
+          if (byChain) worked[w.counter] = (worked[w.counter] ?? 0) + w.add * n;
+          else {
+            const k = `${w.counter}|${w.add * n}`;
+            counted[k] = (counted[k] ?? 0) + first.p;
+          }
         } else
           fogEffects(setup, cc, q, [w], scope, first.p, sink, s0.place, '', null, {
             source: `act:${s0.activity}`,
@@ -2030,12 +2115,27 @@ function catStep(
       }
       out.push(...decideMass(cc, setup, id, s, e.p, mean, q, sink, blocks, memo));
     }
+    // what this lead's mass has done goes with every state made from it, plus this step's work
+    if (byChain && (lead.w || Object.keys(worked).length > 0)) {
+      const w: Work = { ...lead.w };
+      for (const k of Object.keys(worked).sort()) {
+        const [m, v] = w[k] ?? [0, 0];
+        w[k] = [m + (worked[k] ?? 0) * 1000, v];
+      }
+      for (let i = from; i < out.length; i++) {
+        const x = out[i];
+        if (x) out[i] = { ...x, w };
+      }
+    }
   }
   // the cat's states are exclusive: one Bernoulli term per counter and amount
   for (const k of Object.keys(counted).sort()) {
     const bar = k.lastIndexOf('|');
     addCounter(q, k.slice(0, bar), Number(k.slice(bar + 1)), counted[k] ?? 0);
   }
+  // with work on the states, a counter moves by the change of the cat's work mixture (the work its
+  // mass did stays with the states that did it: a cat that keeps at it keeps its own total)
+  if (byChain) workDelta(q, fc.chain, out);
   return { chain: out, mean, conds };
 }
 
@@ -2125,7 +2225,9 @@ function perceive(setup: FogSetup, fc: FogCase, events: readonly FogEvent[], t: 
         for (const r of h.rise) {
           if (!('onEvent' in r) || r.onEvent !== ev.name) continue;
           meanEffect(c, { mean }, h.id, r.add, null, m);
-          chain = chain.flatMap((e) => (sees(e.s) ? bandMove(c, e, h.id, r.add, ev.p) : [e]));
+          chain = chain.flatMap((e) =>
+            sees(e.s) ? carry(e, bandMove(c, e, h.id, r.add, ev.p)) : [e],
+          );
         }
       }
     }
@@ -2324,8 +2426,11 @@ function finishStep(
         fin['goTo'] = (fin['goTo'] ?? 0) + e0.p;
         s = { ...s, activity: 'none', control: 'free' };
       }
-      if (s.control !== 'free' || s.walk || s.interrupt) return [{ s, p: e0.p }];
-      return decideMass(cc, setup, def.id, s, e0.p, mean, fc.q, sink, actors?.[def.id], memo);
+      if (s.control !== 'free' || s.walk || s.interrupt) return carry(e0, [{ s, p: e0.p }]);
+      return carry(
+        e0,
+        decideMass(cc, setup, def.id, s, e0.p, mean, fc.q, sink, actors?.[def.id], memo),
+      );
     });
     fc.cats[def.id] = { ...cat, chain, mean };
   }
@@ -2544,7 +2649,9 @@ export function mergeCases(setup: FogSetup, cases: readonly FogCase[]): FogCase[
       cats[def.id] = {
         chain: normalise(
           c,
-          parts.flatMap((x) => x.cat.chain.map((e) => ({ s: e.s, p: times(e.p, x.s) }))),
+          parts.flatMap((x) =>
+            x.cat.chain.map((e) => ({ s: e.s, p: times(e.p, x.s), ...(e.w && { w: e.w }) })),
+          ),
         ),
         mean,
         conds: parts[0]?.cat.conds ?? -1,
