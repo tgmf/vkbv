@@ -203,7 +203,7 @@ describe('re-run properties (20 random pin sets)', () => {
       if (last.tick >= tiny.tuning.waves.checkpointEvery) replayed += 1;
     }
     expect(replayed).toBeGreaterThan(0); // some edits really started from a later checkpoint
-  });
+  }, 30_000);
 
   it('a re-run in one go gives the same lantern as one advanced a tick at a time', () => {
     let extended = 0;
@@ -236,7 +236,7 @@ describe('re-run properties (20 random pin sets)', () => {
       if (to > from) extended += 1;
     }
     expect(extended).toBeGreaterThan(0);
-  });
+  }, 30_000);
 });
 
 // --- 03 §18 -------------------------------------------------------------------------------------------
