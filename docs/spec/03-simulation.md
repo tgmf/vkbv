@@ -877,8 +877,10 @@ Every world quantity the lantern has not fixed is a probability per case:
   running maximum of the trigger's ppm. Roles bind as in §9.1; a dynamic role
   (`nearCat`) binds the cat most likely to satisfy it at activation (ties in cast
   order); an optional role binds only if that likelihood passes the gate threshold.
-  Auto exits move the mass of the state times the gate's ppm when the gate passes the
-  threshold; hazard exits use §9.2's rates with terms scaled by ppm; choice exits use the
+  Auto exits, in order, each move their gate's ppm of the mass the earlier ones left
+  (the first whose gate holds fires), when the gate passes the threshold; an auto exit
+  gated on the counter of a race link (§13.5) opens with any ppm, since the case split
+  holds each side of the threshold (Tagir, 2026-11-23); hazard exits use §9.2's rates with terms scaled by ppm; choice exits use the
   decision function on decision steps, times the probability that the actor is
   available (standing at a node, no interrupt). Entering a state applies its effects
   with that state's entering mass `m`: a fact or flag gains `m`; a cat-directed effect

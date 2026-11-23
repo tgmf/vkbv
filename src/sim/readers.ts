@@ -26,6 +26,8 @@ export interface Readers {
   order: QuantityKey[];
   /** The links besides the weather, ranked (03 §13.5), at most `fog.maxLinks`. */
   links: Link[];
+  /** The counters whose race holds a link: their auto exits fire with any chance (03 §13.6). */
+  raceCounters: string[];
 }
 
 /** The quantities a condition reads. */
@@ -121,7 +123,8 @@ export function buildReaders(c: Content): Readers {
   for (const o of c.objects) if (o.visibleWhen) reads(o.visibleWhen, worldKeys);
   add(worldKeys, { kind: 'world', id: 'world', cats: [] });
 
-  return { of, order, links: selectLinks(c, of, order) };
+  const { links, raceCounters } = selectLinks(c, of, order);
+  return { of, order, links, raceCounters };
 }
 
 /** The followed protagonists: never fogged (03 §13.1). The demo follows the one without a locked thread. */
@@ -168,7 +171,11 @@ export function gateCounter(
  * and never a fact only storylets binding a followed protagonist set: the lantern holds those.
  * At most `fog.maxLinks`.
  */
-function selectLinks(c: Content, of: Record<QuantityKey, Reader[]>, order: QuantityKey[]): Link[] {
+function selectLinks(
+  c: Content,
+  of: Record<QuantityKey, Reader[]>,
+  order: QuantityKey[],
+): { links: Link[]; raceCounters: string[] } {
   const followed = followedCats(c);
   const setters = factSetters(c);
   const lanternFact = (fact: string) => {
@@ -205,14 +212,14 @@ function selectLinks(c: Content, of: Record<QuantityKey, Reader[]>, order: Quant
     if (cats >= 2 || tree === 1) ranked.push({ key, n: cats + tree, i });
   });
   ranked.sort((a, b) => b.n - a.n || a.i - b.i);
-  return [...races, ...ranked.map((x) => x.key)]
-    .slice(0, c.tuning.fog.maxLinks)
-    .map((key): Link => {
-      if (key.startsWith('fact:')) return { kind: 'fact', fact: key.slice(5) };
-      const rest = key.slice(6);
-      const dot = rest.lastIndexOf('.');
-      return { kind: 'state', storylet: rest.slice(0, dot), state: rest.slice(dot + 1) };
-    });
+  const keys = [...races, ...ranked.map((x) => x.key)].slice(0, c.tuning.fog.maxLinks);
+  const links = keys.map((key): Link => {
+    if (key.startsWith('fact:')) return { kind: 'fact', fact: key.slice(5) };
+    const rest = key.slice(6);
+    const dot = rest.lastIndexOf('.');
+    return { kind: 'state', storylet: rest.slice(0, dot), state: rest.slice(dot + 1) };
+  });
+  return { links, raceCounters: raced.filter((_, i) => keys.includes(races[i] ?? '')) };
 }
 
 /**

@@ -4,6 +4,7 @@ import { catState } from './cats';
 import { cat, chance, test } from './conditions';
 import { runEffects } from './effects';
 import { PPM, softmax } from './math';
+import { gateCounter } from './readers';
 import { hazardRate, score } from './scores';
 import { catPos, dist2, within } from './space';
 import type { CatId, Ctx, Scope, StoryletRun } from './types';
@@ -115,12 +116,22 @@ export const hasOpenChoice = (ctx: Ctx, catId: CatId): boolean =>
  * their gate's ppm, hazard outcomes in ppm (`stay` last), and the choice exits with their actor.
  * A gate is open at `fog.gateThresholdPpm`; about live things every ppm is 0 or 1 000 000.
  */
-export function exitOptions(ctx: Ctx, def: StoryletDef, state: string, scope: Scope) {
+export function exitOptions(
+  ctx: Ctx,
+  def: StoryletDef,
+  state: string,
+  scope: Scope,
+  races: readonly string[] = [],
+) {
   const exits = need(def.states, state, 'storylet state').exits;
   const thr = ctx.c.tuning.fog.gateThresholdPpm;
+  // an auto exit gated on a race link's counter opens with any chance: the fog's case split holds
+  // each side of the threshold (03 §13.5, §13.6; Tagir, 2026-11-23)
+  const race = (e: (typeof exits)[number]) =>
+    e.kind === 'auto' && races.includes(gateCounter(e.gate)?.counter ?? '');
   const open = exits
     .map((e) => ({ e, ppm: e.gate ? chance(ctx, e.gate, scope) : PPM }))
-    .filter((x) => x.ppm >= thr);
+    .filter((x) => x.ppm >= thr || (x.ppm > 0 && race(x.e)));
   const autos = open.filter((x) => x.e.kind === 'auto').map((x) => ({ to: x.e.to, ppm: x.ppm }));
   const hazards = open.filter((x) => x.e.kind === 'hazard').map((x) => x.e);
   let rates = hazards.map((e) => hazardRate(ctx, e.perMille ?? 0, e.terms ?? [], scope));

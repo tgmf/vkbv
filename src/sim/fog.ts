@@ -164,6 +164,8 @@ export interface FogSetup {
   table: PerceptionTable;
   /** Per cat, the gauges its decisions read (boredom included): a band move of one is a trigger. */
   reads: Record<CatId, string[]>;
+  /** The counters whose race holds a link: their auto exits open with any chance (03 §13.6). */
+  races: readonly string[];
   /** Detectors the fog estimates: those something reads or a requirement names (03 §13.6). */
   detectors: string[];
   nodeIndex: Record<NodeId, number>;
@@ -244,6 +246,7 @@ export function fogSetup(c: Content, seed: number): FogSetup {
     decisions,
     reads,
     links: readers.links,
+    races: readers.raceCounters,
     table: buildPerceptionTable(c),
     detectors: c.detectors
       .filter((d) => required.includes(d.emits) || readers.of[`fact:${d.emits}`] !== undefined)
@@ -1638,10 +1641,11 @@ function storyletsTick(
       for (const state of Object.keys(def.states)) {
         const m = before[state] ?? 0;
         if (m <= 0 || isTerminal(def, state)) continue;
-        const { autos, hazard, choices, actor } = exitOptions(ctx, def, state, scope);
+        const { autos, hazard, choices, actor } = exitOptions(ctx, def, state, scope, setup.races);
         let rest = m;
-        const auto = autos[0];
-        if (auto) {
+        // auto exits in order: each takes its chance of the mass the earlier ones left (03 §9.2:
+        // the first whose gate holds fires)
+        for (const auto of autos) {
           const mv = times(rest, auto.ppm);
           move(state, auto.to, mv);
           rest -= mv;

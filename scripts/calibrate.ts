@@ -154,7 +154,13 @@ for (let b = 0; b < 10; b++) {
   console.log(
     `         ${`${b * 10}-${b * 10 + 10}%`.padEnd(10)}` +
       `${inB.length}`.padStart(5) +
-      `  ${pct(meanP)}  ${pct(obs)}  ${pct(diff)}  ${checked ? (ok ? 'ok' : 'MISS') : '(too few)'}`,
+      `  ${pct(meanP)}  ${pct(obs)}  ${pct(diff)}  ${checked ? (ok ? 'ok' : 'MISS') : '(too few)'}` +
+      // which events fall in the bucket: pairs (happened)
+      `  ${events
+        .map((e) => [e, inB.filter((x) => x.event === e)] as const)
+        .filter(([, of]) => of.length > 0)
+        .map(([e, of]) => `${e} ${of.length}(${of.filter((x) => x.hit).length})`)
+        .join(', ')}`,
   );
 }
 const failed = bucketMisses > 0 || (!values.quick && rateMisses > 0);
