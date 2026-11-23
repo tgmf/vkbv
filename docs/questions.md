@@ -441,4 +441,10 @@ changed held by forcing a cat back, 59 reopened (54 of them on seeds 1, 2 and 8,
 already live or the watched state had no mass left).
 Answer:
 
+## M2-21 — Frames' samples and smoothing            (status: answered)
+Where: `03` §16 (`samples` by backward sampling), `03` §14 step 3 (smoothing, deferred to frame requests); `src/sim/frames.ts`
+Question: backward sampling a fogged cat's chain and smoothing past ghosts both need to know which chain state led to which. The fog does not record it: every step merges equal states, and cases split and merge. How should M2 item 9 build them?
+Options seen: (a) defer both to M5, where the renderer's focus layer is their only user; frames carry filtered ghosts; (b) approximate backward sampling without records (a state that could lead to the later one, by mass), no smoothing; (c) record per step the joint mass (state before → after) per case and cat, and case lineage: exact samples, and smoothing at the end of each re-run, at a cost to the fog's hot path and memory.
+Answer: Tagir, 2026-11-23: (a). Frames in M2 have no `samples` and are not smoothed; both are built in M5.
+
 <!-- Gate notes and answers go above this line. -->
