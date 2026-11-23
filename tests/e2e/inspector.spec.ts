@@ -35,12 +35,12 @@ test('scrubbing shows Marti where the simulation has him', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('loading lure_primed shows the lure pin firing at 13:05', async ({ page }) => {
+test('loading lure_primed shows the lure pin firing at 17:35', async ({ page }) => {
   await page.goto('./?dev=1');
   await expect(page.getByTestId('clock')).toContainText('05:40'); // the slider's range comes with the first view
   await page.getByTestId('pinset').selectOption('lure_primed');
-  await page.getByTestId('scrub').fill('446');
-  await expect(page.getByTestId('log')).toContainText('445 13:05 pinFired');
+  await page.getByTestId('scrub').fill('716');
+  await expect(page.getByTestId('log')).toContainText('715 17:35 pinFired');
   await expect(page.getByTestId('log')).toContainText('lure_primed.2');
   await page.screenshot({ path: 'test-results/inspector-lure.png' });
 });
