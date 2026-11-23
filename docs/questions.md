@@ -447,4 +447,20 @@ Question: backward sampling a fogged cat's chain and smoothing past ghosts both 
 Options seen: (a) defer both to M5, where the renderer's focus layer is their only user; frames carry filtered ghosts; (b) approximate backward sampling without records (a state that could lead to the later one, by mass), no smoothing; (c) record per step the joint mass (state before → after) per case and cat, and case lineage: exact samples, and smoothing at the end of each re-run, at a cost to the fog's hot path and memory.
 Answer: Tagir, 2026-11-23: (a). Frames in M2 have no `samples` and are not smoothed; both are built in M5.
 
+## M2-22 — A simulated-only world for testing            (status: answered; to schedule)
+Where: `03` §13 (fog and lantern), `src/sim/lantern.ts`, tuning; the UI's drawing of the unwatched world (M5)
+Question: Tagir asked for an option to switch the unwatched world between the wave and plain
+simulation, the unwatched part hidden as in a fog of war. What would it be, and when?
+Sketch: every cat live from tick 0 (M1's `step`, already the lantern's), none in the fog, live cats
+never released, behind a tuning switch (for example `world: 'wave' | 'concrete'`; not "fog of war":
+"fog" already has two meanings in the glossary). Everything downstream works unchanged: frames (one
+ghost at 1 000 000 per cat), the re-run, checkpoints, the frontier limit, the worker; requirement odds
+become 0 or 1 000 000. `lantern.ts` needs a separate "keep live" set: `followed` also drives the frontier
+limit and placement. What it changes in play: the unwatched world is fixed by the seed, no ghosts, Gaze
+becomes a peek, and vetting and the `05` §5 balance numbers are measured on the wave only. Uses: A/B
+playtests of the wave, a fallback if the re-run budget (`07` §4) fails, debugging.
+Answer: Tagir, 2026-11-23: add a simulated-only version for testing. Not part of M2 item 11; when to
+build it (after item 13's budget numbers, or with the playtest build) and what the UI draws in it wait
+for Tagir. Needs a spec line and a glossary name.
+
 <!-- Gate notes and answers go above this line. -->
