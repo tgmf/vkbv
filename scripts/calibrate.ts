@@ -19,7 +19,7 @@ import { sample } from '../src/sim/math';
 import { rand } from '../src/sim/rng';
 import { step } from '../src/sim/step';
 import type { SimState } from '../src/sim/types';
-import { advance, initialWave, lanternFray } from '../src/sim/lantern';
+import { wholeDayRun } from '../src/sim/recompute';
 import { storyletCats } from '../src/sim/readers';
 
 const { values } = parseArgs({
@@ -88,13 +88,7 @@ function reality(seed: number, stream: number): SimState {
 const pairs: { event: string; p: number; hit: boolean; fog: boolean }[] = [];
 const t0 = performance.now();
 for (let seed = 1; seed <= seeds; seed++) {
-  const setup = fogSetup(c, seed);
-  let w = initialWave(setup, ['marti']);
-  while (lanternFray(w) === null) {
-    const reached = w.lantern.sim.anchor.reachedAt;
-    if (reached !== null && w.lantern.sim.tick > reached + c.tuning.end.afterAnchorTicks) break;
-    w = advance(setup, w, pins, ['marti']);
-  }
+  const w = wholeDayRun(fogSetup(c, seed), pins);
   const sim = w.lantern.sim;
   const end = reality(seed, 100_000 + seed);
   for (const event of events) {
