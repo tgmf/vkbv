@@ -463,4 +463,24 @@ Answer: Tagir, 2026-11-23: add a simulated-only version for testing. Not part of
 build it (after item 13's budget numbers, or with the playtest build) and what the UI draws in it wait
 for Tagir. Needs a spec line and a glossary name.
 
+## M2-23 — How much to calibrate on test content            (status: answered)
+Where: M2 acceptance ("Quick calibration passes. `npm run calibrate` passes"); `07` §3; M2 item 12
+Question: Chapter 1's content is test content, replaced for the alpha. Calibration measures the fog
+against the reference simulation, not the content, but some misses come from an approximation not
+fitting this content. How much of item 12 to do now?
+Options seen: (a) the tool and a baseline: a parallel runner, one full run recorded, only general fog
+bugs fixed, content-specific misses recorded and not chased, the quick test in `npm run check` only if it
+passes; (b) as briefed, every miss chased; (c) defer calibration to the alpha content.
+Answer: Tagir, 2026-11-24: (a). M2's calibration acceptance item is relaxed accordingly.
+Baseline (2026-11-24, 400 seeds, default knobs; tables in `docs/handoff/M2.md`): every event passes its rate
+in both pin sets but `roadBlocked` under `untouched` (28.9% vs 40.5%); every bucket passes but the low ones
+of `roadBlocked`: 0–10% sees 28.7% (`road_both`) and 17.3% (`untouched`) blocked where the fog says about
+1%, and 20–30% (`untouched`) 36.7% vs 25.0%. The fog is overconfident on the crew's race against the rain:
+the counter held as mean and variance (`03` §13.6, M2-8). The quick run (60 seeds) fails on `untouched`
+(the same 0–10% bucket, and `shopClosedEarly` 80–90%, which passes at 400 seeds), so it stays out of
+`npm run check`.
+Follow-up (open): M2-8's answer says road blocked must pass calibration before M2 is done; under (a) it is
+recorded and not chased. Which holds? If M2-8's: its next step is option (c), threshold counters as a
+spread of values behind a knob (an algorithm change, so it waits for you).
+
 <!-- Gate notes and answers go above this line. -->
