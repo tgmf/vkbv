@@ -18,6 +18,9 @@ export const TuningSchema = z.strictObject({
     anchorConditioning: bool(
       'Treat the anchor as already seen: case weights lean toward reaching it (03 §14)',
     ),
+    streamEveryMs: int(
+      'During a re-run the worker posts the frames computed so far, and takes newer requests, this often (ms; 02 §3)',
+    ).min(1),
   }),
   fog: z.strictObject({
     stepTicks: int('Ticks per fog step (03 §13.2)').min(1),

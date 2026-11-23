@@ -120,6 +120,7 @@ export function* rerun(
     states: old ? old.states.slice(0, from) : [],
     strain: null,
     localCauses: 0,
+    ms: 0,
   };
   let reach: number | null = null;
   frames.forEach((f, t) => {

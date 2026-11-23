@@ -3,6 +3,7 @@ import type { Tuning } from '../content/schemas/tuning';
 import type {
   CatId,
   FramesPatch,
+  Frontier,
   Pin,
   RecomputeResult,
   SimEvent,
@@ -19,17 +20,29 @@ export type MainToWorker =
       seed: number;
       pins: Pin[];
       watched: WatchedFact[];
-      preview: boolean;
-    }
-  | { kind: 'commit'; reqId: number } // make a preview the current wave
+      frontier: Frontier;
+      preview: boolean; // true: kept apart until `commit`; false: becomes the current wave at once
+      strain?: boolean; // also compute strain (a projection from the edge): debug panel only
+    } // a re-run (03 §17) against the current (committed) wave
+  | { kind: 'commit'; reqId: number } // make the last finished preview the current wave; replies `ready`
   | { kind: 'observe'; reqId: number; tick: number; cat: CatId }
   | { kind: 'debugHistory'; reqId: number; tick: number; index: number }
   // Dev inspector (docs/milestones/M1.5-inspector.md): one history, viewed one tick at a time.
   | { kind: 'inspect'; reqId: number; seed: number; stream: number; pinset: string; tick: number };
 
+/** A request as the caller writes it: any MainToWorker message without its reqId. */
+export type Request = MainToWorker extends infer M
+  ? M extends unknown
+    ? Omit<M, 'reqId'>
+    : never
+  : never;
+
 export type WorkerToMain =
   | { kind: 'ready'; reqId: number }
   | { kind: 'vetted'; reqId: number; seed: number }
+  // Streamed while a re-run runs: frames from `frames.from` (the replayed checkpoint) to `upTo`. Frames
+  // before the first patch's `from` are the current wave's; nothing past `upTo` exists yet.
+  | { kind: 'rerun'; reqId: number; upTo: number; frames: FramesPatch }
   | { kind: 'result'; reqId: number; result: RecomputeResult }
   | { kind: 'observed'; reqId: number; fact: WatchedFact; frames: FramesPatch }
   | { kind: 'history'; reqId: number; state: SimState; events: SimEvent[] }

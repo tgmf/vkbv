@@ -5,7 +5,8 @@
   },
   "waves": {
     "checkpointEvery": 30,
-    "anchorConditioning": true
+    "anchorConditioning": true,
+    "streamEveryMs": 50
   },
   "fog": {
     "stepTicks": 5,

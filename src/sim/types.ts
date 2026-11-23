@@ -372,6 +372,7 @@ export interface RerunStats {
   states: number[];
   strain: number | null; // only when asked for (the debug panel is open)
   localCauses: number;
+  ms: number; // the re-run's time, measured by the worker (0 from src/sim, which reads no clock)
 }
 
 /** A re-run's result (03 §17): frames for ticks 0..edge, and how the lantern ends. */
