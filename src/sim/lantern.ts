@@ -4,7 +4,8 @@
 // for every fogged cat, release of cats unseen for long, storylets moving between fog and lantern.
 // Fog events a protagonist would perceive are drawn into the lantern (03 §15.1): drawn ones happen
 // (and a fog-held storylet that emitted one runs live from there, its unperceived roles staying in the
-// fog), the rest are negative evidence.
+// fog), the rest are negative evidence. A re-run imposes watched facts at their ticks (03 §15.5) and
+// Gaze fixes what its circle holds (§15.4).
 import { aliveChance, applyEvidence } from './backward';
 import { bandEdges, BOREDOM } from './cats';
 import {
@@ -21,13 +22,23 @@ import {
 } from './fog';
 import { INACTIVE, type FogEvent } from './fog-quantities';
 import { sample } from './math';
+import { gaze, imposed, matching, pickState, shows } from './observe';
 import { perceives } from './perception';
 import { storyletCats } from './readers';
 import { rand } from './rng';
 import { catNode, catPos, nodePos } from './space';
 import { step, type StepResult } from './step';
 import { uniformStreams } from './history';
-import type { CatId, CatState, Pin, SimEvent, SimState } from './types';
+import type {
+  CatId,
+  CatState,
+  GazeFact,
+  Pin,
+  SeenCat,
+  SimEvent,
+  SimState,
+  WatchedFact,
+} from './types';
 import { need } from './types';
 
 /**
@@ -55,6 +66,12 @@ export interface Wave {
   localCauses: number;
   /** The tick the lantern frayed (03 §16), or null. */
   fray: number | null;
+  /** The last step's own events, for the watched fact of its tick (03 §15.2). */
+  tickEvents: SimEvent[];
+  /** Watched facts that could not hold (03 §15.5), in the order they were met. */
+  reopened: WatchedFact[];
+  /** What Gaze fixed (03 §15.4), in tick order. */
+  gazeFacts: GazeFact[];
 }
 
 const inCast = (setup: FogSetup, ids: readonly CatId[]): CatId[] =>
@@ -99,6 +116,9 @@ export function initialWave(setup: FogSetup, followed: readonly CatId[], live = 
     incoming: [],
     localCauses: 0,
     fray: null,
+    tickEvents: [],
+    reopened: [],
+    gazeFacts: [],
   };
 }
 
@@ -161,13 +181,15 @@ const withoutCat = (fog: Fog, id: CatId): Fog => ({
 
 /**
  * Advances the wave one tick (03 §14, §15.1). `followed` are the protagonists whose perception
- * places cats. The draws use scope `obs`, keyed by who, whom and when, never by the log.
+ * places cats; `watched` the watched facts a re-run imposes (§15.5), each at the step from its tick.
+ * The draws use scope `obs`, keyed by who, whom and when, never by the log.
  */
 export function advance(
   setup: FogSetup,
   wave: Wave,
   pins: readonly Pin[],
   followed: readonly CatId[],
+  watched: readonly WatchedFact[] = [],
 ): Wave {
   const { c, seed } = setup;
   const K = c.tuning.fog.stepTicks;
@@ -279,6 +301,33 @@ export function advance(
   }
 
   // 3. the lantern edge (03 §15.1): each protagonist sees, places, or sees nothing
+  const place = (id: CatId, chosen: { s: ChainState; mean: Record<string, number> }) => {
+    const after = applyEvidence(setup, fog, {
+      kind: 'cat',
+      cat: id,
+      states: [chosen.s],
+      holds: true,
+    });
+    if (!after) localCauses += 1; // no consistent past: placed as seen, nothing else changes
+    fog = withoutCat(after ?? fog, id);
+    sim = {
+      ...sim,
+      cats: { ...sim.cats, [id]: placedCat(setup, after ?? fog, id, chosen.s, chosen.mean, t) },
+    };
+    live = inCast(setup, [...live, id]);
+    dwell[id] = c.tuning.lantern.dwellTicks;
+    unseen[id] = 0;
+  };
+  // a re-run's watched facts of this tick (§15.5): one that cannot hold reopens; the fogged cats one
+  // saw are forced into the watched state where the ordinary draw would not place them so
+  const reopened = [...wave.reopened];
+  const forced: { P: CatId; seen: SeenCat; fact: WatchedFact }[] = [];
+  for (const fact of watched) {
+    if (fact.tick !== t0 || !followed.includes(fact.cat)) continue;
+    const check = imposed(setup, fog, sim, live, fact);
+    if (check.holds) forced.push(...check.force.map((seen) => ({ P: fact.cat, seen, fact })));
+    else reopened.push(fact);
+  }
   for (const P of followed) {
     for (const id of live)
       if (id !== P) {
@@ -306,30 +355,17 @@ export function advance(
         ),
       );
       const q = sees.reduce((a, x) => a + x.p, 0);
-      if (q === 0) continue;
+      const force = forced.find((x) => x.P === P && x.seen.cat === id);
+      if (q === 0 && !force) continue;
       const draw = rand(seed, 'obs', t, `place:${P}:${id}`, 1_000_000);
-      if (draw < q) {
-        // place: a perceivable state in proportion to its mass
-        const pick = rand(seed, 'obs', t, `pick:${P}:${id}`, q);
-        let acc = 0;
-        const chosen = sees.find((x) => (acc += x.p) > pick) ?? sees[sees.length - 1];
-        if (!chosen) continue;
-        const after = applyEvidence(setup, fog, {
-          kind: 'cat',
-          cat: id,
-          states: [chosen.s],
-          holds: true,
-        });
-        if (!after) localCauses += 1; // no consistent past: placed as seen, nothing else changes
-        fog = withoutCat(after ?? fog, id);
-        sim = {
-          ...sim,
-          cats: { ...sim.cats, [id]: placedCat(setup, after ?? fog, id, chosen.s, chosen.mean, t) },
-        };
-        live = inCast(setup, [...live, id]);
-        dwell[id] = c.tuning.lantern.dwellTicks;
-        unseen[id] = 0;
-      } else {
+      // place: a perceivable state in proportion to its mass
+      const drawn = draw < q ? pickState(setup, sees, t, `pick:${P}:${id}`) : undefined;
+      if (force && !(drawn && shows(drawn.cat, force.seen))) {
+        const chosen = pickState(setup, matching(setup, fog, force.seen), t, `impose:${P}:${id}`);
+        if (chosen) place(id, chosen);
+        else if (!reopened.includes(force.fact)) reopened.push(force.fact);
+      } else if (drawn) place(id, drawn);
+      else {
         // negative evidence: P does not see it
         const after = applyEvidence(setup, fog, {
           kind: 'cat',
@@ -341,6 +377,10 @@ export function advance(
       }
     }
   }
+
+  // Gaze: what a collapse power's circle holds this tick, fixed as evidence; the cats stay fogged
+  const gazed = gaze(setup, fog, pins, t);
+  fog = gazed.fog;
 
   // 4. held storylets whose roles are all live run in the lantern from a drawn state (03 §13.4)
   for (const id of held) {
@@ -409,6 +449,9 @@ export function advance(
     incoming,
     localCauses,
     fray,
+    tickEvents: r.events,
+    reopened,
+    gazeFacts: [...wave.gazeFacts, ...gazed.facts],
   };
 }
 

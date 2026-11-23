@@ -288,11 +288,44 @@ export interface Scope {
 }
 
 // --- wave and bridge types (filled in M2) -------------------------------------------------------
+/** A cat in a watched view: where it stands and what it does. */
+export interface SeenCat {
+  cat: CatId;
+  node: NodeId;
+  activity: string;
+}
+
+/**
+ * What a watched fact shows (03 §15.2). `self` and `cats` (the protagonist's own part and the cats
+ * it sees) are there so a re-run can compare parts (§15.5).
+ */
+export interface WatchedSummary {
+  self: { node: NodeId; activity: string; interrupt: string | null };
+  cats: SeenCat[];
+  storylets: string[]; // "storyletId.state" entered at the tick
+  detectors: string[];
+  factsSet: string[];
+  events: string[];
+  nodesSeen: NodeId[];
+  paidBy: Record<string, PinId[]>;
+  totalPressure: number;
+  weather: 'dry' | 'rain';
+}
+
 export interface WatchedFact {
   tick: number;
   cat: CatId;
   digest: number;
-  summary: Record<string, unknown>; // shape fixed in M2 (spec 03 §15.2 step 5)
+  summary: WatchedSummary;
+}
+
+/** A fact Gaze fixed (03 §15.4): a fogged cat in the circle at a tick. */
+export interface GazeFact {
+  tick: number;
+  pin: PinId;
+  cat: CatId;
+  node: NodeId;
+  activity: string;
 }
 
 /** Placeholder until M2 (spec 03 §16). */
