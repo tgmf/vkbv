@@ -328,12 +328,61 @@ export interface GazeFact {
   activity: string;
 }
 
-/** Placeholder until M2 (spec 03 §16). */
-export type FramesPatch = Record<string, unknown>;
+/** One distinct way a cat may stand at a tick (03 §16): a live cat has one, at 1 000 000. */
+export interface Ghost {
+  node: NodeId;
+  pos: Pos;
+  activity: string;
+  interrupt: string | null;
+  p: number;
+}
 
-/** Placeholder until M2 (spec 03 §17). */
+/**
+ * What the renderer and the player layer need at one tick (03 §16; `samples` wait for M5,
+ * docs/questions.md M2-21). `happens`: P(it happens at this tick) per emitted event name,
+ * `storylet:<id>.<state>` and `detector:<id>`. `requirements`: P per top-level item of the anchor's
+ * requirement tree, in tree order; `progress` (04 §6) counts the items at `frontier.countAtPpm`.
+ */
+export interface Frame {
+  tick: number;
+  cats: Record<CatId, Ghost[]>;
+  happens: Record<string, number>;
+  rain: number;
+  requirements: number[];
+  progress: number;
+}
+
+/** Frames from tick `from` on, as a re-run streams them (02 §3). */
+export interface FramesPatch {
+  from: number;
+  frames: Frame[];
+}
+
+/** How far the story has been played (04 §6): the re-run's frontier limit is read from it. */
+export interface Frontier {
+  story: number;
+  pastTicks: number;
+  storylets: string[];
+}
+
+/** Debug numbers of a re-run (03 §17), per tick 0..edge; its time is added by the worker. */
+export interface RerunStats {
+  cases: number[];
+  live: number[];
+  states: number[];
+  strain: number | null; // only when asked for (the debug panel is open)
+  localCauses: number;
+}
+
+/** A re-run's result (03 §17): frames for ticks 0..edge, and how the lantern ends. */
 export interface RecomputeResult {
-  end: { kind: 'anchor' | 'fray' | 'chapterEnd'; tick: number };
+  frames: Frame[];
+  edge: number;
+  end: { kind: 'anchor' | 'fray' | 'chapterEnd' | 'limit'; tick: number };
+  reopened: WatchedFact[];
+  breaks: WatchedFact[]; // the reopened facts that were paid (04 §4)
+  gazeFacts: GazeFact[];
+  stats: RerunStats;
 }
 
 /** Lookup that must succeed because content was cross-checked at load. */
