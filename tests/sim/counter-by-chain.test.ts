@@ -122,3 +122,123 @@ describe('counters carried by chains (fog.counterByChain)', () => {
     }
   }, 120_000);
 });
+
+/**
+ * Two fogged workers driven by one storylet that sends them both to work or to nap by turns (a crew
+ * on and off a break). Their work is correlated through the storylet's state: the counter's spread
+ * needs the storylet's states to carry the work too.
+ */
+function crewWorld(): Content {
+  const files = readChapterDir(TINY_DIR);
+  const acts = structuredClone(files.activities) as { activities: Record<string, unknown>[] };
+  const work = acts.activities.find((a) => a['id'] === 'work');
+  if (work) {
+    delete work['gate'];
+    work['score'] = { base: 3 };
+  }
+  const cast = structuredClone(files.cast) as {
+    cats: { id: string; activities: string[]; roles?: string[] }[];
+  };
+  for (const cat of cast.cats)
+    if (cat.id === 'pal' || cat.id === 'bystander') {
+      cat.activities = ['work', 'nap'];
+      cat.roles = [...new Set([...(cat.roles ?? []), 'worker'])];
+    }
+  const sls = structuredClone(files.storylets) as { storylets: Record<string, unknown>[] };
+  const shift = sls.storylets.find((x) => x['id'] === 'shift');
+  if (shift) shift['trigger'] = { clock: ['23:58', '23:59'] }; // out of the way
+  sls.storylets.push({
+    id: 'crew',
+    required: false,
+    once: true,
+    roles: { all: { roleTag: 'worker', bind: 'all' } },
+    trigger: { clock: ['06:05', '23:59'] },
+    start: 'on',
+    states: {
+      on: {
+        onEnter: [{ startActivity: ['@all', 'work'] }],
+        exits: [
+          { to: 'done', kind: 'auto', gate: { counter: 'work', gte: 1000 } }, // a race, never won
+          { to: 'off', kind: 'hazard', perMille: 80 },
+        ],
+      },
+      off: {
+        onEnter: [{ startActivity: ['@all', 'nap'] }],
+        exits: [{ to: 'on', kind: 'hazard', perMille: 80 }],
+      },
+      done: { onEnter: [{ fact: 'crewDone' }], exits: [] },
+    },
+  });
+  const map = structuredClone(files.map) as { edges: Record<string, unknown>[] };
+  for (const e of map.edges) delete e['when'];
+  return loadChapter(
+    { ...files, activities: acts, cast, storylets: sls, map },
+    { ...tuning, fog: { ...tuning.fog, counterByChain: true } },
+  );
+}
+
+describe('counters carried by a storylet’s states (fog.counterByChain)', () => {
+  it('two workers a storylet moves together: the counter has the spread of single histories', () => {
+    const c = crewWorld();
+    const ticks = [40, 50, 60, 80]; // after the first turns of the storylet
+    // the fog: the hero live, both workers fogged
+    const setup = fogSetup(c, 1);
+    const fog: Record<number, [number, number]> = {};
+    let w = initialWave(setup, [], ['hero']);
+    while (w.lantern.sim.tick < 81) {
+      w = advance(setup, w, [], []);
+      const t = w.lantern.sim.tick;
+      if (!ticks.includes(t)) continue;
+      let m = 0;
+      let m2 = 0;
+      for (const fc of w.fog.cases) {
+        const x = fc.weight / WAVE_TOTAL;
+        const q = fc.q.counters['work'] ?? { mean: 0, variance: 0 };
+        m += (x * q.mean) / 1e6;
+        m2 += x * (q.variance / 1e6 + (q.mean / 1e6) ** 2);
+      }
+      fog[t] = [m, Math.sqrt(Math.max(0, m2 - m * m))];
+    }
+    // single histories: the workers' noise and the storylet's hazards vary, the weather is shared
+    const xs: Record<number, number[]> = {};
+    const N = 400;
+    for (let k = 1; k <= N; k++) {
+      const streams = { hero: 0, pal: k, bystander: k, world: k };
+      let s = initialState(c, 1, streams);
+      while (s.tick < 81) {
+        const t = s.tick;
+        const r = step(c, 1, streams, s, [], (bp) =>
+          sample(
+            bp.options.map((o) => o.ppm),
+            rand(
+              1,
+              bp.key.startsWith('weather:') ? 's0:branch' : `s${k}:branch`,
+              t,
+              bp.key,
+              1_000_000,
+            ),
+          ),
+        );
+        if (!r.state) throw new Error('branch point');
+        s = r.state;
+        if (ticks.includes(s.tick)) (xs[s.tick] ??= []).push(s.counters['work'] ?? 0);
+      }
+    }
+    const checks: [number, number, number, number][] = [];
+    for (const t of ticks) {
+      const a = xs[t] ?? [];
+      const rm = a.reduce((x, y) => x + y, 0) / a.length;
+      const rs = Math.sqrt(a.reduce((x, y) => x + (y - rm) ** 2, 0) / a.length);
+      const [fm, fs] = fog[t] ?? [0, 0];
+      checks.push([fm, rm, fs, rs]);
+    }
+    // Not overconfident (without the storylet's part the spread is about 0.8 of the histories'),
+    // and at most 30% wide: a state is credited its average rate of work, so a short spell is
+    // credited more than the walking cats do in it (docs/decisions.md).
+    for (const [fm, rm, fs, rs] of checks) {
+      expect(Math.abs(fm - rm)).toBeLessThanOrEqual(rm * 0.05);
+      expect(fs).toBeGreaterThanOrEqual(rs * 0.85);
+      expect(fs).toBeLessThanOrEqual(rs * 1.3);
+    }
+  }, 180_000);
+});

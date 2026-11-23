@@ -1,7 +1,7 @@
 // Calibration (07 §3): each event's chance by the end of a whole-day run against how often it happens
 // in the reference simulation (src/cli/calibration.ts).
 //   npm run calibrate -- [--seeds N] [--quick] [--pinset NAME] [--jobs J]
-//                                    FOG=minStatePpm,bands, WHOLE=1 to override knobs
+//                                    FOG=minStatePpm,bands, WHOLE=1, BYCHAIN=1 to override knobs
 // Seeds 1..N (default `calibration.seeds`, `calibration.seedsQuick` with --quick) of each pin set
 // (default both of 07 §3: road_both and untouched), split over J child processes (default: the CPU
 // count). Rates must pass in the full run and are printed with --quick; buckets must pass in both.
@@ -26,6 +26,7 @@ const [minState, bands] = (process.env['FOG'] ?? '').split(',').map(Number);
 if (minState) tuning.fog.minStatePpm = minState;
 if (bands) tuning.fog.bands = bands;
 if (process.env['WHOLE'] === '1') tuning.fog.boredomWhole = true; // docs/questions.md M2-7
+if (process.env['BYCHAIN'] === '1') tuning.fog.counterByChain = true; // docs/questions.md M2-8
 const c = loadChapter(CHAPTER1_FILES, tuning);
 const sets = parsePinSets(PINSETS_FILE, c);
 const pinsOf = (name: string) => {

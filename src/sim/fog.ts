@@ -31,6 +31,7 @@ import {
   INACTIVE,
   initialQuantities,
   mixQuantities,
+  mixWork,
   or,
   renormalise,
   setFlag,
@@ -39,6 +40,7 @@ import {
   type FogEvent,
   type FogMod,
   type Quantities,
+  type Work,
 } from './fog-quantities';
 import { initialState, uniformStreams } from './history';
 import { mulPm, PPM } from './math';
@@ -122,45 +124,11 @@ export interface Entry {
   w?: Work;
 }
 
-/**
- * What a chain state's mass has added to counters through activities' `while` effects
- * (`fog.counterByChain`, docs/questions.md M2-8): by counter, the mean in thousandths of a unit and
- * the variance in units² × 1000, so mixing states keeps every product below 2^53.
- */
-export type Work = Record<string, [number, number]>;
-
 /** Entries made from `from` carry the work its mass has done (the first stamp wins). */
 const carry = (from: Entry, outs: Entry[]): Entry[] => {
   const w = from.w;
   return w ? outs.map((x) => (x.w ? x : { ...x, w })) : outs;
 };
-
-/**
- * The mixture of the work of `parts` (mass p each), per counter: the mean, and the mean variance
- * plus the spread of the means. Undefined when no part carries work.
- */
-function mixWork(parts: readonly { p: number; w?: Work }[]): Work | undefined {
-  const names: string[] = [];
-  for (const x of parts)
-    for (const k of Object.keys(x.w ?? {})) if (!names.includes(k)) names.push(k);
-  if (names.length === 0) return undefined;
-  names.sort();
-  const total = parts.reduce((a, x) => a + x.p, 0);
-  if (total <= 0) return undefined;
-  const out: Work = {};
-  for (const k of names) {
-    const mean = Math.trunc(parts.reduce((a, x) => a + x.p * (x.w?.[k]?.[0] ?? 0), 0) / total);
-    const variance = Math.trunc(
-      parts.reduce((a, x) => {
-        const [m, v] = x.w?.[k] ?? [0, 0];
-        const d = m - mean; // thousandths: d² / 1000 is units² × 1000
-        return a + x.p * (v + Math.trunc((d * d) / 1000));
-      }, 0) / total,
-    );
-    out[k] = [mean, variance];
-  }
-  return out;
-}
 
 /**
  * Moves a case's counters by the change of one cat's work mixture between two chains of it
@@ -227,6 +195,11 @@ export interface FogSetup {
   reads: Record<CatId, string[]>;
   /** The counters whose race holds a link: their auto exits open with any chance (03 §13.6). */
   races: readonly string[];
+  /**
+   * With `fog.counterByChain`: each race counter and the storylet that races on it (its first auto
+   * exit gated on the counter, in file order); the storylet's states carry the work it has seen.
+   */
+  raceStorylets: [string, string][];
   /** Detectors the fog estimates: those something reads or a requirement names (03 §13.6). */
   detectors: string[];
   nodeIndex: Record<NodeId, number>;
@@ -310,6 +283,16 @@ export function fogSetup(c: Content, seed: number): FogSetup {
     reads,
     links: readers.links,
     races: readers.raceCounters,
+    raceStorylets: c.tuning.fog.counterByChain
+      ? readers.raceCounters.flatMap((k): [string, string][] => {
+          const sl = c.storylets.find((d) =>
+            Object.values(d.states).some((st) =>
+              st.exits.some((e) => e.kind === 'auto' && gateCounter(e.gate)?.counter === k),
+            ),
+          );
+          return sl ? [[k, sl.id]] : [];
+        })
+      : [],
     table: buildPerceptionTable(c),
     detectors: c.detectors
       .filter((d) => required.includes(d.emits) || readers.of[`fact:${d.emits}`] !== undefined)
@@ -913,6 +896,8 @@ interface Sink {
   own: number;
   catFx: { cat: CatId; mass: number; effect: Effect; scope: Scope; via: Via | null }[];
   finished: Record<CatId, Record<string, number>>;
+  /** With `fog.counterByChain`: `${counter}|${storylet.state}` → this step's work (mass × units) by tag. */
+  worked: Record<string, number>;
 }
 
 /** P(the cat stands at each node), from its chain (a live cat: its node). */
@@ -1713,6 +1698,16 @@ function storyletsTick(
     const entered: [string, number, string][] = [];
     const move = (from: string, to: string, m: number) => {
       if (m <= 0) return;
+      if (sl.w) {
+        // a race storylet's work moves with its mass (fog.counterByChain)
+        const wt = sl.w[to];
+        const wf = sl.w[from];
+        const mixed = mixWork([
+          { p: sl.p[to] ?? 0, ...(wt && { w: wt }) },
+          { p: m, ...(wf && { w: wf }) },
+        ]);
+        if (mixed) sl.w = { ...sl.w, [to]: mixed };
+      }
       sl.p[from] = (sl.p[from] ?? 0) - m;
       sl.p[to] = (sl.p[to] ?? 0) + m;
       entered.push([to, m, from]);
@@ -2035,8 +2030,13 @@ function catStep(
             );
           }
         } else if ('counter' in w) {
-          if (byChain) worked[w.counter] = (worked[w.counter] ?? 0) + w.add * n;
-          else {
+          if (byChain) {
+            worked[w.counter] = (worked[w.counter] ?? 0) + w.add * n;
+            if (lead.s.sl) {
+              const k = `${w.counter}|${lead.s.sl}`;
+              sink.worked[k] = (sink.worked[k] ?? 0) + lead.p * w.add * n;
+            }
+          } else {
             const k = `${w.counter}|${w.add * n}`;
             counted[k] = (counted[k] ?? 0) + first.p;
           }
@@ -2315,6 +2315,60 @@ function blockedShare(blocks: Blocks[string] | undefined, s: ChainState): number
   return PPM - free;
 }
 
+/**
+ * The work fogged cats did this step, credited to the race storylet's states (`fog.counterByChain`):
+ * the work of mass a state last directed, per unit of the storylet's mass in that state, so the
+ * storylet's mass that spent long in a state where nobody works keeps a lower total. The spread this
+ * adds between the storylet's states is work the cats share (a break the whole crew takes); the
+ * counter gains it less the part each cat's own carried work already counts (its share, by mean work).
+ */
+function storyletWork(
+  setup: FogSetup,
+  q: Quantities,
+  cats: Record<CatId, FogCat>,
+  sink: Sink,
+): void {
+  for (const [counter, id] of setup.raceStorylets) {
+    const sl = q.storylets[id];
+    if (!sl) continue;
+    const states = Object.keys(sl.p).sort();
+    const before = sl.w ?? {};
+    const after: Record<string, Work> = { ...before };
+    let credited = false;
+    for (const st of states) {
+      const done = sink.worked[`${counter}|${id}.${st}`] ?? 0;
+      const p = sl.p[st] ?? 0;
+      if (done <= 0 || p <= 0) continue;
+      const [m, v] = before[st]?.[counter] ?? [0, 0];
+      after[st] = { ...before[st], [counter]: [m + Math.trunc((done * 1000) / p), v] };
+      credited = true;
+    }
+    if (!credited) continue;
+    sl.w = after;
+    const spread = (w: Record<string, Work>) =>
+      mixWork(states.map((st) => ({ p: sl.p[st] ?? 0, ...(w[st] && { w: w[st] }) })))?.[
+        counter
+      ]?.[1] ?? 0;
+    const shared = spread(after) - spread(before); // units² × 1000
+    // the part of it each cat's own carried work counts: Σ m_i² / (Σ m_i)², by mean work
+    let sum = 0;
+    let sq = 0;
+    for (const def of setup.c.cats) {
+      const chain = cats[def.id]?.chain;
+      const m = chain ? (mixWork(chain)?.[counter]?.[0] ?? 0) : 0;
+      sum += m;
+      sq += m * m;
+    }
+    const own =
+      sum > 0 ? Math.min(PPM, Math.trunc(sq / Math.max(1, Math.trunc((sum * sum) / PPM)))) : PPM;
+    const cur = q.counters[counter] ?? { mean: 0, variance: 0 };
+    q.counters[counter] = {
+      ...cur,
+      variance: Math.max(0, cur.variance + times(shared, PPM - own) * 1000),
+    };
+  }
+}
+
 /** One case through one step: chains, storylets, effects on chains, perception, detectors. */
 function caseStep(
   setup: FogSetup,
@@ -2334,6 +2388,7 @@ function caseStep(
     own: lanternEvents.length,
     catFx: lanternFx.map((x) => ({ ...x, mass: PPM, via: null })),
     finished: {},
+    worked: {},
   };
   const due =
     q.echoes.length > 0 ||
@@ -2348,6 +2403,7 @@ function caseStep(
     const cat = cur.cats[def.id];
     if (cat) cats[def.id] = catStep(cc, setup, def.id, cat, t, q, sink, actors[def.id]);
   }
+  if (setup.raceStorylets.length > 0) storyletWork(setup, q, cats, sink);
   // storylets read the new chains; `activityFinished` sees this step's finishes on its first tick
   const next: FogCase = { ...cur, q, cats };
   const cc2 = caseCtx(setup, next, t, step, sink.finished);
@@ -2360,7 +2416,10 @@ function caseStep(
   const yesSink = structuredClone(sink);
   yes.weight = times(fc.weight, fire.m);
   yes.links = { ...fc.links, [`fact:${fire.fact}`]: 1 };
-  need(yes.q.storylets, def.id, 'storylet').p = { [fire.state]: PPM };
+  const ysl = need(yes.q.storylets, def.id, 'storylet');
+  ysl.p = { [fire.state]: PPM };
+  const yw = ysl.w?.[fire.state];
+  if (ysl.w) ysl.w = yw ? { [fire.state]: yw } : {};
   const ccYes = caseCtx(setup, yes, t, step);
   const sure = { storylet: def.id, from: '', pFrom: PPM, to: fire.state };
   enterMass(setup, ccYes, yes.q, def, fire.roles, fire.state, PPM, yesSink, sure);
@@ -2455,7 +2514,7 @@ function cloneQ(q: Quantities): Quantities {
   const storylets: Quantities['storylets'] = {};
   for (const k of Object.keys(q.storylets)) {
     const sl = q.storylets[k];
-    if (sl) storylets[k] = { p: { ...sl.p }, roles: sl.roles };
+    if (sl) storylets[k] = { p: { ...sl.p }, roles: sl.roles, ...(sl.w && { w: { ...sl.w } }) };
   }
   const heard: Quantities['heard'] = {};
   for (const k of Object.keys(q.heard)) heard[k] = { ...q.heard[k] };
@@ -2594,7 +2653,11 @@ function linkSplit(setup: FogSetup, cases: readonly FogCase[]): FogCase[] {
         setFact(no.q, l.fact, 0);
       } else {
         const ys = yes.q.storylets[l.storylet];
-        if (ys) ys.p = { [l.state]: PPM };
+        if (ys) {
+          ys.p = { [l.state]: PPM };
+          const yw = ys.w?.[l.state];
+          if (ys.w) ys.w = yw ? { [l.state]: yw } : {};
+        }
         const ns = no.q.storylets[l.storylet];
         if (ns) {
           const rest = { ...ns.p };
@@ -2654,7 +2717,9 @@ export function mergeCases(setup: FogSetup, cases: readonly FogCase[]): FogCase[
           ),
         ),
         mean,
-        conds: parts[0]?.cat.conds ?? -1,
+        // the decision conditions of the heaviest part: a sliver merged in first must not
+        // overwrite them, or the case's mass would decide on every decision step
+        conds: parts.reduce((a, x) => (x.s > a.s ? x : a), { s: -1, cat: { conds: -1 } }).cat.conds,
       };
     }
     const rain: [number, number][] = [];

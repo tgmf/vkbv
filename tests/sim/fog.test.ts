@@ -8,6 +8,7 @@ import {
   fogSetup,
   fogStep,
   initialFog,
+  mergeCases,
   pointMass,
   standIn,
   WAVE_TOTAL,
@@ -230,5 +231,28 @@ describe('whole-band boredom (fog.boredomWhole, docs/questions.md M2-7)', () => 
     const fetching = next?.filter((e) => e.s.activity === 'fetch') ?? [];
     for (const e of fetching) expect(e.s.bored).toBe(1000);
     expect(next?.every((e) => e.s.control === 'free')).toBe(true);
+  });
+});
+
+describe('merging cases (03 §13.5)', () => {
+  it('a merged cat keeps the decision conditions of the heaviest part, whatever the order', () => {
+    const setup = fogSetup(tiny, 1);
+    const base = initialFog(setup, ['pal']).cases[0];
+    if (!base) throw new Error('no case');
+    const withConds = (weight: number, conds: number) => {
+      const pal = base.cats['pal'];
+      if (!pal) throw new Error('no pal');
+      return { ...base, weight, cats: { ...base.cats, pal: { ...pal, conds } } };
+    };
+    const light = withConds(WAVE_TOTAL / 100, 111);
+    const heavy = withConds(WAVE_TOTAL - WAVE_TOTAL / 100, 222);
+    for (const order of [
+      [light, heavy],
+      [heavy, light],
+    ]) {
+      const merged = mergeCases(setup, order);
+      expect(merged.length).toBe(1);
+      expect(merged[0]?.cats['pal']?.conds).toBe(222);
+    }
   });
 });

@@ -14,6 +14,42 @@ export interface FlagPart {
 export interface FogStorylet {
   p: Record<string, number>; // 'inactive' or a state id → ppm, summing to 1 000 000
   roles: Record<string, CatId[]> | null; // bound at first activation
+  /** With `fog.counterByChain`, a race storylet: the work each state's mass has seen. */
+  w?: Record<string, Work>;
+}
+
+/**
+ * What a chain state's mass has added to counters through activities' `while` effects
+ * (`fog.counterByChain`, docs/questions.md M2-8): by counter, the mean in thousandths of a unit and
+ * the variance in units² × 1000, so mixing states keeps every product below 2^53.
+ */
+export type Work = Record<string, [number, number]>;
+
+/**
+ * The mixture of the work of `parts` (mass p each), per counter: the mean, and the mean variance
+ * plus the spread of the means. Undefined when no part carries work.
+ */
+export function mixWork(parts: readonly { p: number; w?: Work }[]): Work | undefined {
+  const names: string[] = [];
+  for (const x of parts)
+    for (const k of Object.keys(x.w ?? {})) if (!names.includes(k)) names.push(k);
+  if (names.length === 0) return undefined;
+  names.sort();
+  const total = parts.reduce((a, x) => a + x.p, 0);
+  if (total <= 0) return undefined;
+  const out: Work = {};
+  for (const k of names) {
+    const mean = Math.trunc(parts.reduce((a, x) => a + x.p * (x.w?.[k]?.[0] ?? 0), 0) / total);
+    const variance = Math.trunc(
+      parts.reduce((a, x) => {
+        const [m, v] = x.w?.[k] ?? [0, 0];
+        const d = m - mean; // thousandths: d² / 1000 is units² × 1000
+        return a + x.p * (v + Math.trunc((d * d) / 1000));
+      }, 0) / total,
+    );
+    out[k] = [mean, variance];
+  }
+  return out;
 }
 
 /** A running effect a pin created in the fog, with P(it exists) in this case (03 §13.6). */
@@ -307,7 +343,24 @@ export function mixQuantities(
       if (v > 0) p[st] = v;
     }
     const roles = parts.find((x) => x.q.storylets[sl.id]?.roles)?.q.storylets[sl.id]?.roles ?? null;
-    out.storylets[sl.id] = { p: renormalise(p), roles };
+    // a race storylet's work by state mixes by each part's mass in that state
+    const w: Record<string, Work> = {};
+    if (parts.some((x) => x.q.storylets[sl.id]?.w))
+      for (const st of Object.keys(p)) {
+        const m = mixWork(
+          parts.map((x, i) => {
+            const own = x.q.storylets[sl.id];
+            const ww = own?.w?.[st];
+            return { p: times(own?.p[st] ?? 0, shares[i] ?? 0), ...(ww && { w: ww }) };
+          }),
+        );
+        if (m) w[st] = m;
+      }
+    out.storylets[sl.id] = {
+      p: renormalise(p),
+      roles,
+      ...(Object.keys(w).length > 0 && { w }),
+    };
   }
   for (const id of keys((q) => q.heard)) {
     const h: Record<string, number> = {};
