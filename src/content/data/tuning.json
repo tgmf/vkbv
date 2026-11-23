@@ -51,12 +51,19 @@
     "countAtPpm": 500000
   },
   "vetting": {
+    "solutions": ["road_tea", "road_box", "road_both"],
     "requireFacts": [
       "crewArrived",
       "rainStarted",
       "rokkoUnderBoat"
     ],
     "minPpm": 300000,
+    "minStorylets": 2,
+    "minStoryletSharePerMille": 100,
+    "fog": {
+      "minStatePpm": 20000,
+      "bands": 2
+    },
     "maxCandidates": 20
   },
   "player": {

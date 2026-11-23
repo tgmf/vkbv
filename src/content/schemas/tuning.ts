@@ -75,8 +75,20 @@ export const TuningSchema = z.strictObject({
     countAtPpm: ppm('A requirement counts toward frontier progress at this probability'),
   }),
   vetting: z.strictObject({
+    solutions: z
+      .array(z.string())
+      .min(1)
+      .describe('The recorded solutions vetting runs: pin sets of 05 §5.1 (04 §2)'),
     requireFacts: z.array(z.string()).describe('Facts a vetted seed must make likely (04 §2)'),
     minPpm: ppm('Probability each required fact must reach for a seed to pass vetting'),
+    minStorylets: int(
+      "The solutions' runs must enter at least the smaller of this many authored storylets… (04 §2)",
+    ).min(0),
+    minStoryletSharePerMille: int('… and this share of them, rounded up (04 §2)').min(0).max(1000),
+    fog: z.strictObject({
+      minStatePpm: ppm('Live vetting of a typed or bookmarked seed: fog.minStatePpm (04 §2)'),
+      bands: int('Live vetting of a typed or bookmarked seed: fog.bands (04 §2)').min(1),
+    }),
     maxCandidates: int('Seeds tried before vetting gives up').min(1),
   }),
   player: z.strictObject({
