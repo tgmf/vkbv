@@ -144,6 +144,17 @@ export function factSetters(c: Content): Record<string, string[]> {
   return out;
 }
 
+/**
+ * The main storylets (03 §12.2): those with an effect that sets a fact named in the anchor's
+ * requirement tree, the anchor fact included; in file order. Derived at load, never authored.
+ */
+export function mainStorylets(c: Content): string[] {
+  const setters = factSetters(c);
+  const facts = [...requirementFacts(c), c.anchor.id];
+  const main = facts.flatMap((f) => setters[f] ?? []);
+  return c.storylets.map((s) => s.id).filter((id) => main.includes(id));
+}
+
 /** The counters a condition compares (`{ counter, … }` leaves). */
 function counterLeaves(cond: Condition, out: Extract<Condition, { counter: string }>[]): void {
   if ('all' in cond) cond.all.forEach((x) => counterLeaves(x, out));

@@ -46,6 +46,7 @@ import {
   buildPerceptionTable,
   buildReaders,
   gateCounter,
+  mainStorylets,
   requirementFacts,
   storyletCats,
   tablePerceives,
@@ -169,6 +170,8 @@ export interface FogSetup {
   /** Detectors the fog estimates: those something reads or a requirement names (03 §13.6). */
   detectors: string[];
   nodeIndex: Record<NodeId, number>;
+  /** The main storylets (03 §12.2), derived once: only they stop a re-run (04 §6). */
+  main: string[];
 }
 
 export const linkKey = (l: Link): string =>
@@ -252,6 +255,7 @@ export function fogSetup(c: Content, seed: number): FogSetup {
       .filter((d) => required.includes(d.emits) || readers.of[`fact:${d.emits}`] !== undefined)
       .map((d) => d.id),
     nodeIndex: Object.fromEntries(c.nodes.map((n, i) => [n.id, i])),
+    main: mainStorylets(c),
   };
 }
 

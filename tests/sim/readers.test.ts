@@ -1,7 +1,12 @@
 // The readers index, link selection (03 §13.5) and the place perception table (03 §13.6).
 import { describe, expect, it } from 'vitest';
 import { perceives } from '../../src/sim/perception';
-import { buildPerceptionTable, buildReaders, tablePerceives } from '../../src/sim/readers';
+import {
+  buildPerceptionTable,
+  buildReaders,
+  mainStorylets,
+  tablePerceives,
+} from '../../src/sim/readers';
 import type { Content } from '../../src/sim/types';
 import { ch1, freshState, tiny } from './helpers';
 
@@ -26,6 +31,19 @@ describe('readers index', () => {
       { kind: 'fact', fact: 'roadDone' },
       { kind: 'fact', fact: 'crewArrived' },
     ]);
+  });
+
+  it('derives the main storylets (03 §12.2)', () => {
+    expect(mainStorylets(ch1)).toEqual([
+      'door_lure',
+      'blocked_road',
+      'usual_route',
+      'chain_on_beach',
+      'tideline_wander',
+      'rokko_morning',
+      'under_the_boat',
+    ]);
+    expect(mainStorylets(tiny)).toEqual(['lured', 'meet']);
   });
 
   it('takes at most fog.maxLinks', () => {
