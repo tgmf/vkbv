@@ -20,13 +20,15 @@ Rules:
 - UI components need no unit tests. Browser tests cover them through `data-testid`
   and the accessible target list (`02` §4).
 - A bug fix starts with a failing test that reproduces it.
-- Balance properties become tests only when Tagir says so in `05` §5 (`B1`, `B8`, `B9`
-  are tests from the start).
+- Balance properties become tests only when Tagir says so in `05` §5 (`B1` and `B8`
+  are tests from the start; `B9` is calibration, §3: `npm run calibrate`, whose quick run
+  joins `npm run check` once it passes, `docs/questions.md` M2-23).
 
 ## 2. Golden files
 
-For each pin set in `05` §5.1 and seeds 1, 2, 3: `tests/golden/<name>.pins.json`
-holds the pins; `tests/golden/<name>.s<seed>.expected.json` holds the result of a
+For each pin set in `05` §5.1 and seeds 1, 2, 3 (the pins are data in
+`src/content/data/pinsets.json`, decisions.md M1.5):
+`tests/golden/<name>.s<seed>.expected.json` holds the result of a
 headless playback (vetting on, Marti followed, observing every tick from 0 to the
 end):
 

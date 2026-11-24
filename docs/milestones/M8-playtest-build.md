@@ -21,6 +21,16 @@ to judge Gate A.
 7. A crash screen: an error boundary with a plain message, "copy details" (error,
    seed, pins, watched facts, tuning version) and reload.
 
+Notes from M2 (2026-11-25):
+- Strain is a projection to the end of the day: 19–70 s on Chapter 1 (`docs/handoff/M2.md`,
+  item 11). `recompute`'s `strain` flag computes it with every re-run; the plan says how
+  the Wave tab keeps re-runs fast while it is open.
+- Timing tests run alone (`npm run bench`, Vitest project `budget`); a CI machine's
+  numbers differ from a desktop's.
+- A simulated-only world for testing (`docs/questions.md` M2-22) waits for Tagir's
+  decision on when to build it; if he puts it in the playtest build, it is a tuning
+  switch shown in this panel.
+
 ## Acceptance
 
 - [ ] Changing a tuning value in the panel changes the next recompute; "copy as JSON"

@@ -4,7 +4,29 @@
 links on demand (`03` §15.3) as
 pure, tested functions, driven headless. No UI.
 
-**Read first:** `04-player-layer.md`, `03` §11, §13–§17, `01` §3.
+**Read first:** `04-player-layer.md`, `03` §11, §13–§17, `01` §3, `docs/handoff/M2.md`.
+
+## Where M2 left things (2026-11-25)
+
+- The worker's code is `src/bridge/host.ts` (`createHost`), also run headless in Node
+  (`tests/bridge/host.test.ts`). The re-run, previews and commits, `vet` and
+  `debugHistory` work; `observe` answers "not implemented". Build it there.
+- Built in M2 and used here: imposed facts and Gaze (`src/sim/observe.ts`, `advance` in
+  `src/sim/lantern.ts`), placement and negative evidence, contributor heaps (for links on
+  demand), the frontier limit and checkpoints (`src/sim/recompute.ts`), vetting.
+- Open questions this milestone meets, with the option chosen for now (keep it; if an
+  acceptance item needs another answer, ask): M2-19 (`totalPressure` counts live cats
+  only, so "watched under pressure" sees only them), M2-20 (an imposed fact whose live
+  cat the edit changed reopens), Q-glossary-2 (reopen only when impossible).
+- The day since M2-18: rain starts 16:30–17:30, the lure is available only after
+  `rainStarted`, the day ends at 00:40 (tick 1140) and frays when the boat leaves (about
+  23:25). "The charge floor at the watched rain start" is late afternoon.
+- Seed 1 fails vetting (the offline list, `src/content/data/ch1/vetted-seeds.json`,
+  starts 4, 6, 7; vetted live, 1 becomes 49598663 in about 20 s). On seed 1 itself the
+  `road_both` lure brings Marti to the door and he goes back in. The plan says which
+  seed the scripted playthrough runs on; the last acceptance item covers where it stops.
+- Speed: the handoff gives `npm run bench`'s numbers and the time of one `observe` at
+  the edge (live playback runs at up to `player.observeMaxTps`, 16 ticks/s).
 
 ## Build
 

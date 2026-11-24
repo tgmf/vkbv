@@ -4,7 +4,22 @@
 ghosts, the timeline, playback that observes, scrubbing that does not. No cards in
 hand yet.
 
-**Read first:** `06-ui.md` §1–§3, §8, §12; `02` §3, §4; `03` §16.
+**Read first:** `06-ui.md` §1–§3, §8, §12; `02` §3, §4; `03` §14, §16;
+`docs/questions.md` M2-21.
+
+## Where M2 left things (2026-11-25)
+
+- The worker streams a re-run as `rerun` patches every `waves.streamEveryMs` (50 ms),
+  then a `result`; `src/bridge/client.ts`: `request(msg, onRerun)`. Frames are plain
+  objects: about 40 kB a patch, 2.7 MB for a re-run to 12:00. `observe` comes from M3.
+- Frames carry filtered ghosts only. Their `samples` (backward sampling, `03` §16) and
+  the smoothing of past ghosts (`03` §14 step 3) were deferred to this milestone
+  (M2-21): the fog does not record which state led to which. Building them costs the
+  re-run (`npm run bench`, 111 of 120 ticks/s); the plan says how, with an estimate,
+  and the handoff gives the measured cost.
+- Seed 1 under `road_both` does not reach the meeting (Marti goes back in at the door);
+  the acceptance item below needs a seed on which it does (`npm run sim -- --seed N
+  --pinset road_both --fog` shows it).
 
 ## Build
 
@@ -31,6 +46,7 @@ hand yet.
    dropdown that loads any pin set from `05` §5.1. It moves into the debug panel in
    M8.
 7. The layout of `06` §1 with empty hand and side-panel areas.
+8. Frames' `samples` and smoothed past ghosts (see above), used by the focus layer.
 
 ## Acceptance
 
@@ -44,7 +60,8 @@ hand yet.
 - [ ] Dragging the playhead anywhere up to the lantern edge updates the scene within
       one frame and observes nothing; it cannot pass the edge; playback observes every
       tick it passes and extends the edge when it reaches it.
-- [ ] `untouched` shows the fray when Rokko leaves; playback stops there.
+- [ ] `untouched` shows the fray when the boat leaves (`boatLeft`, about 23:25);
+      playback stops there.
 - [ ] Keyboard: Space, J, K, L, ←, → and Home work as `06` §8 says; End jumps to the edge
       only with `flags.jumpToEdge`.
 - [ ] The timeline cannot be clicked or dragged ahead of the playhead; the shuttle steps up a
