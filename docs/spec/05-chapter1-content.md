@@ -72,6 +72,7 @@ have **not** been checked against a model of this content; M4 measures them.
 | `content.castMode` | `"full"` | `"full"` or `"core"` (§3) |
 | `waves.checkpointEvery` | 30 | ticks between checkpoints of the lantern (`03` §17) |
 | `waves.anchorConditioning` | true | the anchor treated as already seen, in projections (`03` §14; open, `docs/questions.md` M2-2) |
+| `waves.streamEveryMs` | 50 | during a re-run the worker posts the frames so far, and takes newer requests, this often (`02` §3) |
 | `fog.stepTicks` | 5 | ticks per fog step (`03` §13.2) |
 | `fog.minStatePpm` | 1000 | chain states below this are dropped (adopted 2026-11-22 after calibration; was 100) |
 | `fog.bands` | 3 | bands per changing gauge, the top one saturated (adopted 2026-11-22; was 4) |
@@ -84,6 +85,7 @@ have **not** been checked against a model of this content; M4 measures them.
 | `fog.frayBelowPpm` | 1000 | the lantern, and a projection, fray below this chance of reaching the anchor (`03` §16) |
 | `fog.exactTolerancePpm` | 20000 | tiny-world exactness test (`03` §18) |
 | `fog.ppmQuantum` | 50000 | fog probabilities in decision keys are rounded down to this (`03` §8.2) |
+| `fog.counterByChain` | true | chain states and race storylets' states carry the work their mass did (`03` §13.6; adopted 2026-11-25, M2-8) |
 | `behaviour.boredomWeight` | 4 | score taken from the current activity at full boredom (`03` §8.2) |
 | `lantern.releaseAfterTicks` | 30 | ticks unperceived before a live cat returns to the fog (`03` §13.4) |
 | `lantern.dwellTicks` | 5 | ticks a placed cat keeps its activity before deciding (`03` §15.1) |
@@ -101,7 +103,7 @@ have **not** been checked against a model of this content; M4 measures them.
 | `vetting.minPpm` | 300000 | |
 | `vetting.minStorylets` | 2 | the solutions' runs must enter at least the smaller of this many authored storylets … (`04` §2) |
 | `vetting.minStoryletSharePerMille` | 100 | … and this share of them, rounded up |
-| `vetting.fog` | coarser fog knobs | `fog.minStatePpm` and `fog.bands` for live vetting of a typed or bookmarked seed |
+| `vetting.fog` | `minStatePpm` 20000, `bands` 2 | the fog knobs for live vetting of a typed or bookmarked seed |
 | `vetting.maxCandidates` | 20 | |
 | `player.playedCardRule` | `"pinned"` | `pinned`, `spent` or `discard` (`04` §3) |
 | `player.shuttleTps` | `[4, 16, 64, 256]` | shuttle speeds in ticks per real second, either direction (`06` §3) |

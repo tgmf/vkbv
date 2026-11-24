@@ -17,6 +17,12 @@ from the edit tick to the frontier limit, streamed (`03` §13.1, §17; `04` §6)
 projection is now internal: the whole-day projection for vetting, calibration and
 balance, and strain.
 
+Changed 2026-11-25 (agreed during M2, recorded in `docs/handoff/M2.md` and `docs/questions.md`):
+item 11's hourly strain prints only with `--strain` (it costs minutes); calibration (item 12) was
+narrowed to a tool and a baseline (M2-23) and reads each event's forecast before the run observes it
+(M2-26), and the quick run joins `npm run check` only once it passes; the fog's counters are carried by
+chain and storylet states (`fog.counterByChain`, M2-8); timing tests run alone (`npm run bench`).
+
 **Read first:** `03` §1, §12–§18 (and §4, §8–§10, which the fog reuses), `07` §3, §4,
 `02` §3, `04` §2.
 

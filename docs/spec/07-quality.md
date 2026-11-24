@@ -7,7 +7,8 @@
 | Unit | Vitest | `sim` and `player` functions, content loading, i18n key checks | `npm run check` |
 | Property | Vitest | the invariants in `03` §18 and `04` §10 over seeds 1 to 50 | `npm run check` |
 | Golden | Vitest | headless playbacks of the pin sets in `05` §5 (§2 below) | `npm run check` |
-| Calibration | Vitest | shown probabilities against outcomes (§3) | `npm run check` (small), `npm run calibrate` (full) |
+| Calibration | script | shown probabilities against outcomes (§3) | `npm run calibrate` (full), `npm run calibrate -- --quick` (small; joins `npm run check` once it passes, `docs/questions.md` M2-23) |
+| Budget | Vitest | the re-run budget (§4), `tests/budget/` | `npm run bench`, run alone at the end of `npm run check` |
 | Balance | script | the B-properties of `05` §5.2, measured and printed | `npm run balance` |
 | Browser | Playwright | the app loads, a scripted first playthrough reaches the anchor, no console errors | `npm run e2e` |
 
@@ -60,8 +61,10 @@ that the fog, an approximation, stays close to the reference simulation.
 
 1. run the **whole-day run** (`03` §13.1) with the pin set, conditioning **off**: Marti
    live from tick 0 on stream 0, every other cat in the fog (Tagir, 2026-11-23: Marti is
-   never fogged). Read each event's chance `p` by the end of the run: 1 000 000 if the
-   lantern holds it, otherwise its probability in the fog;
+   never fogged). Read each event's **forecast** `p`: 1 000 000 if the lantern holds it;
+   otherwise its probability in the fog just before the protagonists' perception first
+   moves it by `calibration.observedPpm` (what the ghosts showed before the run learned
+   it), or at the end of the run if it never does (`docs/questions.md` M2-26);
 2. run one **reality**: the reference simulation, a single history (`03` §12.4) in
    stream `100000 + seed`, and record whether each event happened. Its starting stats
    are the seed's (`03` §5), and its weather is the run's: the weather's branch points
@@ -85,9 +88,10 @@ Two checks:
 | Knob | Start |
 | --- | --- |
 | `calibration.seeds` (full run) | 400 |
-| `calibration.seedsQuick` (in `npm run check`) | 60 |
+| `calibration.seedsQuick` (`npm run calibrate -- --quick`) | 60 |
 | `calibration.minPerBucket` | 20 |
 | `calibration.tolerancePpm` | 100000 |
+| `calibration.observedPpm` | 10000 |
 
 Pin set `road_both`, events `crewArrived`, `roadBlocked`, `shopClosedEarly`,
 `rokkoUnderBoat`, `martiOut`, `anchor.meeting`. A second run uses `untouched`. A calibration failure is a bug in the fog, or an approximation in `03` §13 that does
@@ -99,7 +103,7 @@ pass.
 
 | What | Budget | Checked by |
 | --- | --- | --- |
-| Re-run after an edit at 08:00 with the lantern edge at 12:00 (Marti live, the other cats in the fog, 240 ticks), in a worker | first streamed frames within `budgets.recomputeMs` (100 ms), median, on a developer laptop; then at least `budgets.rerunTps` (120) ticks per second; the test fails above 3× the time or below a third of the rate | Vitest (Node, same code as the worker) and the debug panel |
+| Re-run after an edit at 08:00 with the lantern edge at 12:00 (Marti live, the other cats in the fog, 240 ticks), in a worker | first streamed frames within `budgets.recomputeMs` (100 ms), median, on a developer laptop; then at least `budgets.rerunTps` (120) ticks per second; the test fails above 3× the time or below a third of the rate | Vitest (Node, same code as the worker: `tests/budget/rerun.test.ts`, `npm run bench`) and the debug panel |
 | Observe one tick in playback (at the lantern edge: advance the lantern and fog one tick) | ≤ 5 ms median | Vitest |
 | Frame time while scrubbing, all 12 cats with ghosts | 60 fps on a mid-range laptop; no long task over 50 ms | manual, noted in the handoff |
 | JavaScript, graybox build | ≤ 400 kB gzipped (three.js included) | build script prints sizes; CI fails above |

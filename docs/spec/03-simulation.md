@@ -866,13 +866,24 @@ Every world quantity the lantern has not fixed is a probability per case:
 | --- | --- |
 | a fact | P(set by this tick); never decreases |
 | a flag (scoped or not) | P(set now), with its `until` handled per contributing effect |
-| a counter | expected value and variance (integers); `{ counter, gte }` uses the committed `PHI` table on the standardised distance (§13.7) |
+| a counter | expected value and variance (integers), with work carried by the states that did it (below); `{ counter, gte }` uses the committed `PHI` table on the standardised distance (§13.7) |
 | a storylet's state | a distribution over `inactive`, its states and `ended`; roles bound as below |
 | an event | P(emitted at each place this step) |
 | `heard` for a cat | P(the cat has perceived the event); never decreases |
 | a detector | P(completed by this tick), estimated (below) |
 | the anchor | P(reached by this tick) and P(dead by this tick) |
 
+- **Counters fed by activities** (`tuning.fog.counterByChain`, on; `docs/questions.md`
+  M2-8). A cat's `while` work persists with the chain states that did it: each chain
+  state carries the mean and variance of what its mass has added, carried through every
+  transition and mixed where states merge, and the case's counter moves by the change of
+  each cat's mixture (a cat that keeps at work keeps its own total; a per-step independent
+  term would lose it). A counter that a storylet's auto exit races on (§13.5) is also
+  carried by that storylet's states: each step's work is credited to the state that
+  directed the mass (`sl`), per unit of the storylet's mass in it, so a crew's shared
+  break keeps a shared spread; the counter gains that spread less the share each cat's
+  own carried work counts (Σ mᵢ² / (Σ mᵢ)²). Approximation: a state is credited its
+  average rate, so the shared spread can run wide (about 30% on the tiny crew test).
 - **Storylets in the fog.** Activation: the cumulative activation probability is the
   running maximum of the trigger's ppm. Roles bind as in §9.1; a dynamic role
   (`nearCat`) binds the cat most likely to satisfy it at activation (ties in cast

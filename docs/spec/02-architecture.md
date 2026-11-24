@@ -33,10 +33,12 @@ No CSS framework. Plain CSS with custom properties from `src/ui/theme.css`.
 src/
   sim/         rng.ts math.ts exp-table.ts hash.ts space.ts perception.ts
                conditions.ts scores.ts effects.ts cats.ts storylets.ts sifting.ts
-               pins.ts step.ts history.ts readers.ts fog.ts lantern.ts observe.ts
-               frames.ts recompute.ts vet.ts phi-table.ts types.ts
+               pins.ts step.ts history.ts readers.ts fog.ts fog-quantities.ts
+               lantern.ts backward.ts observe.ts frames.ts recompute.ts vet.ts
+               phi-table.ts trace.ts types.ts
   player/      state.ts actions.ts rewards.ts frontier.ts save.ts
-  bridge/      protocol.ts sim.worker.ts client.ts
+  bridge/      protocol.ts host.ts (the worker's code, also run headless in Node) sim.worker.ts
+               client.ts inspect.ts (dev inspector)
   render/      SceneRenderer.ts three/ (graybox implementation)
   ui/          Solid components, theme.css
   content/     schemas/ (Zod) load.ts data/
@@ -47,10 +49,10 @@ src/
                data/ui/   en.json ru.json
   i18n/        t.ts
   telemetry/   events.ts sinks.ts summary.ts
-  cli/         sim.ts
+  cli/         sim.ts fog-report.ts calibration.ts files.ts
 scripts/       content.ts validate-content.ts gen-exp-table.ts gen-phi-table.ts balance.ts
-               calibrate.ts
-tests/         *.test.ts, golden/, fixtures/, e2e/
+               calibrate.ts vet.ts size.ts fog-bench.ts fog-hash.ts crew-compare.ts
+tests/         *.test.ts, golden/, fixtures/, e2e/, budget/ (timing tests, run alone: `npm run bench`)
 docs/          glossary, spec, milestones, handoff, questions, decisions
 ```
 
@@ -118,10 +120,12 @@ type MainToWorker =
   | { kind: 'init'; reqId: number; tuning?: Partial<Tuning> }
   | { kind: 'vet'; reqId: number; requestedSeed: number }
   | { kind: 'recompute'; reqId: number; seed: number; pins: Pin[]; watched: WatchedFact[];
-      frontier: PlayerState['frontier']; preview: boolean }   // a re-run (03 §17)
-  | { kind: 'commit'; reqId: number }                      // make a preview the current wave
+      frontier: PlayerState['frontier']; preview: boolean;
+      strain?: boolean }                                    // a re-run (03 §17); strain: debug panel only
+  | { kind: 'commit'; reqId: number }                      // make a preview the current wave; replies `ready` (`error` without one)
   | { kind: 'observe'; reqId: number; tick: number; cat: CatId }
-  | { kind: 'debugHistory'; reqId: number; tick: number; index: number }; // index 0: the lantern state; i > 0: reference histories (stream i)
+  | { kind: 'debugHistory'; reqId: number; tick: number; index: number } // index 0: the lantern state; i > 0: reference histories (stream i)
+  | { kind: 'inspect'; reqId: number; seed: number; stream: number; pinset: string; tick: number }; // dev inspector (M1.5)
 type WorkerToMain =
   | { kind: 'ready'; reqId: number }
   | { kind: 'vetted'; reqId: number; seed: number }
@@ -129,6 +133,7 @@ type WorkerToMain =
   | { kind: 'result'; reqId: number; result: RecomputeResult }
   | { kind: 'observed'; reqId: number; fact: WatchedFact; frames: FramesPatch }
   | { kind: 'history'; reqId: number; state: SimState; events: SimEvent[] }
+  | { kind: 'inspected'; reqId: number; view: InspectView }                 // dev inspector (M1.5)
   | { kind: 'error'; reqId: number; message: string };
 ```
 
