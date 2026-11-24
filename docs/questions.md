@@ -234,6 +234,11 @@ cases carry it (needs a third link; `fog.maxLinks` is 2 by your instruction); (c
 counters as a distribution (buckets) instead of mean and variance.
 Chosen for now: (a), next.
 Answer: Tagir, 2026-11-22: fix the bias at its source after M2-7 (measure the crew against the reference hour by hour, find the decision that diverges). No third link; `fog.maxLinks` stays 2. Only if the mean work is right and road blocked still fails: threshold counters as a spread of values, behind a knob. Road blocked must pass calibration (07 §3) before M2 is done.
+Update 2026-11-25: the counter's spread, not its bias, was the main error: the counter was one mean and
+variance per case, apart from the states that worked. Fixed by `fog.counterByChain` (on): chain states and
+the race storylet's states carry their work. The bias that remains is about 1.7 points of the crew's time
+(shorter tea breaks, almost no wandering); road blocked's rates pass at 400 seeds, its middle buckets read
+10–16 points low (`docs/handoff/M2.md`, item 12). Not chased further (M2-23).
 
 ## M2-9 — Shuttle follow-ups            (status: answered)
 Where: `06` §3, §8; `04` §6; `05` §4; `docs/glossary.md`; `docs/milestones/M5-viewer.md`
@@ -479,9 +484,10 @@ of `roadBlocked`: 0–10% sees 28.7% (`road_both`) and 17.3% (`untouched`) block
 the counter held as mean and variance (`03` §13.6, M2-8). The quick run (60 seeds) fails on `untouched`
 (the same 0–10% bucket, and `shopClosedEarly` 80–90%, which passes at 400 seeds), so it stays out of
 `npm run check`.
-Follow-up (open): M2-8's answer says road blocked must pass calibration before M2 is done; under (a) it is
-recorded and not chased. Which holds? If M2-8's: its next step is option (c), threshold counters as a
-spread of values behind a knob (an algorithm change, so it waits for you).
+Follow-up (answered 2026-11-25): Tagir chose to fix the road after all. Counters carried by chains and race
+storylets (`fog.counterByChain`, on), the merge fix, the race-split fact fix and forecasts in calibration
+(M2-26). Final 400 seeds: every rate passes, the low buckets pass; the fog under-predicts a blocked road by
+about 10–16 points in the middle buckets (the pace gap). Tables in `docs/handoff/M2.md`.
 
 ## M2-24 — A storylet state and the flag its own onEnter set            (status: open)
 Where: `03` §13.6 (storylets and flags in the fog); `src/sim/fog.ts`; found 2026-11-24 on the tiny world
@@ -494,6 +500,13 @@ are blocked and pal keeps working. Probably most of M2-13's stochastic mismatch.
 has a state whose exits read what its own onEnter set (checked), so the road is not affected.
 Options seen: (a) for the mass in a storylet state, read what that state's own onEnter set for sure as
 certain (with its ttl from the entering tick); (b) leave it until content needs it.
+The flag's length is already kept (each flag part has its `until`); what is missing is the link between
+the flag and the mass that set it: the exit reads the case's P(busy) = 50% where the mass in `chosen` has
+P(busy) = 100% until tick 21. Sharper (a), 2026-11-25: while a state's own onEnter flags with a ttl can
+still hold, keep that state's mass split by entry step (2–3 cohorts for a 10-tick flag at 5-tick
+steps) and read its exit gates per cohort with those flags certain until entry + ttl. The same lesson as
+the road (M2-8): keep the history of the mass with the mass, not as one number per case.
+Tagir, 2026-11-25: keep this and M2-25 tracked into later milestones; fix before content needs them.
 Answer:
 
 ## M2-25 — A fogged walker does not notice an edge that closes            (status: open)
@@ -504,6 +517,7 @@ gate closes when `workDone`; 21% of pal's histories turn back at tick 26, the fo
 the only such edge is `roadworks_pass`, closed by `roadBlocked`, after the race.
 Options seen: (a) at each step, mass about to cross an edge whose `when` fails (in ppm) stops there,
 learns the edge closed and decides; (b) leave it until content needs it.
+Tagir, 2026-11-25: keep tracked into later milestones; fix before content needs it.
 Answer:
 
 ## M2-26 — Calibration when the run's protagonist observes the event            (status: answered)
