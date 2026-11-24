@@ -8,6 +8,14 @@ export default defineConfig({
   worker: { format: 'es' },
   test: {
     environment: 'node',
-    include: ['tests/**/*.test.ts'],
+    projects: [
+      // everything but the timing tests, in parallel (npm run test)
+      {
+        extends: true,
+        test: { name: 'unit', include: ['tests/**/*.test.ts'], exclude: ['tests/budget/**'] },
+      },
+      // the timing tests (07 §4), alone so other suites do not share the CPU (npm run bench)
+      { extends: true, test: { name: 'budget', include: ['tests/budget/**/*.test.ts'] } },
+    ],
   },
 });
