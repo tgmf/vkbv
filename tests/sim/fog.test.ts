@@ -18,7 +18,9 @@ import {
 import { runHistory } from '../../src/sim/history';
 import type { Content } from '../../src/sim/types';
 import { readChapterDir } from '../../src/cli/files';
-import { loadChapter } from '../../src/content/load';
+import { PINSETS_FILE } from '../../src/content/chapter1';
+import { loadChapter, parsePinSets } from '../../src/content/load';
+import { wholeDayRun } from '../../src/sim/recompute';
 import { ch1, ch1Coarse, makeCtx, tiny, TINY_DIR, tuning } from './helpers';
 
 const ids = (c: Content) => c.cats.map((x) => x.id);
@@ -255,4 +257,20 @@ describe('merging cases (03 §13.5)', () => {
       expect(merged[0]?.cats['pal']?.conds).toBe(222);
     }
   });
+});
+
+describe('a race split keeps outcomes apart (03 §13.5)', () => {
+  it('Chapter 1, seed 20, road_both: where the road was done, it was never abandoned', () => {
+    const pins = parsePinSets(PINSETS_FILE, ch1)['road_both'] ?? [];
+    let checked = 0;
+    wholeDayRun(fogSetup(ch1, 20), pins, (w) => {
+      if (w.lantern.sim.tick > 700) return;
+      for (const fc of w.fog.cases)
+        if (fc.links['fact:roadDone'] === 1) {
+          expect(fc.q.facts['roadBlocked'] ?? 0).toBe(0);
+          checked += 1;
+        }
+    });
+    expect(checked).toBeGreaterThan(0);
+  }, 120_000);
 });

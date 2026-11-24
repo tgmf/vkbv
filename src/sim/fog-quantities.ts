@@ -256,6 +256,18 @@ export function raiseFactPart(q: Quantities, fact: string, source: string, v: nu
   combineFact(q, fact);
 }
 
+/** Drops the given sources' parts from every fact (an outcome ruled out in a case). */
+export function dropFactSources(q: Quantities, sources: readonly string[]): void {
+  for (const fact of Object.keys(q.factParts).sort()) {
+    const parts = q.factParts[fact];
+    if (!parts || !sources.some((x) => x in parts)) continue;
+    const kept = { ...parts };
+    for (const x of sources) delete kept[x];
+    q.factParts[fact] = kept;
+    combineFact(q, fact);
+  }
+}
+
 /** Sets a fact to exactly v (a link's case value, the weather's facts). */
 export function setFact(q: Quantities, fact: string, v: number): void {
   q.factParts[fact] = { '': v };

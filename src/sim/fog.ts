@@ -26,6 +26,7 @@ import {
   setFact,
   addHeard,
   clearFlag,
+  dropFactSources,
   counterOf,
   flagChance,
   INACTIVE,
@@ -2369,6 +2370,20 @@ function storyletWork(
   }
 }
 
+/** The states of a storylet from which `target` can be reached by its exits, `target` included. */
+function statesReaching(def: StoryletDef, target: string): string[] {
+  const out = [target];
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const [st, d] of Object.entries(def.states))
+      if (!out.includes(st) && d.exits.some((e) => out.includes(e.to))) {
+        out.push(st);
+        grew = true;
+      }
+  }
+  return out;
+}
+
 /** One case through one step: chains, storylets, effects on chains, perception, detectors. */
 function caseStep(
   setup: FogSetup,
@@ -2416,6 +2431,18 @@ function caseStep(
   const yesSink = structuredClone(sink);
   yes.weight = times(fc.weight, fire.m);
   yes.links = { ...fc.links, [`fact:${fire.fact}`]: 1 };
+  // where it happened, the storylet never entered a state from which this one cannot be reached
+  // (a competing exit this step, an outcome it excludes): those states' facts go (a once-storylet
+  // keeps them by source state)
+  if (def.once) {
+    const reaching = statesReaching(def, fire.state);
+    dropFactSources(
+      yes.q,
+      Object.keys(def.states)
+        .filter((st) => !reaching.includes(st))
+        .map((st) => `sl:${def.id}.${st}`),
+    );
+  }
   const ysl = need(yes.q.storylets, def.id, 'storylet');
   ysl.p = { [fire.state]: PPM };
   const yw = ysl.w?.[fire.state];
