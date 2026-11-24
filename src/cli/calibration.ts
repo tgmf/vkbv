@@ -1,7 +1,7 @@
 // Calibration (07 §3): each event's chance by the end of a whole-day run against whether it happens in
 // one reality of the reference simulation. `seedPairs` runs one seed; `judge` checks the rates and the
 // buckets over all of them. scripts/calibrate.ts and tests/calibration.test.ts share both.
-import { fogSetup, WAVE_TOTAL } from '../sim/fog';
+import { fogSetup, WAVE_TOTAL, type Fog } from '../sim/fog';
 import { initialState, sortPins, uniformStreams } from '../sim/history';
 import { sample } from '../sim/math';
 import { storyletCats } from '../sim/readers';
@@ -74,8 +74,9 @@ function reality(c: Content, pins: readonly Pin[], seed: number, stream: number)
 
 /**
  * One seed (07 §3): the whole-day run (Marti live, the other cats in the fog, conditioning off) gives
- * each event's p, 1 000 000 if the lantern holds it; the reality in stream 100000 + seed gives the
- * outcome. A fog event: the lantern does not hold it and no storylet that sets it has a role for
+ * each event's p, 1 000 000 if the lantern holds it, otherwise its chance in the fog just before the
+ * protagonists' perception first moved it (M2-26), or at the end; the reality in stream 100000 +
+ * seed gives the outcome. A fog event: the lantern does not hold it and no storylet that sets it has a role for
  * Marti or ran live in this run's lantern.
  */
 export function seedPairs(
@@ -84,18 +85,36 @@ export function seedPairs(
   seed: number,
   events: readonly string[] = CALIBRATION_EVENTS,
 ): Pair[] {
-  const w = wholeDayRun(fogSetup(c, seed), pins);
+  // each event's forecast: its chance in the fog just before the protagonists' perception first
+  // moves it by `calibration.observedPpm` (what the ghosts showed before the run learned it, M2-26)
+  const chance = (fog: Fog, event: string) =>
+    fog.cases.reduce(
+      (a, fc) => a + Math.trunc(((fc.q.facts[event] ?? 0) * fc.weight) / WAVE_TOTAL),
+      0,
+    );
+  const before: Record<string, number> = {};
+  const forecast: Record<string, number> = {};
+  const w = wholeDayRun(
+    fogSetup(c, seed),
+    pins,
+    (x) => {
+      for (const event of events) {
+        const b = before[event];
+        if (b === undefined || forecast[event] !== undefined) continue;
+        if (Math.abs(chance(x.fog, event) - b) >= c.tuning.calibration.observedPpm)
+          forecast[event] = b;
+      }
+    },
+    (fog) => {
+      for (const event of events) before[event] = chance(fog, event);
+    },
+  );
   const sim = w.lantern.sim;
   const end = reality(c, pins, seed, 100_000 + seed);
   const set = setters(c);
   return events.map((event) => {
     const held = sim.facts.includes(event);
-    const p = held
-      ? 1_000_000
-      : w.fog.cases.reduce(
-          (a, fc) => a + Math.trunc(((fc.q.facts[event] ?? 0) * fc.weight) / WAVE_TOTAL),
-          0,
-        );
+    const p = held ? 1_000_000 : (forecast[event] ?? chance(w.fog, event));
     const lantern = (set[event] ?? []).some((id) => {
       const run = sim.storylets[id];
       const def = c.storylet[id];

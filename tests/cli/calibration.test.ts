@@ -30,6 +30,30 @@ describe('calibration (07 §3)', () => {
     expect(judge(tiny, fine, false)).toMatchObject({ rateMisses: 0, bucketMisses: 0, pass: true });
   });
 
+  it('one seed: the forecast is the chance before perception moved it, else the end chance (M2-26)', () => {
+    const pins = [powerPin('glow', 'home.room', 0)];
+    const never = {
+      ...tiny,
+      tuning: {
+        ...tiny.tuning,
+        calibration: { ...tiny.tuning.calibration, observedPpm: 1_000_000 },
+      },
+    };
+    for (const seed of [1, 2, 3]) {
+      const end = seedPairs(never, pins, seed, ['workDone', 'heroOut']);
+      const pairs = seedPairs(tiny, pins, seed, ['workDone', 'heroOut']);
+      // the lantern's own fact keeps 1 000 000; a fog fact's forecast is a chance like any other
+      expect(pairs.map((x) => [x.event, x.hit, x.fog])).toEqual(
+        end.map((x) => [x.event, x.hit, x.fog]),
+      );
+      for (const x of pairs) {
+        expect(x.p).toBeGreaterThanOrEqual(0);
+        expect(x.p).toBeLessThanOrEqual(1_000_000);
+      }
+      expect(pairs[1]?.p).toBe(end[1]?.p);
+    }
+  });
+
   it('one seed: a fact the lantern holds is certain and no fog event; the same seed gives the same pairs', () => {
     const pins = [powerPin('glow', 'home.room', 0)];
     const a = seedPairs(tiny, pins, 1, ['heroOut']);

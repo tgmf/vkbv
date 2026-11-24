@@ -92,7 +92,8 @@
     "seeds": 400,
     "seedsQuick": 60,
     "minPerBucket": 20,
-    "tolerancePpm": 100000
+    "tolerancePpm": 100000,
+    "observedPpm": 10000
   },
   "flags": {
     "telemetry": true,

@@ -506,4 +506,20 @@ Options seen: (a) at each step, mass about to cross an edge whose `when` fails (
 learns the edge closed and decides; (b) leave it until content needs it.
 Answer:
 
+## M2-26 — Calibration when the run's protagonist observes the event            (status: answered)
+Where: `07` §3 (each event's chance "by the end of the run"); `src/cli/calibration.ts`
+Question: a whole-day run is a lantern run: what Marti perceives is placed and conditions the fog. With
+`fog.counterByChain` on, the road's odds at the rain are honest (seed 20, `road_both`: 70% blocked, the
+reference 81%), but the lure takes Marti out at 17:35; at 17:53 he perceives a crew cat, it is placed,
+and the case where the road is not done drops to 0. The end-of-run p (about 0) is then what his run
+happened to see, not a forecast, while the reality is an independent history: 57 `road_both` seeds sit
+at p ≈ 12.6% with 64.9% blocked. Before the switch the fog was about 99% "done" at the rain, so his look
+rarely moved anything. How should calibration read p?
+Options seen: (a) the forecast: the event's chance just before the protagonists' perception first moves
+it by `calibration.observedPpm`, else its chance at the end; every seed stays in the check; (b) leave
+the seeds where the run observed the event out of the bucket check; simpler, but it drops the seeds
+players create (cards, the lure) and may bias the rest.
+Answer: Tagir, 2026-11-25: (a). `advance` and `wholeDayRun` take an observer that sees each tick's fog
+before evidence; `calibration.observedPpm` = 10 000.
+
 <!-- Gate notes and answers go above this line. -->

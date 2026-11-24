@@ -182,7 +182,9 @@ const withoutCat = (fog: Fog, id: CatId): Fog => ({
 /**
  * Advances the wave one tick (03 §14, §15.1). `followed` are the protagonists whose perception
  * places cats; `watched` the watched facts a re-run imposes (§15.5), each at the step from its tick.
- * The draws use scope `obs`, keyed by who, whom and when, never by the log.
+ * The draws use scope `obs`, keyed by who, whom and when, never by the log. `beforeEvidence`, if
+ * given, sees the fog after its own step and before anything the protagonists perceive conditions it
+ * (calibration reads a forecast there, 07 §3); it changes nothing.
  */
 export function advance(
   setup: FogSetup,
@@ -190,6 +192,7 @@ export function advance(
   pins: readonly Pin[],
   followed: readonly CatId[],
   watched: readonly WatchedFact[] = [],
+  beforeEvidence?: (fog: Fog) => void,
 ): Wave {
   const { c, seed } = setup;
   const K = c.tuning.fog.stepTicks;
@@ -234,8 +237,11 @@ export function advance(
   let localCauses = wave.localCauses;
 
   // 2. the fog's step when a step boundary passes, reading the lantern; then release (03 §13.4)
-  if (fog.tick + K <= t) {
+  const stepped = fog.tick + K <= t;
+  if (!stepped) beforeEvidence?.(fog);
+  if (stepped) {
     fog = fogStep(setup, fog, held, false, sim, pins, events, fogFx);
+    beforeEvidence?.(fog);
     events = [];
     fogFx = [];
     // the step's fog events each protagonist would perceive: drawn, collapsed or ruled out

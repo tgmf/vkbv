@@ -356,6 +356,15 @@ describe('the whole-day run and the projection from the edge (03 §13.1, §14)',
     }
   });
 
+  it('shows each tick’s fog before evidence to `beforeEvidence`, changing nothing', () => {
+    const setup = fogSetup(tiny, 1);
+    const pins = [glowAt(0)];
+    let seen = 0;
+    const w = wholeDayRun(setup, pins, undefined, () => (seen += 1));
+    expect(canonicalJson(w)).toBe(canonicalJson(wholeDayRun(setup, pins)));
+    expect(seen).toBe(w.lantern.sim.tick); // one fog a tick, before that tick's evidence
+  });
+
   it('shows every wave and every projected fog to `each`, changing nothing', () => {
     const setup = fogSetup(tiny, 1);
     const pins = [glowAt(0)];

@@ -241,9 +241,15 @@ export function rerunAll(setup: FogSetup, prev: Timeline | null, req: RerunReque
  * The whole-day run (03 §13.1): the followed protagonists live from tick 0, every other cat in the
  * fog, the pins applied, nobody watching, no frontier limit; to the lantern's fray, the anchor's
  * end or the chapter's end. Seed vetting, calibration and the balance measures read it. `each`, if
- * given, sees every wave from tick 0 to the last (`npm run sim -- --fog`).
+ * given, sees every wave from tick 0 to the last (`npm run sim -- --fog`); `beforeEvidence` each
+ * tick's fog before the protagonists' perception conditions it (`advance`).
  */
-export function wholeDayRun(setup: FogSetup, pins: readonly Pin[], each?: (w: Wave) => void): Wave {
+export function wholeDayRun(
+  setup: FogSetup,
+  pins: readonly Pin[],
+  each?: (w: Wave) => void,
+  beforeEvidence?: (fog: Fog) => void,
+): Wave {
   const { c } = setup;
   const followed = followedCats(c);
   let w = initialWave(setup, followed);
@@ -251,7 +257,7 @@ export function wholeDayRun(setup: FogSetup, pins: readonly Pin[], each?: (w: Wa
   while (w.fray === null && w.lantern.sim.tick < c.world.ticks) {
     const reached = w.lantern.sim.anchor.reachedAt;
     if (reached !== null && w.lantern.sim.tick > reached + c.tuning.end.afterAnchorTicks) break;
-    w = advance(setup, w, pins, followed);
+    w = advance(setup, w, pins, followed, [], beforeEvidence);
     each?.(w);
   }
   return w;

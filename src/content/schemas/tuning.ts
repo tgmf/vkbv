@@ -133,6 +133,9 @@ export const TuningSchema = z.strictObject({
     seedsQuick: int('Seeds in the quick calibration inside npm run check').min(1),
     minPerBucket: int('Pairs a probability bucket needs to be checked').min(1),
     tolerancePpm: ppm('Largest allowed gap between predicted and observed frequency'),
+    observedPpm: ppm(
+      "An event counts as observed in a run once the protagonists' perception moves its chance by at least this; its forecast is the chance just before (07 §3, docs/questions.md M2-26)",
+    ),
   }),
   flags: z.strictObject({
     telemetry: bool('Send telemetry when VITE_TELEMETRY_URL is set'),
