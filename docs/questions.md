@@ -122,6 +122,10 @@ in the fog, streamed, so (c) is now the design. `07` §4 now asks for the first 
 Marti's chain (about 440 of 2 534 states at 09:40) leaves the per-edit path. To be
 measured again.
 Answer:
+Update 2026-11-25 (item 13, `tests/budget/rerun.test.ts`): the re-run that `07` §4 now measures (edit at
+08:00, edge at 12:00, Marti live) takes 72 ms to the first frames (budget 100) at 111 ticks/s (budget 120)
+with the default knobs; `minStatePpm` 3000 gives 156, 2 bands 138 (calibration with them not run). The
+fog's steps take 78% of the time. Tagir allows precompute at chapter load if needed.
 
 ## M2-2 — Anchor conditioning with nothing drawn past the lantern edge            (status: answered)
 Where: `03` §14, `05` §4 `waves.anchorConditioning`; glossary Anchor ("unwatched waves lean toward it")
@@ -303,6 +307,9 @@ Options seen: (a) investigate before M2 is done (start: the hero's first decisio
 inputs); (b) accept the bystander test as the acceptance check and leave the hero as a known gap.
 Chosen for now: (b) in the test; (a) recommended.
 Answer:
+Update 2026-11-24: the stochastic cat's mismatch is mostly M2-24 (a storylet state's own flag read as the
+case-wide chance) and M2-25 (walkers and closing edges); with both worked around, the tiny world's fog
+matches its histories (`tests/sim/counter-by-chain.test.ts`).
 
 ## M2-14 — martiOut under road_both after the walking fix            (status: answered)
 Where: `07` §3; `src/sim/fog.ts` (`pathTicks`); `docs/handoff/M2.md`
