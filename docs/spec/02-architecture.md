@@ -49,7 +49,7 @@ src/
                data/ui/   en.json ru.json
   i18n/        t.ts
   telemetry/   events.ts sinks.ts summary.ts
-  cli/         sim.ts fog-report.ts calibration.ts files.ts
+  cli/         sim.ts fog-report.ts calibration.ts balance.ts content-lists.ts parallel.ts files.ts
 scripts/       content.ts validate-content.ts gen-exp-table.ts gen-phi-table.ts balance.ts
                calibrate.ts vet.ts size.ts fog-bench.ts fog-hash.ts crew-compare.ts
 tests/         *.test.ts, golden/, fixtures/, e2e/, budget/ (timing tests, run alone: `npm run bench`)

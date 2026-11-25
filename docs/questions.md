@@ -506,6 +506,11 @@ Follow-up (answered 2026-11-25): Tagir chose to fix the road after all. Counters
 storylets (`fog.counterByChain`, on), the merge fix, the race-split fact fix and forecasts in calibration
 (M2-26). Final 400 seeds: every rate passes, the low buckets pass; the fog under-predicts a blocked road by
 about 10–16 points in the middle buckets (the pace gap). Tables in `docs/handoff/M2.md`.
+Update 2026-11-25 (M4, knobs 1000/3 kept): the full run is as at the end of M2 (rates pass; `road_both`
+misses roadBlocked 10–20%, 50–60%, 70–80%, `untouched` 60–70%). The quick run (60 seeds) passes: no bucket
+misses, since those buckets hold fewer than 20 pairs at 60 seeds; its rate misses (`road_both` roadBlocked
+46.0 / 60.0, martiOut 58.3 / 71.7; `untouched` shopClosedEarly 81.0 / 68.3) are not decisive there. As the
+brief says, it joined `npm run check` (about 4 minutes on every core).
 
 ## M2-24 — A storylet state and the flag its own onEnter set            (status: open)
 Where: `03` §13.6 (storylets and flags in the fog); `src/sim/fog.ts`; found 2026-11-24 on the tiny world
@@ -623,5 +628,87 @@ accept, and judge the teaching beats per seed in M4.
 Answer: Tagir, 2026-11-25: vetting cannot check every player action, even on the tiny world, so (a) is
 out. Not blocking; track it as test matter: scripted playthroughs follow what the vetted seed does.
 Notes where tests and playtests meet it: `07` §5, the M7 and M8 briefs, the M4 brief.
+
+## M4-1 — Live vetting's coarse knobs pass seeds that play at the default knobs cannot solve            (status: open)
+Where: `04` §2 ("a typed or bookmarked seed is vetted live … with the coarser fog knobs `tuning.vetting.fog`");
+`05` §4 `vetting.fog` (20 000 / 2); `src/sim/vet.ts` (`vettingContent`); the golden playbacks
+(`tests/golden/*.s2`, `*.s3`)
+Measured: requested seeds 2 and 3 pass live vetting as they are (a recorded solution reaches the anchor at
+20 000 / 2). Played at the default knobs (1000 / 3), no road set reaches the anchor on either:
+on seed 2 (`road_both`) Marti goes to the door at 17:35 and back inside at 17:50 (`door_lure.back_inside`);
+on seed 3 (`road_tea`) he goes out, meets the barrier, reaches the beach at 18:03 and is soaked, but no
+`chain_on_beach` follows; both fray when the boat sails (00:30). The offline list, vetted at the default
+knobs, rejects both (`vetted-seeds.json` starts 4, 6, 7). Two causes are possible, not separated yet:
+`fog.bands` also sets live cats' decision-trigger keys (decisions.md, 2026-11-22), so 2 bands simulate a
+different Marti, not only a coarser fog; and Marti's conditions read the coarser fog's odds.
+Options seen: (a) `vetting.fog` keeps the game's `bands` and coarsens only `minStatePpm` (measure its time
+and agreement with the offline list); (b) live vetting uses the default knobs (slower behind the loading
+indicator: tens of seconds to minutes per typed seed); (c) accept: a typed seed is a sufficient check of a
+different world, and may fray.
+Chosen for now: (c), unchanged; golden playbacks and `npm run balance` vet live as the worker does, so
+B6 on seeds 1–50 includes such seeds.
+Answer:
+
+## M4-2 — B2 and B3: the "unprimed" lure is usually primed once already            (status: open)
+Where: `05` §5.2 B2 (`lure_unprimed`: P(martiOut by 19:00) ≤ 15%), B3 (`lure_one_prime` ≤ 35%);
+`ch1/world.json` primes; `ch1/hooks.json` `questionItch`; `ch1/storylets.json` `door_lure`
+Measured (`npm run balance`, seeds 1–50 vetted live, knobs 1000/3): B2 **30.0%** (15/50), B3 **64.0%**
+(32/50); B4 passes (82.0%, ≥ 60%).
+Trace (scratch run of the same 50 vetted seeds, Marti's gauges at 17:35 when the lure is placed):
+`itchy` (questionItch ≥ 600) holds on 42 of 50 seeds (median 843, 10 seeds at the cap 1000), `noFreshTea` on
+4, `lightPockets` on none. The itch rises 1 every 2 ticks while Marti stands at a window and 80 per
+`chatter.heard`, and decays only 1 every 6 ticks, so a day at home raises it. So `lure_unprimed` is one prime
+on 38 seeds (14 go out) and two on 4 (1 out), none out with 0 primes (8 seeds); `lure_one_prime` (the junk
+special sets `lightPockets`) is two primes on 38 (24 out), three on 4 (4 out), one on 8 (4 out).
+`door_lure`'s exits score `primeCount × 2`, so the property's "unprimed" and "one prime" are one and two
+primes in practice. Seed 1 (vetted 49598663): itch 1000 at 17:35, out at 17:45.
+Options seen: (a) change the content (the itch's window rise or decay, or the `itchy` threshold) so the
+morning does not prime him; (b) change B2/B3 to count primes as they stand at the lure; (c) accept.
+Chosen for now: none; content and tuning unchanged.
+Answer:
+
+## M4-3 — B5: no subset of the road pins blocks the road on average            (status: open)
+Where: `05` §5.2 B5; `ch1/cards.json` (`tea_break`, `box`, `sudden_flea`, `something_shiny`);
+`ch1/map.json` `town.roadworks` (tags `outdoor`, `box`); `ch1/hooks.json` `boxPull`
+Measured (`npm run balance`): P(roadBlocked) at the first fog step that sees the rain, mean over 50 seeds,
+`lure_primed` plus: `tea_break` 42.8%, `box` 29.1%, `sudden_flea` 29.1%, `something_shiny` 29.9%; any subset
+with `tea_break` 42.8–44.0%, any without it 29.1–29.9%. **0 subsets reach 50%** (B5 needs at least 3, and no
+single pin).
+Trace: the reference simulation agrees (scratch: 10 vetted seeds × 20 streams of `runHistory`, road blocked
+by the day's end): base 40.0%, `tea_break` 57.5%, `box` 40.0%, `sudden_flea` 40.5%, `something_shiny` 39.0%.
+So it is the content, not the fog. (The fog reads 11–15 points lower than these histories, on a different
+seed sample: the pace gap of M2-8.)
+- `box` changes nothing at all (the crew's activities 08:00–12:00 are identical): `town.roadworks` itself is
+  tagged `box` (and holds the `crate_stack`, tagged `box`), so `boxPull`'s rise (+6 a tick at a `box` place)
+  keeps every crew cat at the cap 1000 all morning without the card (seed 49598663 stream 1: 1000 at 09:00
+  with and without it); the card's `boxHere` flag adds nothing, and `work_road` still outscores `sit_in_box`.
+- `sudden_flea` grooms one cat for 6–15 ticks (0.3% of the crew's morning), `something_shiny` attracts for 20
+  ticks (0.4%): against 1 740 units of work over the day, too little to matter.
+- `tea_break` raises the crew's tea break share from 12.1% to 18.1% of the morning: the only lever.
+Options seen: (a) content: the roadworks' `box` tag (or the crate) and the other cards' strength; (b) change
+B5; (c) accept.
+Chosen for now: none; content and tuning unchanged.
+Answer:
+
+## M4-4 — B6: the road solutions fray on 15–18 of 50 seeds            (status: open)
+Where: `05` §5.2 B6 (`road_tea`, `road_box`, `road_both` do not fray on at least 45 of 50 seeds)
+Measured (`npm run balance`): does not fray `road_tea` **35/50**, `road_box` **32/50**, `road_both`
+**35/50**.
+Trace (scratch: `road_both`'s whole-day runs of its 15 fraying seeds, the lantern's storylets at the end):
+- Marti never goes out (the lure takes him to the door; `door_lure` back to `home`): requested 2, 5, 8,
+  18, 32, 42, 45, 47 (8 seeds); 6 of them (2, 5, 8, 18, 32, 42) are among B4's 9 seeds without `martiOut` by 19:00;
+- out, road blocked, but `blocked_road` ends in `turn_home` (30, 36) or `detour_square` (16, 41): 4 seeds;
+- out, road blocked, toward the Sea Steps and on the beach, but no `chain_on_beach` (3): 1 seed;
+- out, road open, `usual_route` ends in `go_home` (9, 46): 2 seeds.
+Every one frays when the boat sails (`boat_sails`, between 23:31 and 00:30). Five of the eight "never out"
+seeds are their own vetted seed (2, 18, 32, 42, 45 pass live vetting as they are); the offline vetting at
+the game's knobs rejects 2, 18, 32 and 42 (M4-1) and passes 45 (that list was made in M2, before M3's
+changes). `road_box` frays on 18 seeds, 3 more than `road_tea`; `box` alone leaves the
+road as `lure_primed` does (M4-3).
+Options seen: (a) content (the lure's pull on a primed Marti, the detour and turn-home exits, the chain);
+(b) vetting at the game's knobs (M4-1), so a vetted seed is one the solutions solve as played; (c) change
+B6; (d) accept.
+Chosen for now: none; content and tuning unchanged.
+Answer:
 
 <!-- Gate notes and answers go above this line. -->
