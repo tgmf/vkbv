@@ -5,9 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { createHost } from '../../src/bridge/host';
 import type { Request, WorkerToMain } from '../../src/bridge/protocol';
 import { CHAPTER1_FILES, PINSETS_FILE, TUNING_FILE } from '../../src/content/chapter1';
-import { loadChapter, loadTuning } from '../../src/content/load';
+import { c, knobs, more } from './knobs';
 
-const c = loadChapter(CHAPTER1_FILES, loadTuning(TUNING_FILE));
 const TICKS = 240; // 05:40 to 09:40, live
 const quantile = (xs: number[], q: number) =>
   [...xs].sort((a, b) => a - b)[Math.floor(xs.length * q)] ?? 0;
@@ -28,7 +27,7 @@ function observeTimes(seed: number): number[] {
     for (let fn = queue.shift(); fn; fn = queue.shift()) fn();
     return last;
   };
-  send({ kind: 'init' });
+  send({ kind: 'init', tuning: more });
   const frontier = { story: 0, pastTicks: 0, storylets: [] };
   send({ kind: 'recompute', seed, pins: [], watched: [], frontier, preview: false });
   const times: number[] = [];
@@ -48,7 +47,7 @@ describe('the observe budget (07 §4)', () => {
     const ms = median(runs.flat());
     const { observeMs } = c.tuning.budgets;
     console.log(
-      `observe budget: ${ms.toFixed(1)} ms median (budget ${observeMs}), mean ${mean(runs.flat()).toFixed(1)} ms, ` +
+      `observe budget, ${knobs}: ${ms.toFixed(1)} ms median (budget ${observeMs}), mean ${mean(runs.flat()).toFixed(1)} ms, ` +
         `90th percentile ${quantile(runs.flat(), 0.9).toFixed(1)} ms; per seed: ` +
         runs
           .map(
