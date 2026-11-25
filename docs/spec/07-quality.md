@@ -9,7 +9,7 @@
 | Golden | Vitest | headless playbacks of the pin sets in `05` §5 (§2 below) | `npm run check` |
 | Calibration | script | shown probabilities against outcomes (§3) | `npm run calibrate` (full), `npm run calibrate -- --quick` (small; in `npm run check` since M4, where it passed: `docs/questions.md` M2-23) |
 | Budget | Vitest | the re-run budget (§4), `tests/budget/` | `npm run bench`, run alone at the end of `npm run check` |
-| Balance | script | the B-properties of `05` §5.2, measured and printed | `npm run balance` |
+| Balance | script | the B-properties of `05` §5.2, measured and printed, not enforced (Tagir, M4) | `npm run balance` |
 | Browser | Playwright | the app loads, a scripted first playthrough reaches the anchor, no console errors | `npm run e2e` |
 
 Rules:
@@ -22,7 +22,8 @@ Rules:
 - A bug fix starts with a failing test that reproduces it.
 - Balance properties become tests only when Tagir says so in `05` §5 (`B1` and `B8`
   are tests from the start; `B9` is calibration, §3: `npm run calibrate`, whose quick run
-  is in `npm run check` since M4, `docs/questions.md` M2-23).
+  is in `npm run check` since M4, `docs/questions.md` M2-23). B2 to B7 stay measured only; the
+  minimum bar of `05` §5.2 (solvable, every card visibly does something) is tests (Tagir, 2026-11-25).
 
 ## 2. Golden files
 

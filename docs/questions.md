@@ -629,7 +629,7 @@ Answer: Tagir, 2026-11-25: vetting cannot check every player action, even on the
 out. Not blocking; track it as test matter: scripted playthroughs follow what the vetted seed does.
 Notes where tests and playtests meet it: `07` §5, the M7 and M8 briefs, the M4 brief.
 
-## M4-1 — Live vetting's coarse knobs pass seeds that play at the default knobs cannot solve            (status: open)
+## M4-1 — Live vetting's coarse knobs pass seeds that play at the default knobs cannot solve            (status: answered, fixed)
 Where: `04` §2 ("a typed or bookmarked seed is vetted live … with the coarser fog knobs `tuning.vetting.fog`");
 `05` §4 `vetting.fog` (20 000 / 2); `src/sim/vet.ts` (`vettingContent`); the golden playbacks
 (`tests/golden/*.s2`, `*.s3`)
@@ -647,9 +647,9 @@ indicator: tens of seconds to minutes per typed seed); (c) accept: a typed seed 
 different world, and may fray.
 Chosen for now: (c), unchanged; golden playbacks and `npm run balance` vet live as the worker does, so
 B6 on seeds 1–50 includes such seeds.
-Answer:
+Answer: Tagir, 2026-11-25: fix it. Done: live vetting runs at the game's own fog knobs; `vetting.fog` and `vettingContent` are gone (`04` §2, `05` §4). Measured (requested 1–6, 18 runs side by side): the game's knobs take 33–156 s (1 to 5 candidates); 3 bands with the coarse state floor still disagreed with them on seeds 3 and 5, so only the game's knobs vet the world that is played. A typed or bookmarked seed now waits tens of seconds to a few minutes behind the loading indicator; a new game draws from the offline list (already vetted at these knobs; 4 and 6 checked again). Golden playbacks of seeds 2 and 3 updated with this as the reason: they vet to 3762896133 and 3754479982, and every road set reaches the anchor on both. Tests: `tests/sim/vet.test.ts` (a vetted seed is solved by a recorded solution played at the game's knobs), the golden files' "solvable".
 
-## M4-2 — B2 and B3: the "unprimed" lure is usually primed once already            (status: open)
+## M4-2 — B2 and B3: the "unprimed" lure is usually primed once already            (status: answered, spec updated)
 Where: `05` §5.2 B2 (`lure_unprimed`: P(martiOut by 19:00) ≤ 15%), B3 (`lure_one_prime` ≤ 35%);
 `ch1/world.json` primes; `ch1/hooks.json` `questionItch`; `ch1/storylets.json` `door_lure`
 Measured (`npm run balance`, seeds 1–50 vetted live, knobs 1000/3): B2 **30.0%** (15/50), B3 **64.0%**
@@ -665,9 +665,9 @@ primes in practice. Seed 1 (vetted 49598663): itch 1000 at 17:35, out at 17:45.
 Options seen: (a) change the content (the itch's window rise or decay, or the `itchy` threshold) so the
 morning does not prime him; (b) change B2/B3 to count primes as they stand at the lure; (c) accept.
 Chosen for now: none; content and tuning unchanged.
-Answer:
+Answer: Tagir, 2026-11-25: accepted: Chapter 1 is placeholder content. B2–B7 stay measured (`npm run balance`, printed in each handoff) and are not enforced. What is enforced is a minimum bar: the chapter is solvable on every vetted seed, and every card of the demo deck visibly does something (`05` §5.2, `07` §1; tests `tests/golden/playback.s*.test.ts` "solvable" and `tests/sim/cards-visible.test.ts`). Spec updated.
 
-## M4-3 — B5: no subset of the road pins blocks the road on average            (status: open)
+## M4-3 — B5: no subset of the road pins blocks the road on average            (status: answered, spec updated)
 Where: `05` §5.2 B5; `ch1/cards.json` (`tea_break`, `box`, `sudden_flea`, `something_shiny`);
 `ch1/map.json` `town.roadworks` (tags `outdoor`, `box`); `ch1/hooks.json` `boxPull`
 Measured (`npm run balance`): P(roadBlocked) at the first fog step that sees the rain, mean over 50 seeds,
@@ -688,9 +688,9 @@ seed sample: the pace gap of M2-8.)
 Options seen: (a) content: the roadworks' `box` tag (or the crate) and the other cards' strength; (b) change
 B5; (c) accept.
 Chosen for now: none; content and tuning unchanged.
-Answer:
+Answer: Tagir, 2026-11-25: accepted: Chapter 1 is placeholder content. B2–B7 stay measured (`npm run balance`, printed in each handoff) and are not enforced. What is enforced is a minimum bar: the chapter is solvable on every vetted seed, and every card of the demo deck visibly does something (`05` §5.2, `07` §1; tests `tests/golden/playback.s*.test.ts` "solvable" and `tests/sim/cards-visible.test.ts`). Spec updated.
 
-## M4-4 — B6: the road solutions fray on 15–18 of 50 seeds            (status: open)
+## M4-4 — B6: the road solutions fray on 15–18 of 50 seeds            (status: answered, spec updated)
 Where: `05` §5.2 B6 (`road_tea`, `road_box`, `road_both` do not fray on at least 45 of 50 seeds)
 Measured (`npm run balance`): does not fray `road_tea` **35/50**, `road_box` **32/50**, `road_both`
 **35/50**.
@@ -709,6 +709,6 @@ Options seen: (a) content (the lure's pull on a primed Marti, the detour and tur
 (b) vetting at the game's knobs (M4-1), so a vetted seed is one the solutions solve as played; (c) change
 B6; (d) accept.
 Chosen for now: none; content and tuning unchanged.
-Answer:
+Answer: Tagir, 2026-11-25: accepted: Chapter 1 is placeholder content. B2–B7 stay measured (`npm run balance`, printed in each handoff) and are not enforced. What is enforced is a minimum bar: the chapter is solvable on every vetted seed, and every card of the demo deck visibly does something (`05` §5.2, `07` §1; tests `tests/golden/playback.s*.test.ts` "solvable" and `tests/sim/cards-visible.test.ts`). Spec updated.
 
 <!-- Gate notes and answers go above this line. -->

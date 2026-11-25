@@ -103,7 +103,6 @@ have **not** been checked against a model of this content; M4 measures them.
 | `vetting.minPpm` | 300000 | |
 | `vetting.minStorylets` | 2 | the solutions' runs must enter at least the smaller of this many authored storylets … (`04` §2) |
 | `vetting.minStoryletSharePerMille` | 100 | … and this share of them, rounded up |
-| `vetting.fog` | `minStatePpm` 20000, `bands` 2 | the fog knobs for live vetting of a typed or bookmarked seed |
 | `vetting.maxCandidates` | 20 | |
 | `player.playedCardRule` | `"pinned"` | `pinned`, `spent` or `discard` (`04` §3) |
 | `player.shuttleTps` | `[4, 16, 64, 256]` | shuttle speeds in ticks per real second, either direction (`06` §3) |
@@ -174,6 +173,14 @@ them. "Frays" is the lantern's fray (`03` §16).
 | B8 | `cards_on_marti`: the direct `teaCraving` shift from `tea_break` is exactly +45 (300 × 15%); the `questionItch` shift from `something_shiny` is exactly +18 | structural, a test from M2 |
 | B9 | Calibration (`07` §3) | structural: `npm run calibrate` from M2; its quick run is in `npm run check` since M4 (`docs/questions.md` M2-23) |
 
+**Decided (Tagir, 2026-11-25, M4; `docs/questions.md` M4-2 to M4-4).** Chapter 1 is placeholder
+content, so B2 to B7 stay measured but are not enforced: `npm run balance` prints them, every handoff
+reports them, and nothing fails on them. The **minimum bar** is enforced instead, by tests in `npm run
+check`:
+
+- **Solvable.** On every vetted seed a recorded solution reaches the anchor as played (vetting runs at the
+  game's own knobs, `04` §2). Checked on the golden playbacks' requested seeds 1 to 3
+  (`tests/golden/playback.s*.test.ts`, 
 ### 5.3 Golden playbacks
 
 For each pin set and seeds 1, 2, 3: a **headless playback** from tick 0 to the end,

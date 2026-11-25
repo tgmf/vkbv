@@ -82,7 +82,9 @@ and is simply replaced by the next candidate.
 for a page load. `npm run vet` vets seeds offline and writes the list of vetted seeds
 (`src/content/data/ch1/vetted-seeds.json`); a new game draws its seed from that list.
 Only a seed the player types (`?seed=`) or a bookmark is vetted live, in the worker,
-behind a loading indicator, with the coarser fog knobs `tuning.vetting.fog`.
+behind a loading indicator, with the game's own fog knobs: coarser knobs would vet a different
+world, in which a seed can pass that play cannot solve (Tagir, 2026-11-25, `docs/questions.md` M4-1).
+It takes tens of seconds to a few minutes.
 
 The result is stored as `seed` and never changed during play. A bookmarked seed is
 always the vetted one, so it always gives the same world.
