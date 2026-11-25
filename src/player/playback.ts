@@ -25,7 +25,9 @@ export function press(c: Content, s: Shuttle, key: ShuttleKey): Shuttle {
       return s.dir === 'pause' ? { dir: 'fwd', speed: 0 } : PAUSED;
     case 'fwd':
     case 'back':
-      return s.dir === key ? { dir: key, speed: Math.min(s.speed + 1, top) } : { dir: key, speed: 0 };
+      return s.dir === key
+        ? { dir: key, speed: Math.min(s.speed + 1, top) }
+        : { dir: key, speed: 0 };
     default: {
       const never: never = key;
       throw new Error(`unknown key ${String(never)}`);

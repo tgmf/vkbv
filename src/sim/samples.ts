@@ -88,12 +88,7 @@ export function traceOf(
 }
 
 /** Draws an index from integer weights with a `render` draw; null when they sum to 0. */
-function draw(
-  seed: number,
-  t: number,
-  purpose: string,
-  weights: readonly number[],
-): number | null {
+function draw(seed: number, t: number, purpose: string, weights: readonly number[]): number | null {
   const total = weights.reduce((a, x) => a + x, 0);
   if (total <= 0) return null;
   const r = rand(seed, 'render', t, purpose, total);
@@ -123,7 +118,16 @@ function linkedCase(
   const same = from ? cases.findIndex((x) => x.key === from.key) : -1;
   if (same >= 0) return same;
   const fitting = cases.map((x) => (from && fits(x) ? x.w : 0));
-  return draw(seed, t, purpose, fitting) ?? draw(seed, t, purpose, cases.map((x) => x.w)) ?? 0;
+  return (
+    draw(seed, t, purpose, fitting) ??
+    draw(
+      seed,
+      t,
+      purpose,
+      cases.map((x) => x.w),
+    ) ??
+    0
+  );
 }
 
 /** One cat's ghost at a tick given the ghost it moves to (or from), by mass among those in reach. */
@@ -141,7 +145,13 @@ function pickGhost(
     return g && (!other || dist2(g.pos, other.pos) <= reach2) ? p : 0;
   });
   const k =
-    draw(seed, t, purpose, near) ?? draw(seed, t, purpose, cands.map(([, p]) => p));
+    draw(seed, t, purpose, near) ??
+    draw(
+      seed,
+      t,
+      purpose,
+      cands.map(([, p]) => p),
+    );
   return k === null ? null : (cands[k]?.[0] ?? null);
 }
 
@@ -172,7 +182,12 @@ export function samplesOf(
       if (!tr || !frame || !o) continue;
       const ci =
         t === last
-          ? (draw(seed, t, `focus:${k}`, tr.cases.map((x) => x.w)) ?? 0)
+          ? (draw(
+              seed,
+              t,
+              `focus:${k}`,
+              tr.cases.map((x) => x.w),
+            ) ?? 0)
           : linkedCase(seed, t, `focus:${k}`, tr.cases, caseAt, (x) =>
               caseAt ? within(x.links, caseAt.links) : false,
             );
@@ -217,8 +232,15 @@ export function extendSamples(
   for (let k = 0; k < K; k++) {
     const prevCase = before.trace.cases[before.samples.cases[k] ?? -1];
     const ci = prevCase
-      ? linkedCase(seed, t, `focusf:${k}`, tr.cases, prevCase, (x) => within(prevCase.links, x.links))
-      : (draw(seed, t, `focusf:${k}`, tr.cases.map((x) => x.w)) ?? 0);
+      ? linkedCase(seed, t, `focusf:${k}`, tr.cases, prevCase, (x) =>
+          within(prevCase.links, x.links),
+        )
+      : (draw(
+          seed,
+          t,
+          `focusf:${k}`,
+          tr.cases.map((x) => x.w),
+        ) ?? 0);
     out.cases.push(ci);
     for (const { id } of c.cats) {
       const cands = tr.cats[id]?.[ci];

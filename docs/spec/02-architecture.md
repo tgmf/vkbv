@@ -157,6 +157,12 @@ interface SceneView {                  // what the renderer gets every animation
   held: Highlight | null;              // valid targets while a card or power is held
   previousPath: [number, number][] | null;   // after an edit (06 §6)
   settings: { focusLayer: boolean; assist: boolean; reducedMotion: boolean };
+  // added in M5:
+  samples: TickSamples | null;         // the focus layer's samples at tick (03 §16)
+  nextSamples: TickSamples | null;     // and at tick + 1
+  bubbles: { cat: CatId | null; node: NodeId; text: string }[]; // speech bubbles, text through t()
+  labels: Readonly<Record<string, string>>;  // `node:<id>`, `cat:<id>` display text, through t()
+  follow: CatId | null;                // the cat the camera follows; null once the player pans
 }
 interface SceneRenderer {
   mount(canvas: HTMLCanvasElement): void;
@@ -168,7 +174,9 @@ interface SceneRenderer {
 ```
 
 `frac` and all floating-point maths live only in `render` and `ui`. Picks report what
-was hit (cat, object, place); they never decide a game rule.
+was hit (cat, object, place); they never decide a game rule. The UI imports the renderer
+from `src/render/index.ts` (`createGrayboxRenderer`), and the simulation types it reads in
+replies from `src/bridge/protocol.ts`, which re-exports them (`ui` may not import `sim`).
 
 For browser tests, the UI mirrors the scene into an accessible, visually hidden list
 of targets (cats, objects, places) with `data-testid` (`cat-marti`, `place-town.roadworks`,

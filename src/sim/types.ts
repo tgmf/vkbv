@@ -430,7 +430,14 @@ export interface WouldLink {
   cat: CatId;
   quantity: string; // `heard:<cat>:<event>`
   p: number;
-  top: { source: string; cats: CatId[]; place: string | null; from: number; to: number; ppm: number };
+  top: {
+    source: string;
+    cats: CatId[];
+    place: string | null;
+    from: number;
+    to: number;
+    ppm: number;
+  };
 }
 
 /** Debug numbers of a re-run (03 §17), per tick 0..edge; its time is added by the worker. */

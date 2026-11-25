@@ -115,7 +115,8 @@ export function createHost(files: HostFiles, deps: HostDeps): Host {
   /** The reference history of stream `index` with the timeline's pins (03 §12.4), the last one kept. */
   function referenceOf(c: Content, tl: Timeline, index: number): History {
     const key = `${tl.seed}|${index}|${JSON.stringify(tl.pins)}`;
-    if (reference?.key !== key) reference = { key, history: runHistory(c, tl.seed, index, tl.pins) };
+    if (reference?.key !== key)
+      reference = { key, history: runHistory(c, tl.seed, index, tl.pins) };
     return reference.history;
   }
 
@@ -182,7 +183,8 @@ export function createHost(files: HostFiles, deps: HostDeps): Host {
         const tick = Math.max(0, Math.min(msg.tick, tl.result.edge));
         const recent: { tick: number; events: SimEvent[] }[] = [];
         let w = lanternAt(c, tl, Math.max(0, tick - LOG_TICKS)).w;
-        const step = (x: Wave) => advance(setupOf(c, tl.seed), x, tl.pins, followedCats(c), tl.watched);
+        const step = (x: Wave) =>
+          advance(setupOf(c, tl.seed), x, tl.pins, followedCats(c), tl.watched);
         while (w.lantern.sim.tick < tick) {
           const next = step(w);
           recent.push({ tick: w.lantern.sim.tick, events: next.tickEvents });

@@ -131,7 +131,9 @@ describe('frames for the viewer (06 §2)', () => {
             return e.cat === 'hero' ? [{ text: e.line, shows: `voice:${e.hook}`, cat: e.cat }] : [];
           if (e.type !== 'storylet') return [];
           const text = tiny.storylet[e.id]?.states[e.state]?.textKey;
-          return text ? [{ text, shows: `${e.id}.${e.state}`, cat: Object.values(e.roles).flat()[0] ?? null }] : [];
+          return text
+            ? [{ text, shows: `${e.id}.${e.state}`, cat: Object.values(e.roles).flat()[0] ?? null }]
+            : [];
         });
         expect(f.lines.map(({ text, shows, cat }) => ({ text, shows, cat }))).toEqual(expected);
         storylet += f.lines.filter((l) => !l.shows.startsWith('voice:')).length;

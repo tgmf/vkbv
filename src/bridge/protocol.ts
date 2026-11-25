@@ -33,6 +33,16 @@ export type MainToWorker =
   // lantern at `tick` (index 0), or the reference history of stream `index` with the current pins.
   | { kind: 'inspect'; reqId: number; tick: number; index: number };
 
+/** Simulation types the UI reads in replies (src/ui may not import src/sim, 02 §2). */
+export type {
+  Frame,
+  FrameLine,
+  Pin,
+  RecomputeResult,
+  TickSamples,
+  WatchedFact,
+} from '../sim/types';
+
 /** A request as the caller writes it: any MainToWorker message without its reqId. */
 export type Request = MainToWorker extends infer M
   ? M extends unknown

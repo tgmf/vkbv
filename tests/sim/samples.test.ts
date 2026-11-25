@@ -98,7 +98,9 @@ describe('samples (03 §16, M5-1)', () => {
     while (tl.result.edge < 60) {
       const next = extendEdge(setup, tl);
       if (!next) break;
-      const placed = next.edgeWave.lantern.live.some((id) => !tl.edgeWave.lantern.live.includes(id));
+      const placed = next.edgeWave.lantern.live.some(
+        (id) => !tl.edgeWave.lantern.live.includes(id),
+      );
       const n = tl.result.samples.length;
       expect(next.result.samples).toHaveLength(n + 1);
       if (placed) {
@@ -135,5 +137,5 @@ describe('samples (03 §16, M5-1)', () => {
     expect(spread).toBeGreaterThan(0);
     // … and the likeliest ghost (index 0) is drawn more often than any other
     expect(counts[0] ?? 0).toBeGreaterThan(Math.max(...counts.slice(1).map((x) => x ?? 0)));
-  });
+  }, 60_000); // a Chapter 1 re-run to 10:40: about 1.3 s alone, far more under the full suite
 });

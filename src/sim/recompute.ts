@@ -239,7 +239,12 @@ export function* rerun(
     }
     const pf = before && frames[t - 1];
     const pt = before && trace[t - 1];
-    const { next, frame, view, trace: tr } = tickOf(
+    const {
+      next,
+      frame,
+      view,
+      trace: tr,
+    } = tickOf(
       setup,
       w,
       before && pf && pt ? { wave: before, frame: pf, trace: pt } : undefined,
@@ -327,7 +332,12 @@ export function extendEdge(setup: FogSetup, tl: Timeline): Timeline | null {
   const t = w.lantern.sim.tick;
   const pf = r.frames[t - 1];
   const pt = tl.trace[t - 1];
-  const { next, frame, view, trace: tr } = tickOf(
+  const {
+    next,
+    frame,
+    view,
+    trace: tr,
+  } = tickOf(
     setup,
     w,
     pf && pt && { wave: tl.edgeWave, frame: pf, trace: pt },

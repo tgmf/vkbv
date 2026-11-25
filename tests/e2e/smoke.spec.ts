@@ -5,6 +5,8 @@ import { expect, test } from '@playwright/test';
 test('the shell loads, switches language and starts the worker', async ({ page }) => {
   const console: string[] = [];
   page.on('console', (m) => {
+    // the GL driver notes it when a screenshot reads the WebGL canvas back; not the app's
+    if (m.text().includes('GPU stall due to ReadPixels')) return;
     if (m.type() === 'error' || m.type() === 'warning') console.push(`${m.type()}: ${m.text()}`);
   });
   page.on('pageerror', (e) => console.push(`pageerror: ${e.message}`));
