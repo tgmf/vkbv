@@ -72,6 +72,32 @@ function reality(c: Content, pins: readonly Pin[], seed: number, stream: number)
   return s;
 }
 
+/** A local cause's top contributor is strong above this share of its chance (per mille; M3-1, M4). */
+export const STRONG_SHARE_PM = 200;
+
+/**
+ * What deferring links on demand cost in one run (03 §15.3, M3-1): its local causes, those recorded
+ * in `wouldLink` (a `heard` caused only in the fog), and how many of those had a strong top contributor.
+ */
+export interface LocalCauses {
+  localCauses: number;
+  wouldLink: number;
+  strong: number;
+}
+
+/** One seed's pairs and its run's local causes. */
+export interface SeedRun extends LocalCauses {
+  pairs: Pair[];
+}
+
+/** `seedRun`'s pairs alone. */
+export const seedPairs = (
+  c: Content,
+  pins: readonly Pin[],
+  seed: number,
+  events: readonly string[] = CALIBRATION_EVENTS,
+): Pair[] => seedRun(c, pins, seed, events).pairs;
+
 /**
  * One seed (07 §3): the whole-day run (Marti live, the other cats in the fog, conditioning off) gives
  * each event's p, 1 000 000 if the lantern holds it, otherwise its chance in the fog just before the
@@ -79,12 +105,12 @@ function reality(c: Content, pins: readonly Pin[], seed: number, stream: number)
  * seed gives the outcome. A fog event: the lantern does not hold it and no storylet that sets it has a role for
  * Marti or ran live in this run's lantern.
  */
-export function seedPairs(
+export function seedRun(
   c: Content,
   pins: readonly Pin[],
   seed: number,
   events: readonly string[] = CALIBRATION_EVENTS,
-): Pair[] {
+): SeedRun {
   // each event's forecast: its chance in the fog just before the protagonists' perception first
   // moves it by `calibration.observedPpm` (what the ghosts showed before the run learned it, M2-26)
   const chance = (fog: Fog, event: string) =>
@@ -112,7 +138,7 @@ export function seedPairs(
   const sim = w.lantern.sim;
   const end = reality(c, pins, seed, 100_000 + seed);
   const set = setters(c);
-  return events.map((event) => {
+  const pairs = events.map((event) => {
     const held = sim.facts.includes(event);
     const p = held ? 1_000_000 : (forecast[event] ?? chance(w.fog, event));
     const lantern = (set[event] ?? []).some((id) => {
@@ -125,6 +151,24 @@ export function seedPairs(
     });
     return { seed, event, p, hit: end.facts.includes(event), fog: !held && !lantern };
   });
+  return {
+    pairs,
+    localCauses: w.localCauses,
+    wouldLink: w.wouldLink.length,
+    strong: w.wouldLink.filter((x) => x.top.ppm * 1000 > x.p * STRONG_SHARE_PM).length,
+  };
+}
+
+/** The local causes of many runs (M3-1), as one line. */
+export function localCausesLine(runs: readonly LocalCauses[]): string {
+  const sum = (f: (r: LocalCauses) => number) => runs.reduce((a, r) => a + f(r), 0);
+  const withAny = runs.filter((r) => r.localCauses > 0).length;
+  return (
+    `local causes: ${sum((r) => r.localCauses)} in ${runs.length} runs (${withAny} of them with any); ` +
+    `${sum((r) => r.wouldLink)} a link would have explained (a heard from the fog), ` +
+    `${sum((r) => r.strong)} with a top contributor above ${STRONG_SHARE_PM / 10}% of its chance; ` +
+    `${sum((r) => r.localCauses - r.wouldLink)} with no consistent past`
+  );
 }
 
 export interface Verdict {

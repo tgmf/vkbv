@@ -5,10 +5,17 @@
 // Seeds 1..N (default `calibration.seeds`, `calibration.seedsQuick` with --quick) of each pin set
 // (default both of 07 §3: road_both and untouched), split over J child processes (default: the CPU
 // count). Rates must pass in the full run and are printed with --quick; buckets must pass in both.
-import { fork } from 'node:child_process';
+// Each pin set also prints its runs' local causes (03 §15.3, docs/questions.md M3-1).
 import { availableParallelism } from 'node:os';
 import { parseArgs } from 'node:util';
-import { judge, seedPairs, type Pair } from '../src/cli/calibration';
+import {
+  judge,
+  localCausesLine,
+  seedRun,
+  type LocalCauses,
+  type Pair,
+} from '../src/cli/calibration';
+import { answerPart, inChildren } from '../src/cli/parallel';
 import { CHAPTER1_FILES, PINSETS_FILE, TUNING_FILE } from '../src/content/chapter1';
 import { loadChapter, loadTuning, parsePinSets } from '../src/content/load';
 
@@ -35,15 +42,15 @@ const pinsOf = (name: string) => {
   return pins;
 };
 
-type Result = { set: string; pairs: Pair[] }[];
+type Result = { set: string; pairs: Pair[]; local: LocalCauses };
 
 if (values.part !== undefined) {
   // a child: its share of (set, seed) items, sent back to the parent
-  const out: Result = values.part.split(',').map((item) => {
+  answerPart(values.part, (item): Result => {
     const [set = '', seed = ''] = item.split(':');
-    return { set, pairs: seedPairs(c, pinsOf(set), Number(seed)) };
+    const { pairs, ...local } = seedRun(c, pinsOf(set), Number(seed));
+    return { set, pairs, local };
   });
-  process.send?.(out, () => process.disconnect?.());
 } else {
   const cal = c.tuning.calibration;
   const seeds = Number(values.seeds ?? (values.quick ? cal.seedsQuick : cal.seeds));
@@ -51,31 +58,12 @@ if (values.part !== undefined) {
   names.forEach(pinsOf);
   const jobs = Math.max(1, Number(values.jobs ?? availableParallelism()));
   const items = names.flatMap((set) => Array.from({ length: seeds }, (_, i) => `${set}:${i + 1}`));
-  const shares = Array.from({ length: Math.min(jobs, items.length) }, (_, j) =>
-    items.filter((_, i) => i % jobs === j),
-  );
   const t0 = performance.now();
-  const results = await Promise.all(
-    shares.map(
-      (share) =>
-        new Promise<Result>((resolve, reject) => {
-          const child = fork(import.meta.filename, ['--part', share.join(',')]);
-          let got: Result | null = null;
-          child.on('message', (m) => (got = m as Result));
-          child.on('error', reject);
-          child.on('exit', (code) =>
-            got ? resolve(got) : reject(new Error(`a calibration child exited with ${code}`)),
-          );
-        }),
-    ),
-  );
+  const results = await inChildren<Result>(import.meta.filename, items, jobs);
   let failed = false;
   for (const set of names) {
-    const pairs = results
-      .flat()
-      .filter((r) => r.set === set)
-      .flatMap((r) => r.pairs)
-      .sort((a, b) => a.seed - b.seed);
+    const of = results.filter((r) => r.set === set);
+    const pairs = of.flatMap((r) => r.pairs).sort((a, b) => a.seed - b.seed);
     const v = judge(c, pairs, values.quick);
     const pct = (x: number) => `${(x / 10_000).toFixed(1)}%`;
     console.log(
@@ -83,10 +71,11 @@ if (values.part !== undefined) {
         `${seeds} seeds; tolerance ${pct(cal.tolerancePpm)}, at least ${cal.minPerBucket} pairs a bucket`,
     );
     for (const line of v.lines) console.log(line);
+    console.log(localCausesLine(of.map((r) => r.local)));
     failed ||= !v.pass;
   }
   console.error(
-    `${items.length} seed runs on ${shares.length} processes: ${Math.round((performance.now() - t0) / 1000)} s`,
+    `${items.length} seed runs on ${Math.min(jobs, items.length)} processes: ${Math.round((performance.now() - t0) / 1000)} s`,
   );
   process.exitCode = failed ? 1 : 0;
 }

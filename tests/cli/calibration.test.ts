@@ -1,7 +1,17 @@
-// Calibration's checks (07 §3) on hand-made pairs, and one seed's pairs on the tiny world.
+// Calibration's checks (07 §3) on hand-made pairs, one seed's pairs on the tiny world, and the local
+// causes a run reports (M3-1).
 import { describe, expect, it } from 'vitest';
-import { judge, seedPairs, type Pair } from '../../src/cli/calibration';
-import { powerPin, tiny } from '../sim/helpers';
+import {
+  judge,
+  localCausesLine,
+  seedPairs,
+  seedRun,
+  STRONG_SHARE_PM,
+  type Pair,
+} from '../../src/cli/calibration';
+import { fogSetup } from '../../src/sim/fog';
+import { wholeDayRun } from '../../src/sim/recompute';
+import { cardPin, powerPin, tiny } from '../sim/helpers';
 
 /** `n` pairs of one event at chance p, `hits` of them happened. */
 const pairs = (event: string, n: number, p: number, hits: number, fog = true): Pair[] =>
@@ -59,5 +69,31 @@ describe('calibration (07 §3)', () => {
     const a = seedPairs(tiny, pins, 1, ['heroOut']);
     expect(a).toEqual(seedPairs(tiny, pins, 1, ['heroOut']));
     expect(a).toEqual([{ seed: 1, event: 'heroOut', p: 1_000_000, hit: a[0]?.hit, fog: false }]);
+  });
+
+  it('one seed: its run’s local causes, those a link would have explained, and the strong ones (M3-1)', () => {
+    // the rumour reaches the fogged pal; the glow brings the hero out, where it places pal
+    const pins = [cardPin('rumour', { place: 'street.b' }, 2), powerPin('glow', 'home.room', 10)];
+    const r = seedRun(tiny, pins, 2, ['heroOut']);
+    const w = wholeDayRun(fogSetup(tiny, 2), pins);
+    expect(r.pairs).toEqual(seedPairs(tiny, pins, 2, ['heroOut']));
+    expect(r.localCauses).toBe(w.localCauses);
+    expect(r.wouldLink).toBe(w.wouldLink.length);
+    expect(r.wouldLink).toBeGreaterThan(0); // pal's heard rumour, at least
+    expect(r.strong).toBe(
+      w.wouldLink.filter((x) => x.top.ppm * 1000 > x.p * STRONG_SHARE_PM).length,
+    );
+    expect(r.strong).toBeGreaterThan(0); // the rumour's own event is its top source
+  });
+
+  it('sums local causes over runs into one line', () => {
+    const line = localCausesLine([
+      { localCauses: 3, wouldLink: 2, strong: 1 },
+      { localCauses: 0, wouldLink: 0, strong: 0 },
+    ]);
+    expect(line).toBe(
+      'local causes: 3 in 2 runs (1 of them with any); 2 a link would have explained (a heard from the ' +
+        'fog), 1 with a top contributor above 20% of its chance; 1 with no consistent past',
+    );
   });
 });
