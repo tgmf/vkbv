@@ -1,0 +1,137 @@
+{
+ "seed": 2,
+ "vettedSeed": 2,
+ "end": {
+  "kind": "fray",
+  "tick": 1130
+ },
+ "watchedHash": "d2ba5bdb",
+ "checkpoints": {
+  "0": "823fcd47",
+  "60": "e4db730c",
+  "120": "140f7751",
+  "180": "3ef3b2fb",
+  "240": "a27c86d8",
+  "300": "33a06c42",
+  "360": "a5bf4308",
+  "420": "fd35500a",
+  "480": "07beb2d4",
+  "540": "56a45efc",
+  "600": "9a0240b4",
+  "660": "afb19ab3",
+  "720": "8a1f5df0",
+  "780": "712a8838",
+  "840": "1df5f172",
+  "900": "1c438e0b",
+  "960": "aa601cef",
+  "1020": "cd78679e",
+  "1080": "dcf43720"
+ },
+ "watched": {
+  "door_lure.home": 0,
+  "rain_started": 678,
+  "door_lure.at_door": 715,
+  "door_lure.back_inside": 730,
+  "ogryzok_trade.sizing_up": 730,
+  "ogryzok_trade.offers": 735,
+  "ogryzok_trade.traded": 740,
+  "boat_sails": 1130
+ },
+ "fog": {
+  "0": {
+   "cases": 1,
+   "live": 1,
+   "states": 11
+  },
+  "60": {
+   "cases": 3,
+   "live": 1,
+   "states": 553
+  },
+  "120": {
+   "cases": 3,
+   "live": 1,
+   "states": 617
+  },
+  "180": {
+   "cases": 3,
+   "live": 1,
+   "states": 550
+  },
+  "240": {
+   "cases": 2,
+   "live": 1,
+   "states": 404
+  },
+  "300": {
+   "cases": 2,
+   "live": 1,
+   "states": 376
+  },
+  "360": {
+   "cases": 2,
+   "live": 1,
+   "states": 364
+  },
+  "420": {
+   "cases": 2,
+   "live": 1,
+   "states": 410
+  },
+  "480": {
+   "cases": 2,
+   "live": 1,
+   "states": 352
+  },
+  "540": {
+   "cases": 2,
+   "live": 1,
+   "states": 355
+  },
+  "600": {
+   "cases": 2,
+   "live": 1,
+   "states": 368
+  },
+  "660": {
+   "cases": 2,
+   "live": 1,
+   "states": 374
+  },
+  "720": {
+   "cases": 2,
+   "live": 1,
+   "states": 604
+  },
+  "780": {
+   "cases": 2,
+   "live": 1,
+   "states": 436
+  },
+  "840": {
+   "cases": 2,
+   "live": 1,
+   "states": 453
+  },
+  "900": {
+   "cases": 2,
+   "live": 1,
+   "states": 415
+  },
+  "960": {
+   "cases": 2,
+   "live": 1,
+   "states": 410
+  },
+  "1020": {
+   "cases": 2,
+   "live": 1,
+   "states": 335
+  },
+  "1080": {
+   "cases": 2,
+   "live": 1,
+   "states": 262
+  }
+ }
+}

@@ -1,0 +1,129 @@
+{
+ "seed": 1,
+ "vettedSeed": 49598663,
+ "end": {
+  "kind": "fray",
+  "tick": 1075
+ },
+ "watchedHash": "d42b09aa",
+ "checkpoints": {
+  "0": "ce99311c",
+  "60": "d7b85df8",
+  "120": "284589a1",
+  "180": "f1175c2d",
+  "240": "20c2d2ac",
+  "300": "f9420c2d",
+  "360": "cf3acc88",
+  "420": "c1b9a89d",
+  "480": "fd5f3373",
+  "540": "4417c1b9",
+  "600": "b66b93c6",
+  "660": "b9de7a5c",
+  "720": "74e1320d",
+  "780": "256f721a",
+  "840": "99bb25d7",
+  "900": "876ad929",
+  "960": "6178670f",
+  "1020": "16e43481"
+ },
+ "watched": {
+  "door_lure.home": 0,
+  "crew_chatter.tale": 230,
+  "crew_chatter.overheard": 231,
+  "crew_chatter.scoffed": 248,
+  "rain_started": 664,
+  "boat_sails": 1075
+ },
+ "fog": {
+  "0": {
+   "cases": 1,
+   "live": 1,
+   "states": 11
+  },
+  "60": {
+   "cases": 3,
+   "live": 1,
+   "states": 531
+  },
+  "120": {
+   "cases": 3,
+   "live": 1,
+   "states": 595
+  },
+  "180": {
+   "cases": 3,
+   "live": 1,
+   "states": 553
+  },
+  "240": {
+   "cases": 2,
+   "live": 1,
+   "states": 518
+  },
+  "300": {
+   "cases": 2,
+   "live": 1,
+   "states": 381
+  },
+  "360": {
+   "cases": 2,
+   "live": 1,
+   "states": 359
+  },
+  "420": {
+   "cases": 2,
+   "live": 1,
+   "states": 399
+  },
+  "480": {
+   "cases": 2,
+   "live": 1,
+   "states": 352
+  },
+  "540": {
+   "cases": 2,
+   "live": 1,
+   "states": 355
+  },
+  "600": {
+   "cases": 2,
+   "live": 1,
+   "states": 369
+  },
+  "660": {
+   "cases": 2,
+   "live": 1,
+   "states": 373
+  },
+  "720": {
+   "cases": 2,
+   "live": 1,
+   "states": 537
+  },
+  "780": {
+   "cases": 2,
+   "live": 1,
+   "states": 504
+  },
+  "840": {
+   "cases": 2,
+   "live": 1,
+   "states": 458
+  },
+  "900": {
+   "cases": 2,
+   "live": 1,
+   "states": 425
+  },
+  "960": {
+   "cases": 2,
+   "live": 1,
+   "states": 425
+  },
+  "1020": {
+   "cases": 2,
+   "live": 1,
+   "states": 312
+  }
+ }
+}

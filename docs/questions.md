@@ -136,7 +136,7 @@ tables. Re-run budget (`npm run bench`, every pin set, seeds 1–3 medians; budg
 `bands` also sets the decision-trigger keys of live cats, so 1000/2 changes single histories (the reference)
 too: `martiOut` observed 67.3% against 66.5%, and every golden single history would change. 3000/3 changes
 the fog only.
-Chosen for now: none (Tagir chooses, M4).
+Chosen (Tagir, 2026-11-25, M4): keep 1000/3. The budget stays short (the numbers above); M2-1 stays open.
 
 ## M2-2 — Anchor conditioning with nothing drawn past the lantern edge            (status: answered)
 Where: `03` §14, `05` §4 `waves.anchorConditioning`; glossary Anchor ("unwatched waves lean toward it")

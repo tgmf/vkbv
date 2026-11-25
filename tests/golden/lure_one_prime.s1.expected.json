@@ -1,0 +1,119 @@
+{
+ "seed": 1,
+ "vettedSeed": 49598663,
+ "end": {
+  "kind": "anchor",
+  "tick": 790
+ },
+ "watchedHash": "b0f5f279",
+ "checkpoints": {
+  "0": "ce99311c",
+  "60": "d7b85df8",
+  "120": "284589a1",
+  "180": "f1175c2d",
+  "240": "20c2d2ac",
+  "300": "f9420c2d",
+  "360": "cf3acc88",
+  "420": "c1b9a89d",
+  "480": "fd5f3373",
+  "540": "4417c1b9",
+  "600": "b66b93c6",
+  "660": "b9de7a5c",
+  "720": "579dd47f",
+  "780": "a7571be1"
+ },
+ "watched": {
+  "door_lure.home": 0,
+  "crew_chatter.tale": 230,
+  "crew_chatter.overheard": 231,
+  "crew_chatter.scoffed": 248,
+  "rain_started": 664,
+  "door_lure.at_door": 715,
+  "door_lure.out": 725,
+  "marti_out_in_rain": 728,
+  "ogryzok_trade.sizing_up": 730,
+  "blocked_road.facing": 734,
+  "blocked_road.toward_steps": 735,
+  "ogryzok_trade.ignores": 735,
+  "marti_on_beach": 743,
+  "marti_soaked": 749,
+  "chain_on_beach.noticed": 750,
+  "chain_on_beach.retreat": 755,
+  "chain_on_beach.following": 765,
+  "under_the_boat.hidden": 779,
+  "under_the_boat.tail_spotted": 785,
+  "under_the_boat.meeting": 790
+ },
+ "fog": {
+  "0": {
+   "cases": 1,
+   "live": 1,
+   "states": 11
+  },
+  "60": {
+   "cases": 3,
+   "live": 1,
+   "states": 531
+  },
+  "120": {
+   "cases": 3,
+   "live": 1,
+   "states": 595
+  },
+  "180": {
+   "cases": 3,
+   "live": 1,
+   "states": 553
+  },
+  "240": {
+   "cases": 2,
+   "live": 1,
+   "states": 518
+  },
+  "300": {
+   "cases": 2,
+   "live": 1,
+   "states": 381
+  },
+  "360": {
+   "cases": 2,
+   "live": 1,
+   "states": 359
+  },
+  "420": {
+   "cases": 2,
+   "live": 1,
+   "states": 399
+  },
+  "480": {
+   "cases": 2,
+   "live": 1,
+   "states": 352
+  },
+  "540": {
+   "cases": 2,
+   "live": 1,
+   "states": 355
+  },
+  "600": {
+   "cases": 2,
+   "live": 1,
+   "states": 369
+  },
+  "660": {
+   "cases": 2,
+   "live": 1,
+   "states": 373
+  },
+  "720": {
+   "cases": 2,
+   "live": 1,
+   "states": 541
+  },
+  "780": {
+   "cases": 1,
+   "live": 2,
+   "states": 89
+  }
+ }
+}

@@ -1,0 +1,142 @@
+{
+ "seed": 3,
+ "vettedSeed": 3,
+ "end": {
+  "kind": "fray",
+  "tick": 1130
+ },
+ "watchedHash": "cf66ecc0",
+ "checkpoints": {
+  "0": "7a7d2270",
+  "60": "93242fc1",
+  "120": "b41ce4df",
+  "180": "ac069343",
+  "240": "5c17093e",
+  "300": "e23be778",
+  "360": "11c3c98c",
+  "420": "470f2b13",
+  "480": "e1477807",
+  "540": "1b8aa813",
+  "600": "d8055cc2",
+  "660": "61cd21c8",
+  "720": "efb8e678",
+  "780": "fd01c2f7",
+  "840": "7d715484",
+  "900": "62d7c939",
+  "960": "d4a8bf8e",
+  "1020": "47d25a09",
+  "1080": "a852039e"
+ },
+ "watched": {
+  "door_lure.home": 0,
+  "crew_chatter.tale": 212,
+  "crew_chatter.overheard": 213,
+  "crew_chatter.scoffed": 215,
+  "rain_started": 661,
+  "door_lure.at_door": 1100,
+  "door_lure.out": 1105,
+  "blocked_road.facing": 1114,
+  "blocked_road.toward_steps": 1115,
+  "marti_on_beach": 1123,
+  "chain_on_beach.noticed": 1125,
+  "chain_on_beach.following": 1130,
+  "boat_sails": 1130
+ },
+ "fog": {
+  "0": {
+   "cases": 1,
+   "live": 1,
+   "states": 11
+  },
+  "60": {
+   "cases": 3,
+   "live": 1,
+   "states": 524
+  },
+  "120": {
+   "cases": 3,
+   "live": 1,
+   "states": 562
+  },
+  "180": {
+   "cases": 3,
+   "live": 1,
+   "states": 511
+  },
+  "240": {
+   "cases": 2,
+   "live": 1,
+   "states": 491
+  },
+  "300": {
+   "cases": 2,
+   "live": 1,
+   "states": 369
+  },
+  "360": {
+   "cases": 2,
+   "live": 1,
+   "states": 348
+  },
+  "420": {
+   "cases": 2,
+   "live": 1,
+   "states": 385
+  },
+  "480": {
+   "cases": 2,
+   "live": 1,
+   "states": 339
+  },
+  "540": {
+   "cases": 2,
+   "live": 1,
+   "states": 343
+  },
+  "600": {
+   "cases": 2,
+   "live": 1,
+   "states": 370
+  },
+  "660": {
+   "cases": 2,
+   "live": 1,
+   "states": 365
+  },
+  "720": {
+   "cases": 2,
+   "live": 1,
+   "states": 543
+  },
+  "780": {
+   "cases": 2,
+   "live": 1,
+   "states": 513
+  },
+  "840": {
+   "cases": 2,
+   "live": 1,
+   "states": 473
+  },
+  "900": {
+   "cases": 2,
+   "live": 1,
+   "states": 442
+  },
+  "960": {
+   "cases": 2,
+   "live": 1,
+   "states": 417
+  },
+  "1020": {
+   "cases": 2,
+   "live": 1,
+   "states": 337
+  },
+  "1080": {
+   "cases": 2,
+   "live": 1,
+   "states": 272
+  }
+ }
+}
