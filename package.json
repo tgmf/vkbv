@@ -19,7 +19,7 @@
     "format": "prettier --write .",
     "content:check": "tsx scripts/content.ts",
     "sim": "tsx src/cli/sim.ts",
-    "balance": "tsx scripts/not-yet.ts balance M4",
+    "balance": "tsx scripts/balance.ts",
     "calibrate": "tsx scripts/calibrate.ts",
     "vet": "tsx scripts/vet.ts",
     "golden:update": "vitest run --project unit tests/golden --update",
