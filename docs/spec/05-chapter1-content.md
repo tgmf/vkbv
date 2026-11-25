@@ -172,7 +172,7 @@ them. "Frays" is the lantern's fray (`03` §16).
 | B6 | `road_tea`, `road_box`, `road_both`: the timeline does not fray on at least 45 of 50 seeds | balance |
 | B7 | `late_lure` frays on at least 45 of 50 seeds (the window closes) | balance |
 | B8 | `cards_on_marti`: the direct `teaCraving` shift from `tea_break` is exactly +45 (300 × 15%); the `questionItch` shift from `something_shiny` is exactly +18 | structural, a test from M2 |
-| B9 | Calibration (`07` §3) | structural: `npm run calibrate` from M2; its quick run joins `npm run check` once it passes (`docs/questions.md` M2-23) |
+| B9 | Calibration (`07` §3) | structural: `npm run calibrate` from M2; its quick run is in `npm run check` since M4 (`docs/questions.md` M2-23) |
 
 ### 5.3 Golden playbacks
 
