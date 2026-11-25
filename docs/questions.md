@@ -727,4 +727,28 @@ cards feel dead on other cats.
 Chosen for now: none; tracked with the other open fog issues.
 Answer: Tagir, 2026-11-25: (b), leave it until the playtests (M8, Gate A): trace it then if the cards feel dead on other cats.
 
+## M5-1 — How to build frames' samples and smoothing            (status: answered)
+Where: `03` §14 step 3, §16; `docs/milestones/M5-viewer.md` item 8; M2-21
+Question: the fog keeps no record of which state led to which. (a) Record every transition in the fog's
+hot path (exact; estimated 15–30% off the re-run); (b) approximate: keep per tick each case's links and
+weight and each fogged cat's ghost masses, and treat "could have come from" (same place and activity, or
+within one fog step's walk) as the transition; sample backward by mass from the edge.
+Answer: Tagir, 2026-11-25: (b), "just a cloud of possible positions".
+
+## M5-2 — `?dev=1` was already the M1.5 inspector            (status: answered)
+Where: `docs/milestones/M5-viewer.md` item 6; `docs/milestones/M1.5-inspector.md`
+Answer: Tagir, 2026-11-25: merge the inspector into `?dev=1`: one dev page, with a seed field as the
+inspector had.
+
+## M5-3 — The seed before M7's new-game flow            (status: answered)
+Where: `04` §2; `docs/milestones/M7-chapter-flow.md` item 4
+Question: live vetting of a typed seed and the new-game flow are M7's. Which seed does M5's viewer play?
+Answer: Tagir, 2026-11-25: until M7, the viewer plays the first seed of `vetted-seeds.json`, and the dev
+page has a seed field whose value is played as typed (not vetted). Chapter 1 is placeholder content.
+
+## M5-4 — L is both "shuttle forward" and "hold the lure"            (status: answered, spec updated)
+Where: `06` §8
+Answer: Tagir, 2026-11-25: L is shuttle forward only. `06` §8 updated: G holds Gaze; the lure is held
+from its button (or Tab to it), with no letter key of its own.
+
 <!-- Gate notes and answers go above this line. -->

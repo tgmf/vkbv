@@ -7,6 +7,7 @@ import type {
   GazeFact,
   Pin,
   RecomputeResult,
+  SamplesPatch,
   SimEvent,
   SimState,
   WatchedFact,
@@ -28,8 +29,9 @@ export type MainToWorker =
   | { kind: 'commit'; reqId: number } // make the last finished preview the current wave; replies `ready`
   | { kind: 'observe'; reqId: number; tick: number; cat: CatId }
   | { kind: 'debugHistory'; reqId: number; tick: number; index: number }
-  // Dev inspector (docs/milestones/M1.5-inspector.md): one history, viewed one tick at a time.
-  | { kind: 'inspect'; reqId: number; seed: number; stream: number; pinset: string; tick: number };
+  // The dev page's state panel (M1.5 inspector, merged into `?dev=1` in M5): the current timeline's
+  // lantern at `tick` (index 0), or the reference history of stream `index` with the current pins.
+  | { kind: 'inspect'; reqId: number; tick: number; index: number };
 
 /** A request as the caller writes it: any MainToWorker message without its reqId. */
 export type Request = MainToWorker extends infer M
@@ -47,12 +49,14 @@ export type WorkerToMain =
   | { kind: 'result'; reqId: number; result: RecomputeResult }
   // A watched fact (03 §15.2). At the lantern edge the edge moves one tick: `frames` holds the new
   // edge's frame, `gazeFacts` what Gaze fixed there, and `edge` and `end` say where the timeline now
-  // stands; behind it both are empty.
+  // stands; behind it both are empty. `samples` holds the focus layer's samples that changed: the
+  // new edge's, or every tick's when a placement drew them again (03 §16).
   | {
       kind: 'observed';
       reqId: number;
       fact: WatchedFact;
       frames: FramesPatch;
+      samples: SamplesPatch;
       gazeFacts: GazeFact[];
       edge: number;
       end: RecomputeResult['end'];
@@ -61,15 +65,16 @@ export type WorkerToMain =
   | { kind: 'inspected'; reqId: number; view: InspectView }
   | { kind: 'error'; reqId: number; message: string };
 
-/** What the dev inspector shows at one tick of one history. Plain data; floats never occur. */
+/** What the dev page's state panel shows at one tick. Plain data; floats never occur. */
 export interface InspectView {
   tick: number;
   lastTick: number;
   clock: string; // HH:MM
-  end: { kind: 'anchor' | 'dead'; tick: number; clock: string };
+  end: { kind: string; tick: number; clock: string }; // a history's or a timeline's end
   weather: 'dry' | 'rain';
   cats: {
     id: CatId;
+    live: boolean; // false: a fogged cat, its lantern copy stale
     pos: [number, number];
     node: string;
     activity: string;

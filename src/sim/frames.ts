@@ -10,8 +10,10 @@ import { fogStates, lanternReader, WAVE_TOTAL, type Fog, type FogSetup } from '.
 import { INACTIVE, or, times } from './fog-quantities';
 import type { LanternState, Wave } from './lantern';
 import { PPM } from './math';
-import { catNode, catPos } from './space';
-import type { CatId, Content, Ctx, Frame, Ghost, SimEvent, SimState } from './types';
+import { perceives, rangeBetween } from './perception';
+import { followedCats } from './readers';
+import { catNode, catPos, nodePos } from './space';
+import type { CatId, Content, Ctx, Frame, Ghost, Pin, SimEvent, SimState } from './types';
 import { need, newDecisionMemo } from './types';
 
 const ghostKey = (g: Ghost): string =>
@@ -140,6 +142,7 @@ export function frameOf(
   wave: Wave,
   next: Wave | null,
   prev?: { wave: Wave; frame: Frame },
+  pins: readonly Pin[] = [],
 ): Frame {
   const { c } = setup;
   const sim = wave.lantern.sim;
@@ -183,14 +186,76 @@ export function frameOf(
     requirements,
     progress: progressOf(c, requirements),
     ...targets(setup, wave),
+    effects: sim.effects.map((e) => ({
+      pin: e.pin,
+      kind: e.kind,
+      source: e.source,
+      place: e.place,
+      radiusM: e.radiusM,
+    })),
+    gazes: gazesAt(c, pins, sim.tick),
+    lanterns: lanternsOf(c, wave),
+    lines: linesOf(c, sim, next?.tickEvents ?? []),
   };
 }
 
+/** The lines of a step's events (06 §2): followed protagonists' voices, storylet states with text. */
+function linesOf(c: Content, sim: SimState, events: readonly SimEvent[]): Frame['lines'] {
+  const followed = followedCats(c);
+  const out: Frame['lines'] = [];
+  for (const e of events) {
+    if (e.type === 'voice' && followed.includes(e.cat))
+      out.push({ cat: e.cat, node: e.node, text: e.line, shows: `voice:${e.hook}` });
+    else if (e.type === 'storylet') {
+      const text = need(c.storylet, e.id, 'storylet').states[e.state]?.textKey;
+      if (text === undefined) continue;
+      const cat = Object.values(e.roles).flat()[0] ?? null;
+      const cs = cat === null ? undefined : sim.cats[cat];
+      out.push({
+        cat,
+        node: cs ? catNode(cs) : (c.nodes[0]?.id ?? ''),
+        text,
+        shows: `${e.id}.${e.state}`,
+      });
+    }
+  }
+  return out;
+}
+
+/** Gaze circles whose window holds tick t (03 §15.4), in log order. */
+function gazesAt(c: Content, pins: readonly Pin[], t: number): Frame['gazes'] {
+  const out: Frame['gazes'] = [];
+  for (const pin of pins) {
+    if (pin.kind !== 'power') continue;
+    for (const prim of need(c.power, pin.power, 'power').effects)
+      if (prim.prim === 'collapse' && t >= pin.tick && t < pin.tick + prim.ticks)
+        out.push({ pin: pin.id, place: pin.place, radiusM: prim.radiusM });
+  }
+  return out;
+}
+
+/** Each live followed protagonist's sight (03 §4): its range toward its own space, the places it sees. */
+function lanternsOf(c: Content, wave: Wave): Frame['lanterns'] {
+  const sim = wave.lantern.sim;
+  return followedCats(c).flatMap((cat) => {
+    const cs = sim.cats[cat];
+    if (!cs || !wave.lantern.live.includes(cat)) return [];
+    const here = catNode(cs);
+    const seen = c.nodes
+      .filter((n) =>
+        perceives(c, sim, cat, { pos: nodePos(c, n.id), node: n.id, radiusM: null }, 'sight'),
+      )
+      .map((n) => n.id);
+    return [{ cat, rangeMm: rangeBetween(c, cat, here, here, sim.weather.now, 'sight'), seen }];
+  });
+}
+
 /**
- * Objects' P(visible) and the powers available at the wave's tick (04 §3, §8): `visibleWhen` and
- * `availableWhen` read as conditions do in the lantern, the fog through its reader (03 §13.3).
+ * Objects' P(visible), the powers available and edges' P(closed) at the wave's tick (04 §3, §8; 06 §2):
+ * `visibleWhen`, `availableWhen` and `when` read as conditions do in the lantern, the fog through its
+ * reader (03 §13.3).
  */
-function targets(setup: FogSetup, wave: Wave): Pick<Frame, 'visible' | 'powers'> {
+function targets(setup: FogSetup, wave: Wave): Pick<Frame, 'visible' | 'powers' | 'closed'> {
   const { c } = setup;
   const sim = wave.lantern.sim;
   let ctx: Ctx | null = null;
@@ -217,5 +282,7 @@ function targets(setup: FogSetup, wave: Wave): Pick<Frame, 'visible' | 'powers'>
   const powers = c.powers
     .filter((p) => !p.availableWhen || test(at(), p.availableWhen, {}))
     .map((p) => p.id);
-  return { visible, powers };
+  const closed: Record<string, number> = {};
+  for (const e of c.edges) if (e.when) closed[e.id] = PPM - chance(at(), e.when, {});
+  return { visible, powers, closed };
 }

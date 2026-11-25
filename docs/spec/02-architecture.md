@@ -125,17 +125,18 @@ type MainToWorker =
   | { kind: 'commit'; reqId: number }                      // make a preview the current wave; replies `ready` (`error` without one)
   | { kind: 'observe'; reqId: number; tick: number; cat: CatId }
   | { kind: 'debugHistory'; reqId: number; tick: number; index: number } // index 0: the lantern state; i > 0: reference histories (stream i)
-  | { kind: 'inspect'; reqId: number; seed: number; stream: number; pinset: string; tick: number }; // dev inspector (M1.5)
+  | { kind: 'inspect'; reqId: number; tick: number; index: number }; // dev page's state panel (M5): as debugHistory, as a readable view
 type WorkerToMain =
   | { kind: 'ready'; reqId: number }
   | { kind: 'vetted'; reqId: number; seed: number }
   | { kind: 'rerun'; reqId: number; upTo: number; frames: FramesPatch }   // streamed progress
   | { kind: 'result'; reqId: number; result: RecomputeResult }
   | { kind: 'observed'; reqId: number; fact: WatchedFact; frames: FramesPatch;
-      gazeFacts: GazeFact[]; edge: number; end: RecomputeResult['end'] } // at the edge: the new
-                                                          // edge's frame, Gaze there, where it ends
+      samples: SamplesPatch; gazeFacts: GazeFact[]; edge: number;
+      end: RecomputeResult['end'] }                       // at the edge: the new edge's frame and
+                                                          // samples, Gaze there, where it ends
   | { kind: 'history'; reqId: number; state: SimState; events: SimEvent[] }
-  | { kind: 'inspected'; reqId: number; view: InspectView }                 // dev inspector (M1.5)
+  | { kind: 'inspected'; reqId: number; view: InspectView }                 // dev page (M5)
   | { kind: 'error'; reqId: number; message: string };
 ```
 

@@ -952,7 +952,10 @@ observation, a watched fact, a Gaze sample, or the anchor treated as already see
 3. **Smoothing.** The same cat's earlier fog steps, back to where it was last live or
    to tick 0, are re-weighted by the forward–backward rule so earlier ghosts agree
    with what was seen. This only changes frames of past ticks, so an implementation may
-   defer it until those frames are requested.
+   defer it until those frames are requested. Built (M5, `docs/questions.md` M5-1): the
+   focus layer's samples (§16) are drawn backward from the edge, so they follow the smoothed
+   odds; ghosts' opacities stay the filtered odds, so §18's "a pin at t leaves every frame
+   before t unchanged" holds.
 4. **Forward again.** The fog is re-advanced from `t` with the new weights.
 
 **Anchor treated as already seen.** With `tuning.waves.anchorConditioning` on, a
@@ -1101,10 +1104,16 @@ probabilities in ppm (a live cat has one at 1 000 000); per event kind and story
 state, the probability it happens at that tick; the probability it is raining; the
 probability each requirement item holds; for each object with `visibleWhen`, the
 probability it is visible, and the powers whose `availableWhen` holds in the lantern at
-that tick (`04` §3, §8 judge targets in the frame at the playhead); and `samples`: `tuning.render.focusSamples`
-coherent trajectories for the renderer's focus layer (`06` §2), made by drawing a case
-by weight and then backward-sampling each fogged cat's chain in that case (purpose
-`"focus:" + k`, scope `render`, never `obs`). Frames are derived and never saved.
+that tick (`04` §3, §8 judge targets in the frame at the playhead); for the viewer (`06`
+§2, M5): each edge with a `when` and its probability of being closed, the lantern's running
+effects, Gaze circles in their window, each followed protagonist's sight range and the places
+it sees, and the lines voiced at that tick. Beside the frames, `samples`:
+`tuning.render.focusSamples` coherent trajectories for the renderer's focus layer (`06` §2),
+made by drawing a case by weight and then backward-sampling each fogged cat's ghosts in that
+case (purpose `"focus:" + k`, scope `render`, never `obs`). The fog records no transitions, so
+a ghost may follow another within one fog step's walk (`docs/questions.md` M5-1: "a cloud of
+possible positions"); during live playback trajectories are carried forward by the same rule.
+Frames and samples are derived and never saved.
 
 ## 17. Re-run
 

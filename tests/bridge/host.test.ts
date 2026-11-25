@@ -255,4 +255,62 @@ describe('the worker host (02 §3)', () => {
     h.drain();
     expect(h.fromOf(edit)).toBe(60);
   });
+
+  it('observe sends the samples that changed: the new edge’s, or all after a placement', () => {
+    const h = harness();
+    const fresh: Frontier = { story: 0, pastTicks: 0, storylets: [] };
+    h.send({ ...recompute([glow], false), frontier: fresh });
+    h.drain();
+    let samples: unknown[] = [];
+    let redrawn = 0;
+    for (let t = 0; t < 40; t++) {
+      const m = h.last(h.send({ kind: 'observe', tick: t, cat: 'hero' }));
+      if (m?.kind !== 'observed') throw new Error(JSON.stringify(m));
+      expect(m.samples.from + m.samples.ticks.length).toBe(t + 2);
+      if (m.samples.from < t + 1) redrawn += 1;
+      samples = [...samples.slice(0, m.samples.from), ...m.samples.ticks];
+    }
+    const seen: Frontier = { story: 1000, pastTicks: 0, storylets: setup.main };
+    const re = rerunAll(setup, null, { pins: [glow], watched: [], frontier: seen });
+    expect(samples).toHaveLength(41);
+    expect(redrawn).toBeGreaterThan(0); // the glow brings the hero out, where it places cats
+    expect(re.result.samples.length).toBeGreaterThan(40);
+  });
+
+  it('inspect: the lantern at a tick with the events that led there, or a reference history', () => {
+    const h = harness();
+    const run = h.send(recompute([glow], false));
+    h.drain();
+    const edge = h.resultOf(run).edge;
+    const id = h.send({ kind: 'inspect', tick: 20, index: 0 });
+    const m = h.last(id);
+    if (m?.kind !== 'inspected') throw new Error(JSON.stringify(m));
+    let w = initialWave(setup, ['hero']);
+    while (w.lantern.sim.tick < 20) w = advance(setup, w, [glow], ['hero']);
+    const hero = w.lantern.sim.cats['hero'];
+    expect(m.view.tick).toBe(20);
+    expect(m.view.lastTick).toBe(edge);
+    expect(m.view.cats.find((x) => x.id === 'hero')).toMatchObject({
+      live: true,
+      activity: hero?.activity,
+    });
+    expect(m.view.cats.filter((x) => !x.live).map((x) => x.id)).toEqual(
+      setup.c.cats.map((x) => x.id).filter((x) => !w.lantern.live.includes(x)),
+    );
+    // the events of ticks 5..19, oldest first (a trace line starts with its tick)
+    const ticks = m.view.events.map((line) => Number(line.trim().split(' ')[0]));
+    expect(ticks.length).toBeGreaterThan(0);
+    expect(ticks.every((t) => t >= 5 && t < 20)).toBe(true);
+    expect([...ticks].sort((a, b) => a - b)).toEqual(ticks);
+    // past the edge: the edge
+    const far = h.last(h.send({ kind: 'inspect', tick: edge + 50, index: 0 }));
+    expect(far?.kind === 'inspected' && far.view.tick).toBe(edge);
+    // a reference history: every cat live, the history's own end
+    const ref = runHistory(setup.c, 1, 2, [glow]);
+    const r = h.last(h.send({ kind: 'inspect', tick: 20, index: 2 }));
+    if (r?.kind !== 'inspected') throw new Error(JSON.stringify(r));
+    expect(r.view.cats.every((x) => x.live)).toBe(true);
+    expect(r.view.end.kind).toBe(ref.end.kind);
+    expect(r.view.lastTick).toBe(ref.states.length - 1);
+  });
 });

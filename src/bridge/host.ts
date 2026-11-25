@@ -14,9 +14,9 @@ import { runHistory, type History } from '../sim/history';
 import { advance, type Wave } from '../sim/lantern';
 import { followedCats } from '../sim/readers';
 import { extendEdge, rerun, type Timeline } from '../sim/recompute';
-import type { Frame, Pin } from '../sim/types';
+import type { Frame, Pin, SimEvent } from '../sim/types';
 import { vet } from '../sim/vet';
-import { inspectView } from './inspect';
+import { historySource, inspectView, LOG_TICKS } from './inspect';
 import type { MainToWorker, WorkerToMain } from './protocol';
 
 export interface HostFiles {
@@ -49,8 +49,7 @@ export function createHost(files: HostFiles, deps: HostDeps): Host {
   let preview: Timeline | null = null;
   /** The running re-run; a newer `recompute` replaces it, and the old one posts nothing more. */
   let job: object | null = null;
-  /** The dev inspector's history, and the last reference history of `debugHistory`. */
-  let inspected: { key: string; history: History } | null = null;
+  /** The last reference history of `debugHistory` and `inspect`. */
   let reference: { key: string; history: History } | null = null;
 
   const setupOf = (c: Content, seed: number): FogSetup => (setups[seed] ??= fogSetup(c, seed));
@@ -113,6 +112,13 @@ export function createHost(files: HostFiles, deps: HostDeps): Host {
     return { w, next: tick < tl.result.edge ? step(w) : null };
   }
 
+  /** The reference history of stream `index` with the timeline's pins (03 §12.4), the last one kept. */
+  function referenceOf(c: Content, tl: Timeline, index: number): History {
+    const key = `${tl.seed}|${index}|${JSON.stringify(tl.pins)}`;
+    if (reference?.key !== key) reference = { key, history: runHistory(c, tl.seed, index, tl.pins) };
+    return reference.history;
+  }
+
   function handle(msg: MainToWorker): void {
     if (msg.kind === 'init') {
       try {
@@ -128,7 +134,7 @@ export function createHost(files: HostFiles, deps: HostDeps): Host {
         return fail(msg.reqId, e.message);
       }
       setups = {};
-      current = preview = job = inspected = reference = null;
+      current = preview = job = reference = null;
       return post({ kind: 'ready', reqId: msg.reqId });
     }
     const c = content;
@@ -160,23 +166,36 @@ export function createHost(files: HostFiles, deps: HostDeps): Host {
           const events = next ? next.tickEvents : [];
           return post({ kind: 'history', reqId: msg.reqId, state: w.lantern.sim, events });
         }
-        const key = `${tl.seed}|${msg.index}|${JSON.stringify(tl.pins)}`;
-        if (reference?.key !== key)
-          reference = { key, history: runHistory(c, tl.seed, msg.index, tl.pins) };
-        const { states, events } = reference.history;
+        const { states, events } = referenceOf(c, tl, msg.index);
         const state = states[msg.tick];
         if (!state) return fail(msg.reqId, `tick ${msg.tick} is past the history's end`);
         return post({ kind: 'history', reqId: msg.reqId, state, events: events[msg.tick] ?? [] });
       }
       case 'inspect': {
-        // dev inspector (docs/milestones/M1.5-inspector.md)
-        const key = `${msg.seed}|${msg.stream}|${msg.pinset}`;
-        if (inspected?.key !== key)
-          inspected = {
-            key,
-            history: runHistory(c, msg.seed, msg.stream, pinsets[msg.pinset] ?? []),
-          };
-        const view = inspectView(c, inspected.history, msg.tick);
+        // the dev page's state panel: the lantern at the tick, or a reference history
+        const tl = current;
+        if (!tl) return fail(msg.reqId, 'no current wave');
+        if (msg.index > 0) {
+          const view = inspectView(c, historySource(referenceOf(c, tl, msg.index), msg.tick));
+          return post({ kind: 'inspected', reqId: msg.reqId, view });
+        }
+        const tick = Math.max(0, Math.min(msg.tick, tl.result.edge));
+        const recent: { tick: number; events: SimEvent[] }[] = [];
+        let w = lanternAt(c, tl, Math.max(0, tick - LOG_TICKS)).w;
+        const step = (x: Wave) => advance(setupOf(c, tl.seed), x, tl.pins, followedCats(c), tl.watched);
+        while (w.lantern.sim.tick < tick) {
+          const next = step(w);
+          recent.push({ tick: w.lantern.sim.tick, events: next.tickEvents });
+          w = next;
+        }
+        const view = inspectView(c, {
+          tick,
+          state: w.lantern.sim,
+          recent,
+          end: tl.result.end,
+          lastTick: tl.result.edge,
+          live: w.lantern.live,
+        });
         return post({ kind: 'inspected', reqId: msg.reqId, view });
       }
       case 'observe': {
@@ -202,12 +221,16 @@ export function createHost(files: HostFiles, deps: HostDeps): Host {
         current = { ...next, watched };
         const r = current.result;
         const frames = { from: edge + 1, frames: r.frames.slice(edge + 1) };
+        let from = 0;
+        while (from < r.samples.length && r.samples[from] === tl.result.samples[from]) from++;
+        const samples = { from, ticks: r.samples.slice(from) };
         const gazeFacts = r.gazeFacts.filter((g) => g.tick > edge);
         return post({
           kind: 'observed',
           reqId: msg.reqId,
           fact,
           frames,
+          samples,
           gazeFacts,
           edge: r.edge,
           end: r.end,

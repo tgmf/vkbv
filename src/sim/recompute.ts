@@ -12,6 +12,7 @@ import { PPM } from './math';
 import { watch } from './observe';
 import { followedCats } from './readers';
 import { canonicalJson } from './hash';
+import { extendSamples, samplesOf, traceOf, type TickTrace } from './samples';
 import type {
   CatId,
   Frame,
@@ -51,6 +52,8 @@ export interface Timeline {
    * edge whose step was taken (`{}` for a last tick): playback behind the edge reads them.
    */
   views: Record<CatId, WatchedFact>[];
+  /** Index t: what the focus layer's samples read at tick t (samples.ts). */
+  trace: TickTrace[];
   result: RecomputeResult;
 }
 
@@ -69,11 +72,11 @@ const viewOf = (setup: FogSetup, next: Wave, followed: readonly CatId[]) => {
 function tickOf(
   setup: FogSetup,
   w: Wave,
-  prev: { wave: Wave; frame: Frame } | undefined,
+  prev: { wave: Wave; frame: Frame; trace: TickTrace } | undefined,
   pins: readonly Pin[],
   followed: readonly CatId[],
   watched: readonly WatchedFact[],
-): { next: Wave | null; frame: Frame; view: Record<CatId, WatchedFact> } {
+): { next: Wave | null; frame: Frame; view: Record<CatId, WatchedFact>; trace: TickTrace } {
   const { c } = setup;
   const sim = w.lantern.sim;
   const reached = sim.anchor.reachedAt;
@@ -82,10 +85,12 @@ function tickOf(
     sim.tick >= c.world.ticks ||
     (reached !== null && sim.tick >= reached + c.tuning.end.afterAnchorTicks);
   const next = terminal ? null : advance(setup, w, pins, followed, watched);
+  const frame = frameOf(setup, w, next, prev, pins);
   return {
     next,
-    frame: frameOf(setup, w, next, prev),
+    frame,
     view: next ? viewOf(setup, next, followed) : {},
+    trace: traceOf(setup, w.fog, frame, w.lantern.live, prev),
   };
 }
 
@@ -169,6 +174,7 @@ export function* rerun(
   const checkpoints = kept ? kept.checkpoints.slice(0, k + 1) : [start];
   const frames: Frame[] = kept ? kept.result.frames.slice(0, from) : [];
   const views = kept ? kept.views.slice(0, from) : [];
+  const trace = kept ? kept.trace.slice(0, from) : [];
   const old = kept?.result.stats;
   const stats: RerunStats = {
     cases: old ? old.cases.slice(0, from) : [],
@@ -199,9 +205,16 @@ export function* rerun(
       }),
     );
   };
-  const record = (t: number, w: Wave, frame: Frame, view: Record<CatId, WatchedFact>) => {
+  const record = (
+    t: number,
+    w: Wave,
+    frame: Frame,
+    view: Record<CatId, WatchedFact>,
+    tr: TickTrace,
+  ) => {
     frames.push(frame);
     views.push(view);
+    trace.push(tr);
     stats.cases.push(w.fog.cases.length);
     stats.live.push(w.lantern.live.length);
     stats.states.push(fogStateCount(w.fog));
@@ -225,10 +238,11 @@ export function* rerun(
       break;
     }
     const pf = before && frames[t - 1];
-    const { next, frame, view } = tickOf(
+    const pt = before && trace[t - 1];
+    const { next, frame, view, trace: tr } = tickOf(
       setup,
       w,
-      before && pf ? { wave: before, frame: pf } : undefined,
+      before && pf && pt ? { wave: before, frame: pf, trace: pt } : undefined,
       pins,
       followed,
       watched,
@@ -240,12 +254,12 @@ export function* rerun(
       tested = w;
       end = { kind: 'limit', tick: edgeWave.lantern.sim.tick };
       if (!before) {
-        record(t, w, frame, view);
+        record(t, w, frame, view, tr);
         yield { tick: t, frame };
       }
       break;
     }
-    record(t, w, frame, view);
+    record(t, w, frame, view, tr);
     yield { tick: t, frame };
     if (next === null) {
       edgeWave = w;
@@ -276,6 +290,7 @@ export function* rerun(
     edgeWave,
     ahead,
     views,
+    trace,
     result: {
       frames,
       edge,
@@ -283,6 +298,7 @@ export function* rerun(
       reopened,
       breaks,
       gazeFacts: edgeWave.gazeFacts,
+      samples: samplesOf(setup, frames, trace),
       stats,
     },
   };
@@ -310,10 +326,11 @@ export function extendEdge(setup: FogSetup, tl: Timeline): Timeline | null {
   const r = tl.result;
   const t = w.lantern.sim.tick;
   const pf = r.frames[t - 1];
-  const { next, frame, view } = tickOf(
+  const pt = tl.trace[t - 1];
+  const { next, frame, view, trace: tr } = tickOf(
     setup,
     w,
-    pf && { wave: tl.edgeWave, frame: pf },
+    pf && pt && { wave: tl.edgeWave, frame: pf, trace: pt },
     tl.pins,
     followedCats(c),
     tl.watched,
@@ -326,15 +343,27 @@ export function extendEdge(setup: FogSetup, tl: Timeline): Timeline | null {
     end = { kind: 'fray', tick: next.fray ?? t };
   }
   const due = t % c.tuning.waves.checkpointEvery === 0;
+  const frames = [...r.frames, frame];
+  const trace = [...tl.trace, tr];
+  // a cat placed at the new edge: trajectories are drawn again so they end where it was seen;
+  // otherwise each is carried one tick forward (samples.ts)
+  const placed = w.lantern.live.some((id) => !tl.edgeWave.lantern.live.includes(id));
+  const ps = r.samples[t - 1];
+  const samples =
+    placed || !pf || !pt || !ps
+      ? samplesOf(setup, frames, trace)
+      : [...r.samples, extendSamples(setup, { frame: pf, trace: pt, samples: ps }, frame, tr)];
   return {
     ...tl,
     checkpoints: due ? [...tl.checkpoints, w] : tl.checkpoints,
     edgeWave: w,
     ahead,
     views: [...tl.views, view],
+    trace,
     result: {
       ...r,
-      frames: [...r.frames, frame],
+      frames,
+      samples,
       edge: t,
       end,
       gazeFacts: w.gazeFacts,

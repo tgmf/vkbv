@@ -354,6 +354,56 @@ export interface Frame {
   visible: Record<ObjectId, number>;
   /** The powers whose `availableWhen` holds in the lantern at this tick, or that have none (04 §3.2). */
   powers: PowerId[];
+  /** P(closed) of each edge with a `when` (06 §2: a barrier with that opacity). */
+  closed: Record<EdgeId, number>;
+  /** The lantern's running effects at this tick (06 §2: a running lure's glowing cat), creation order. */
+  effects: FrameEffect[];
+  /** Gaze circles whose window holds this tick (06 §2), in log order. */
+  gazes: { pin: PinId; place: NodeId; radiusM: number }[];
+  /**
+   * Each followed protagonist's lantern (06 §2): its sight range in mm toward its own space (rain
+   * included, 03 §4) and the places it sees by sight.
+   */
+  lanterns: { cat: CatId; rangeMm: number; seen: NodeId[] }[];
+  /**
+   * Lines of the step from this tick (06 §2: speech bubbles), in emission order: a followed
+   * protagonist's voice, and each lantern storylet state with a `textKey`. `text` is the text key;
+   * `cat` the voicing cat or the state's first bound role (null: none, shown at `node`); `shows` the
+   * watched fact's entry that shows it (`voice:<hook>` in its events, `storylet.state` in its
+   * storylets), so the UI shows only lines the protagonist perceived.
+   */
+  lines: FrameLine[];
+}
+
+export interface FrameLine {
+  cat: CatId | null;
+  node: NodeId;
+  text: string;
+  shows: string;
+}
+
+/** A running effect as a frame shows it. */
+export interface FrameEffect {
+  pin: PinId;
+  kind: RunningEffect['kind'];
+  source: { card: CardId } | { power: PowerId };
+  place: NodeId;
+  radiusM: number;
+}
+
+/**
+ * The focus layer's samples at one tick (03 §16, docs/questions.md M5-1): trajectory k's case index
+ * (`cases[k]`) and each fogged cat's ghost index in the frame (`cats[cat][k]`). Render only.
+ */
+export interface TickSamples {
+  cases: number[];
+  cats: Record<CatId, number[]>;
+}
+
+/** Samples from tick `from` on (02 §3). */
+export interface SamplesPatch {
+  from: number;
+  ticks: TickSamples[];
 }
 
 /** Frames from tick `from` on, as a re-run streams them (02 §3). */
@@ -402,6 +452,8 @@ export interface RecomputeResult {
   reopened: WatchedFact[];
   breaks: WatchedFact[]; // the reopened facts that were paid (04 §4)
   gazeFacts: GazeFact[];
+  /** The focus layer's samples for ticks 0..edge (03 §16), built when the re-run ends. */
+  samples: TickSamples[];
   stats: RerunStats;
 }
 
