@@ -3,9 +3,14 @@ import type { SimClient } from '../bridge/client';
 import type { Pin } from '../bridge/protocol';
 import type { TuningRow } from '../content/schemas';
 import { LOCALES, setLocale, t, type Locale } from '../i18n/t';
+import { handOf } from '../player/targets';
+import { BreakAlert } from './BreakAlert';
 import { clockText } from './clock';
 import { DevPanel } from './DevPanel';
 import type { Game } from './game';
+import { Hand } from './Hand';
+import { createSceneHandle } from './scene';
+import { SidePanel } from './SidePanel';
 import { Targets } from './Targets';
 import { Timeline } from './Timeline';
 import { World } from './World';
@@ -33,10 +38,11 @@ export interface AppProps {
   dev: boolean;
 }
 
-/** The layout of 06 §1: top bar, world view, side panel and hand (empty in M5), the timeline. */
+/** The layout of 06 §1: top bar, world view, side panel, hand, the break alert and the timeline. */
 export function App(props: AppProps) {
   const c = () => props.game.content;
   const ui = () => props.game.ui;
+  const scene = createSceneHandle();
   const [debug, setDebug] = createSignal(new URLSearchParams(location.search).get('debug') === '1');
   const labels = createMemo(() => {
     const out: Record<string, string> = {};
@@ -51,9 +57,40 @@ export function App(props: AppProps) {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
       const g = props.game;
+      // 1 to 9 hold the nth card in hand; G holds Gaze (06 §8, docs/questions.md M5-4)
+      if (/^[1-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const card = handOf(ui().player, c())[Number(e.key) - 1];
+        if (card) g.hold({ card });
+        e.preventDefault();
+        return;
+      }
+      // while something is held, Tab moves through its valid targets only (docs/questions.md M6-5)
+      if (e.key === 'Tab' && ui().held) {
+        const list = [
+          ...document.querySelectorAll<HTMLElement>('[data-testid="targets"] [data-valid="true"]'),
+        ];
+        if (list.length > 0) {
+          const i = list.indexOf(document.activeElement as HTMLElement);
+          const next = e.shiftKey
+            ? (list[(i < 0 ? 0 : i) - 1] ?? list[list.length - 1])
+            : (list[i + 1] ?? list[0]);
+          next?.focus();
+        }
+        e.preventDefault();
+        return;
+      }
       switch (e.key) {
         case '`':
           setDebug((d) => !d);
+          break;
+        case 'g':
+        case 'G': {
+          const gaze = c().powers.find((p) => p.effects.some((x) => x.prim === 'collapse'));
+          if (gaze) g.hold({ power: gaze.id });
+          break;
+        }
+        case 'Escape':
+          g.escape();
           break;
         case ' ':
           g.press('play');
@@ -117,31 +154,18 @@ export function App(props: AppProps) {
       <main class="world" data-testid="world" aria-label={tr('ui.world')}>
         <World
           game={props.game}
+          scene={scene}
           seed={props.seed}
           labels={labels}
           text={tr}
           followName={followName}
           focusLayer={true}
         />
-        <Targets game={props.game} text={tr} />
+        <Targets game={props.game} scene={scene} text={tr} />
       </main>
-      <aside class="side" data-testid="side">
-        <section>
-          <h2>{tr('ui.panel.charge')}</h2>
-        </section>
-        <section>
-          <h2>{tr('ui.panel.powers')}</h2>
-        </section>
-        <section>
-          <h2>{tr('ui.panel.journal')}</h2>
-          <h3>{tr('ui.panel.hooks')}</h3>
-          <h3>{tr('ui.panel.stories')}</h3>
-        </section>
-        <section>
-          <h2>{tr('ui.panel.log')}</h2>
-        </section>
-      </aside>
-      <section class="hand" data-testid="hand" aria-label={tr('ui.hand')} />
+      <SidePanel game={props.game} text={tr} />
+      <Hand game={props.game} scene={scene} text={tr} />
+      <BreakAlert game={props.game} text={tr} />
       <Timeline game={props.game} text={tr} />
       <Show when={props.dev}>
         <DevPanel game={props.game} sim={props.sim} pinsets={props.pinsets} seed={props.seed} />

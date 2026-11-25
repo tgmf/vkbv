@@ -28,11 +28,12 @@ body {
 .shell {
   display: grid;
   grid-template-columns: 1fr 240px;
-  grid-template-rows: auto 1fr 56px auto;
+  grid-template-rows: auto 1fr auto auto auto;
   grid-template-areas:
     'top side'
     'world side'
     'hand side'
+    'alert alert'
     'timeline timeline';
 }
 
@@ -221,7 +222,7 @@ button[aria-pressed='true'] {
   left: 8px;
 }
 
-/* --- side panel and hand (empty in M5) ---------------------------------------------------- */
+/* --- side panel and hand (06 §4, §5, §6) ---------------------------------------------------- */
 .side {
   grid-area: side;
   overflow: auto;
@@ -245,8 +246,238 @@ button[aria-pressed='true'] {
 
 .hand {
   grid-area: hand;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 6px 12px;
   border-top: 1px solid var(--line);
   background: var(--panel);
+  overflow-x: auto;
+}
+
+.hand .cards {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 150px;
+  padding: 6px 8px;
+  text-align: left;
+  border-radius: 6px;
+  touch-action: none;
+}
+
+.card .name {
+  font-weight: 600;
+}
+
+.card .text,
+.card .hint {
+  font-size: 14px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.card[data-held='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+  transform: translateY(-4px);
+}
+
+.card[data-arrived='true'] {
+  animation: arrive 0.8s ease-out;
+}
+
+.hand .piles {
+  margin: 0;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+@keyframes arrive {
+  from {
+    transform: translateY(-40px) scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.meter {
+  position: relative;
+  height: 12px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--bg);
+}
+
+.meter .fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.4s ease-out;
+}
+
+.meter .cost {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+}
+
+.power {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.power .why {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.journal {
+  margin: 0 0 8px;
+  padding-left: 16px;
+}
+
+.journal q {
+  display: block;
+  color: var(--muted);
+}
+
+button.link {
+  padding: 0;
+  border: none;
+  background: none;
+  text-decoration: underline;
+}
+
+.log ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.log li {
+  margin-bottom: 4px;
+}
+
+.log .when {
+  font-family: var(--mono);
+  color: var(--muted);
+}
+
+mark.drive {
+  background: none;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* --- in the world view: notices, the special's confirm step, the inspect panel ------------ */
+.notice {
+  position: absolute;
+  transform: translate(-50%, -130%);
+  max-width: 260px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.8);
+  border: 1px solid var(--error);
+  color: var(--text);
+  pointer-events: none;
+}
+
+.confirm-step {
+  position: absolute;
+  transform: translate(-50%, 12px);
+  width: 280px;
+  padding: 8px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.confirm-step p {
+  margin: 0 0 6px;
+}
+
+.confirm-step .once {
+  color: var(--muted);
+}
+
+.buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.inspect {
+  position: absolute;
+  top: 48px;
+  left: 8px;
+  width: 300px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.inspect h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.inspect .found {
+  color: var(--accent);
+}
+
+.world-view[data-held='true'] canvas {
+  cursor: crosshair;
+}
+
+/* --- the break alert (06 §6): a bar above the timeline, not a modal ------------------------- */
+.break-alert {
+  grid-area: alert;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 8px 12px;
+  background: #3b2a22;
+  border-top: 2px solid var(--error);
+}
+
+.break-alert h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.break-alert ul {
+  margin: 0;
+  padding-left: 16px;
+  flex: 1;
+  max-height: 96px;
+  overflow-y: auto;
 }
 
 /* --- timeline (06 §3): at least 120 px, full width ---------------------------------------- */
@@ -313,9 +544,99 @@ button[aria-pressed='true'] {
   stroke: var(--text);
 }
 
-.timeline .pin rect {
+.timeline .pin {
+  cursor: grab;
+  transition: transform 0.4s ease-out;
+  outline: none;
+}
+
+.timeline .pin[data-dragging='true'] {
+  transition: none;
+}
+
+.timeline .pin .frame {
+  fill: var(--bg);
+  stroke: var(--text);
+}
+
+.timeline .pin .body {
+  fill: #3a4a6a;
+}
+
+.timeline .pin.hollow .frame {
+  stroke-dasharray: 3 2;
+}
+
+.timeline .pin:focus-visible .frame {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.timeline .pin.locked {
+  cursor: default;
+}
+
+.timeline .pin .lock {
+  fill: none;
+  stroke: var(--text);
+}
+
+.timeline .pin .withdraw circle {
+  fill: var(--error);
+}
+
+.timeline .pin .withdraw path {
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+
+.timeline .pin .why {
+  font-size: 14px;
+  fill: var(--text);
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 3;
+}
+
+.timeline .presence {
+  fill: #9be08a;
+}
+
+.timeline .edge {
+  stroke: var(--muted);
+}
+
+.timeline .pulse {
+  animation: pulse 0.25s ease-in-out 8 alternate;
+}
+
+.timeline .dot.gone {
+  fill: none;
+  stroke: var(--accent);
+}
+
+.timeline .arrive {
+  animation: pulse 0.3s ease-in-out 4 alternate;
+}
+
+.timeline .ripple {
+  animation: pulse 0.5s ease-in-out infinite alternate;
+}
+
+.timeline .fly-home {
+  animation: fly-home 0.9s ease-in forwards;
+}
+
+.timeline .fly-home rect {
   fill: #3a4a6a;
   stroke: var(--text);
+}
+
+@keyframes fly-home {
+  to {
+    transform: translateY(-140px);
+    opacity: 0;
+  }
 }
 
 .timeline .pin text {
@@ -354,8 +675,18 @@ button[aria-pressed='true'] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .timeline .stream {
+  .timeline .stream,
+  .timeline .pulse,
+  .timeline .arrive,
+  .timeline .ripple,
+  .timeline .fly-home,
+  .card[data-arrived='true'] {
     animation: none;
+  }
+
+  .timeline .pin,
+  .meter .fill {
+    transition: none;
   }
 }
 

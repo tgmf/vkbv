@@ -2,11 +2,15 @@
 // dressed build replaces sits behind it. Floats live here and in src/ui only.
 import type { CatId, Frame, NodeId, ObjectId, TickSamples } from '../sim/types';
 
-/** Valid targets while a card or power is held (M6); null in the viewer. */
+/** Valid targets while a card or power is held (06 §4), as src/player computed them. */
 export interface Highlight {
   cats: CatId[];
   objects: ObjectId[];
   places: NodeId[];
+  /** The target keyboard focus is on (06 §8), drawn with a focus ring. */
+  focus: Pick | null;
+  /** A ring of this radius in metres under the pointer: Gaze's circle (06 §5). */
+  ring: number | null;
 }
 
 /** What is under a screen point. It never decides a game rule. */
@@ -39,12 +43,20 @@ export interface SceneView {
   labels: Readonly<Record<string, string>>;
   /** The cat the camera follows, or null when the player has panned away. */
   follow: CatId | null;
+  /**
+   * Added in M6: the pointer over the canvas in CSS pixels from its top left, or null. While something
+   * is held the magnifying ring (and Gaze's ring) sits there (06 §4, §5).
+   */
+  pointer: [number, number] | null;
 }
 
 export interface SceneRenderer {
   mount(canvas: HTMLCanvasElement): void;
   render(view: SceneView, dtMs: number): void;
+  /** What is under a screen point; while something is held, a highlighted hit before any other. */
   pick(x: number, y: number): Pick | null;
+  /** Where a cat, object or place was last drawn, in CSS pixels from the canvas's top left (M6). */
+  screenOf(target: Pick): [number, number] | null;
   resize(width: number, height: number): void;
   dispose(): void;
 }

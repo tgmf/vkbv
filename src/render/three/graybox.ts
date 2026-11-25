@@ -15,6 +15,7 @@ import {
   NormalBlending,
   OctahedronGeometry,
   OrthographicCamera,
+  Plane,
   PlaneGeometry,
   Raycaster,
   RingGeometry,
@@ -29,7 +30,7 @@ import {
 import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import type { Content } from '../../content/schemas/content';
 import type { CatId, Ghost, NodeId } from '../../sim/types';
-import type { Pick, SceneRenderer, SceneView } from '../SceneRenderer';
+import type { Highlight, Pick, SceneRenderer, SceneView } from '../SceneRenderer';
 import { createFogPass } from './fogPass';
 import {
   catTexture,
@@ -50,6 +51,9 @@ const FOCUS_FADE_MS = 250;
 const LANTERN_OVERSCAN = 1 / 0.975;
 const MAX_BUBBLES = 3; // lines shown at once over one cat or place
 const LABELS_FROM_ZOOM = 0.75; // place names pile up when zoomed further out
+const MAGNIFY_PX = 70; // the magnifying ring's radius on screen while something is held (06 §4)
+const MAGNIFY_SCALE = 1.4; // cats the held card can affect, inside the ring
+const DIM = 0.3; // what is not a valid target while something is held
 
 /** A render-only seeded generator (06 §2: never Math.random, never the simulation's rand). */
 function renderRandom(seed: number): () => number {
@@ -81,6 +85,8 @@ interface Marker {
   solid: boolean;
   focus: boolean;
   score: number;
+  /** Inside the magnifying ring while something is held: spread wide; a valid target, enlarged. */
+  magnified: boolean;
 }
 
 export interface GrayboxOptions {
@@ -270,8 +276,32 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
   );
   path.renderOrder = 7;
   scene.add(path);
+  let drawnPath: SceneView['previousPath'] = null;
 
   const areas: Area[] = [];
+  /** What the last frame held, where it drew each cat, and its view (for `pick` and `screenOf`). */
+  let held: Highlight | null = null;
+  let last: SceneView | null = null;
+  const drawn: Record<CatId, { x: number; z: number; opacity: number }> = {};
+  const raycaster = new Raycaster();
+  const ground = new Plane(new Vector3(0, 1, 0), 0);
+  /** The point on the ground under a canvas point (CSS pixels from its top left). */
+  function groundAt(px: number, py: number): Vector3 | null {
+    raycaster.setFromCamera(new Vector2((px / size.w) * 2 - 1, -(py / size.h) * 2 + 1), camera);
+    return raycaster.ray.intersectPlane(ground, new Vector3());
+  }
+  /** A cat's, object's or place's position in the world, as last drawn. */
+  function worldOf(t: Pick): Vector3 | null {
+    if (t.kind === 'object') return objects[t.id]?.position.clone() ?? null;
+    if (t.kind === 'place') {
+      const p = c.node[t.id]?.pos;
+      return p ? new Vector3(p[0], 0.4, p[1]) : null;
+    }
+    const d = drawn[t.id];
+    if (d) return new Vector3(d.x, 0.45, d.z);
+    const g = last?.frame.cats[t.id]?.[0];
+    return g ? new Vector3(g.pos[0], 0.45, g.pos[1]) : null;
+  }
 
   // --- the focus layer's trajectory choice ----------------------------------------------------------
   const focus = { k: 0, prev: -1, since: 0, last: -Infinity };
@@ -371,6 +401,7 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
   function markersOf(
     view: SceneView,
     lit: readonly Area[],
+    lens: Area | null,
   ): { shown: Marker[]; folded: Record<NodeId, Set<CatId>> } {
     const { frame, next, frac } = view;
     const inLantern = (x: number, z: number) =>
@@ -405,9 +436,27 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
           solid: solo,
           focus: false,
           score,
+          magnified: lens !== null && (x - lens.x) ** 2 + (z - lens.z) ** 2 <= lens.r * lens.r,
         });
       }
     }
+    // inside the magnifying ring a cat's ghosts at one spot are one marker, so the ring can spread them
+    const merged: Record<string, Marker> = {};
+    const kept: Marker[] = [];
+    for (const m of all) {
+      if (!m.magnified) {
+        kept.push(m);
+        continue;
+      }
+      const key = `${m.cat}|${Math.round(m.x)},${Math.round(m.z)}`;
+      const seen = merged[key];
+      if (seen) {
+        seen.opacity = Math.min(1, seen.opacity + m.opacity);
+        seen.score = Math.max(seen.score, m.score);
+      } else kept.push((merged[key] = { ...m }));
+    }
+    all.length = 0;
+    all.push(...kept);
     all.sort((a, b) => b.score - a.score);
     const shown: Marker[] = [];
     const folded: Record<NodeId, Set<CatId>> = {};
@@ -416,7 +465,8 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
     for (const m of all) {
       const here = (atPlace[m.node] ??= new Set());
       const crowded = !here.has(m.cat) && here.size >= MAX_PER_PLACE && m.score < 3 * PPM;
-      if (shown.length < budget && !crowded) {
+      // the magnifying ring spreads a cluster: everything inside it is drawn (06 §4)
+      if (m.magnified || (shown.length < budget && !crowded)) {
         shown.push(m);
         here.add(m.cat);
       } else (folded[m.node] ??= new Set()).add(m.cat);
@@ -448,6 +498,7 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
         solid: false,
         focus: true,
         score: 0,
+        magnified: false,
       });
     }
     return out;
@@ -471,13 +522,22 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
 
     // places, labels; the fog is everything outside the lanterns (fogPass.ts)
     const lit = areasOf(view, dtMs);
+    held = view.held;
+    last = view;
+    const hp = held && view.pointer ? groundAt(view.pointer[0], view.pointer[1]) : null;
+    const lens: Area | null = hp ? { x: hp.x, z: hp.z, r: MAGNIFY_PX * wpp() } : null;
+    const validPlaces = held ? new Set(held.places) : null;
+    const validObjects = held ? new Set(held.objects) : null;
+    const validCats = held ? new Set(held.cats) : null;
     const inLantern = (x: number, z: number) =>
       lit.some((l) => (l.x - x) ** 2 + (l.z - z) ** 2 <= l.r * l.r);
     for (const n of c.nodes) {
       const p = places[n.id];
       const open = revealed.has(n.id);
-      if (p)
+      if (p) {
         p.mesh.material.color.copy(p.base).lerp(new Color('#ffffff'), seen.has(n.id) ? 0.18 : 0);
+        if (validPlaces && !validPlaces.has(n.id)) p.mesh.material.color.multiplyScalar(0.45);
+      }
       const label = labels[`node:${n.id}`];
       if (label) {
         // an unrevealed place's name is not known yet; names outside the lantern are in the fog
@@ -502,7 +562,7 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
       if (!m) continue;
       const p = (view.frame.visible[o.id] ?? PPM) / PPM;
       m.visible = revealed.has(o.node) && p > 0;
-      m.material.opacity = p;
+      m.material.opacity = p * (validObjects && !validObjects.has(o.id) ? DIM : 1);
       m.scale.setScalar(motion ? 1 + 0.12 * Math.sin(time * 2.4) : 1);
       m.rotation.y = motion ? time * 0.6 : 0;
     }
@@ -518,7 +578,7 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
     }
 
     // cats: markers within the display budget, clusters, the focus layer
-    const { shown, folded } = markersOf(view, lit);
+    const { shown, folded } = markersOf(view, lit, lens);
     let focusOn = view.settings.focusLayer && motion && view.samples !== null;
     const K = c.tuning.render.focusSamples;
     if (focusOn) {
@@ -541,26 +601,45 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
     for (const m of shown) (spots[`${Math.round(m.x)},${Math.round(m.z)}`] ??= []).push(m);
     const h = CAT_PX * wpp();
     let si = 0;
+    let ri = 0;
+    for (const id of Object.keys(drawn)) delete drawn[id];
     for (const m of marks) {
       const sprite = spriteAt(si++);
       const mat = sprite.material;
       mat.map = textures[m.cat] ?? null;
       mat.blending = m.solid || m.focus ? NormalBlending : AdditiveBlending;
       const shimmer = !m.solid && !m.focus && motion ? 0.85 + 0.15 * Math.sin(time * 3 + si) : 1;
-      mat.opacity = m.opacity * shimmer;
+      const valid = validCats?.has(m.cat) ?? false;
+      mat.opacity = m.opacity * shimmer * (validCats && !valid ? DIM : 1);
       mat.needsUpdate = true;
       const group = m.focus ? undefined : spots[`${Math.round(m.x)},${Math.round(m.z)}`];
       let ox = 0;
+      let oz = 0;
       if (group && group.length > 1) {
         const i = group.indexOf(m);
-        ox = (i - (group.length - 1) / 2) * h * 0.75;
+        if (m.magnified && lens) {
+          // the magnifying ring spreads a cluster on a small circle (06 §4)
+          const r = Math.min(lens.r * 0.7, h * 0.5 * group.length);
+          const a = (2 * Math.PI * i) / group.length;
+          ox = r * Math.cos(a);
+          oz = r * Math.sin(a);
+        } else ox = (i - (group.length - 1) / 2) * h * 0.75;
       }
-      sprite.position.set(m.x + ox, 0.45, m.z);
-      sprite.scale.set(h * 0.8, h, 1);
+      const big = m.magnified && valid ? MAGNIFY_SCALE : 1;
+      sprite.position.set(m.x + ox, 0.45, m.z + oz);
+      sprite.scale.set(h * 0.8 * big, h * big, 1);
       sprite.userData = { pick: { kind: 'cat', id: m.cat } satisfies Pick };
+      if (!m.focus && (drawn[m.cat]?.opacity ?? -1) < m.opacity)
+        drawn[m.cat] = { x: m.x + ox, z: m.z + oz, opacity: m.opacity };
+      // a valid target is ringed, ghosts included (06 §4)
+      if (valid && !m.focus)
+        ringAt(ri++, h * 0.45 * big, '#ffd36b', 0.5 + 0.5 * m.opacity).position.set(
+          m.x + ox,
+          0.46,
+          m.z + oz,
+        );
     }
     // running effects: a power's glowing cat, a card's faint ring; Gaze rings
-    let ri = 0;
     for (const fx of view.frame.effects) {
       const p = c.node[fx.place]?.pos;
       if (!p) continue;
@@ -579,6 +658,31 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
     for (const g of view.frame.gazes) {
       const p = c.node[g.place]?.pos;
       if (p) ringAt(ri++, g.radiusM, '#7fd6ff', 0.6).position.set(p[0], 0.55, p[1]);
+    }
+    // while something is held: valid places and objects ringed, the magnifying ring and Gaze's ring
+    // under the pointer, the keyboard's focus (06 §4, §5, §8)
+    for (const id of held?.places ?? []) {
+      const p = c.node[id]?.pos;
+      if (p) ringAt(ri++, placeSize(id) * 0.8, '#ffd36b', 0.7).position.set(p[0], 0.42, p[1]);
+    }
+    for (const id of held?.objects ?? []) {
+      const o = objects[id];
+      if (o?.visible)
+        ringAt(ri++, 0.8, '#ffd36b', 0.9).position.set(o.position.x, 0.5, o.position.z);
+    }
+    if (lens) {
+      ringAt(ri++, lens.r, '#ffffff', 0.3).position.set(lens.x, 0.5, lens.z);
+      if (held?.ring) ringAt(ri++, held.ring, '#7fd6ff', 0.85).position.set(lens.x, 0.52, lens.z);
+    }
+    const focused = held?.focus ? worldOf(held.focus) : null;
+    if (held?.focus && focused) {
+      const r =
+        held.focus.kind === 'place'
+          ? placeSize(held.focus.id) * 0.95
+          : held.focus.kind === 'cat'
+            ? h * 0.7
+            : 1.1;
+      ringAt(ri++, r, '#ffffff', 1).position.set(focused.x, 0.55, focused.z);
     }
     for (let i = si; i < sprites.length; i++) {
       const s = sprites[i];
@@ -642,13 +746,20 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
 
     // the previous path (06 §6)
     path.visible = view.previousPath !== null;
-    if (view.previousPath)
-      path.geometry.setFromPoints(view.previousPath.map(([x, z]) => new Vector3(x, 0.5, z)));
+    if (view.previousPath && view.previousPath !== drawnPath) {
+      // a new geometry only when the path changes: replacing attributes every frame leaks GL buffers
+      path.geometry.dispose();
+      path.geometry = new BufferGeometry().setFromPoints(
+        view.previousPath.map(([x, z]) => new Vector3(x, 0.5, z)),
+      );
+    }
+    drawnPath = view.previousPath;
 
     if (canvasEl) {
       canvasEl.dataset['tick'] = String(view.tick);
       canvasEl.dataset['focus'] = focusOn ? String(focus.k) : 'off';
       canvasEl.dataset['pulse'] = motion ? 'on' : 'off';
+      canvasEl.dataset['path'] = view.previousPath ? String(view.previousPath.length) : 'off';
     }
     fogPass.render(gl, scene, camera, lit);
     css.render(scene, camera);
@@ -658,7 +769,6 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
     for (const o of (cssPool[kind] ?? []).slice(i)) o.visible = false;
   }
 
-  const raycaster = new Raycaster();
   return {
     mount(canvas) {
       canvasEl = canvas;
@@ -691,11 +801,24 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
         ],
         false,
       );
-      for (const h of hits) {
+      const picks = hits.flatMap((h) => {
         const p = h.object.userData['pick'] as Pick | undefined;
-        if (p) return p;
-      }
-      return null;
+        return p ? [p] : [];
+      });
+      const valid = (p: Pick) =>
+        held !== null &&
+        (p.kind === 'cat'
+          ? held.cats.includes(p.id)
+          : p.kind === 'object'
+            ? held.objects.includes(p.id)
+            : held.places.includes(p.id));
+      return picks.find(valid) ?? picks[0] ?? null;
+    },
+    screenOf(t) {
+      const w = worldOf(t);
+      if (!w) return null;
+      const v = w.project(camera);
+      return [((v.x + 1) / 2) * size.w, ((1 - v.y) / 2) * size.h];
     },
     resize(width, height) {
       size = { w: Math.max(1, width), h: Math.max(1, height) };
