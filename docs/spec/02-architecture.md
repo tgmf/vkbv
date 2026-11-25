@@ -92,7 +92,7 @@ PlayerState (pins, watched, seed, …)
    │ playback tick t → t+1
    ├──────── observe {t, cat} ────────────────────▶ at the lantern edge: advance the lantern one
    │                                                 tick, place cats, apply evidence
-   │◀─────── {watchedFact, frames} ───────────────┘  (03 §15.2)
+   │◀─────── {fact, frames, gazeFacts, edge, end} ┘  (03 §15.2); behind the edge: the fact only
    ▼
 rewards (player/rewards.ts) → PlayerState
 playhead + frac (UI) → SceneView → SceneRenderer

@@ -21,6 +21,21 @@ recorded, and its balance is measured and reported so Tagir can decide.
 - A whole-day run takes about 11 s alone (20 s with every core busy); reuse the
   parallel runner of `scripts/calibrate.ts` for `npm run balance`.
 
+## Where M3 left things (2026-11-25)
+
+- Links on demand are deferred (`docs/questions.md` M3-1): every `heard` a placed cat takes
+  from the fog with a contributor heap counts in `stats.localCauses` and is recorded in
+  `stats.wouldLink` (its chance `p`, the heap's top source and its `ppm`). Report, for
+  `untouched` and `road_both`, the local-cause rate and how many had a strong top
+  contributor (share `top.ppm / p` above 20%): that is what deferring the links costs.
+- Seed 1 vets live to 49598663; there `empty_teapot` can never be found (M3-4) and the
+  unprimed lure already brings Marti out. Golden playbacks and the balance measures use
+  the pin sets as data, so they are not affected, but say so where a property depends
+  on a hook card.
+- `npm run bench` now also times one observe at the edge (`budgets.observeMs` 5): median
+  2.4 ms, mean 11.6 ms, every fifth tick (a fog step) 50–140 ms. Give it with the chosen
+  fog knobs too.
+
 ## Build
 
 1. Golden playbacks (`07` §2) for every pin set in `pinsets.json`, seeds 1 to 3, next

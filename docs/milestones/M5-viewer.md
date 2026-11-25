@@ -21,6 +21,20 @@ hand yet.
   the acceptance item below needs a seed on which it does (`npm run sim -- --seed N
   --pinset road_both --fog` shows it).
 
+## Where M3 left things (2026-11-25)
+
+- `observe {tick, cat}` answers `observed {fact, frames, gazeFacts, edge, end}`: behind the
+  edge the stored fact (no frames); at the edge the edge moves one tick and `frames`
+  holds its frame. `src/player` has every action; the headless driver
+  (`tests/helpers/playthrough.ts`) shows the whole loop: edits previewed with
+  `previewNotice` (the break alert), committed with `applyPreview`, then, if pins moved
+  to the edge, one more `recompute` with them.
+- Live playback costs 2–3 ms a tick, but every fifth tick also steps the fog: 50–140 ms.
+  At `player.observeMaxTps` (16, 62 ms a tick) the slowest ones stall; playback must
+  wait for the reply, not skip it (`02` §3). Measure frame time with playback running.
+- Frames carry `visible` (objects' P(visible)) and `powers` (available at the tick):
+  opacity of objects with `visibleWhen` (`06` §2) and the power buttons read them.
+
 ## Build
 
 1. A Solid store holding: content, `PlayerState`, the latest result, playhead and

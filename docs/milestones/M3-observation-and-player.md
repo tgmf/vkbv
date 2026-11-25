@@ -58,10 +58,14 @@ pure, tested functions, driven headless. No UI.
 - [ ] Links on demand: on the tiny world, perceiving a fact whose cause is a meeting in
       the fog raises the probability that the listed contributor was at that place in
       that window (Bayes worked by hand in the test); an unlisted cause counts in
-      `stats.localCauses`.
+      `stats.localCauses`. **Changed (Tagir, 2026-11-25, `docs/questions.md` M3-1):** links
+      on demand are deferred; a cause only in the fog is a local cause, recorded in
+      `stats.wouldLink` with its heap's top source; one test for that fallback.
 - [ ] Repeat by default: watch the morning to 10:00, scroll back to 07:00, pin
       `tea_break` on `town.roadworks`: the re-run reaches 10:00 again; play to 10:00:
-      every watched fact of Marti's morning still holds and nothing reopens.
+      every watched fact of Marti's morning still holds and nothing reopens. **As built:**
+      on seed 1 this edit reaches Marti (the overheard tale, M1-2) and 49 of his facts
+      from 09:00 reopen; `box` at 07:00 reopens nothing. Open: `docs/questions.md` M3-3.
 - [ ] Breaks: a watched fact with a non-empty `paidBy` that an edit would reopen is
       reported by the preview; committing removes it and pays nothing back; unpaid
       reopened facts land in `marks.changedUnwatched`.
