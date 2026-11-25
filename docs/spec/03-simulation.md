@@ -1136,7 +1136,7 @@ unchanged, except where the backward pass smooths them (§14).
 
 Live playback at the edge (§15.2) advances the lantern one tick and runs nothing else.
 
-A re-run returns `{ frames, edge, end, reopened, breaks, gazeFacts, stats }` where `edge`
+A re-run returns `{ frames, edge, end, reopened, breaks, gazeFacts, samples, stats }` where `edge`
 is the new lantern edge and `end` is `{ kind: 'anchor' | 'fray' | 'chapterEnd' |
 'limit', tick }`: how the lantern ends (`'limit'` when it stopped at the frontier limit;
 its tick is the edge). `stats` holds, per tick, the number of cases, live cats and fog

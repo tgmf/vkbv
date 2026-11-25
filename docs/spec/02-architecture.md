@@ -34,12 +34,13 @@ src/
   sim/         rng.ts math.ts exp-table.ts hash.ts space.ts perception.ts
                conditions.ts scores.ts effects.ts cats.ts storylets.ts sifting.ts
                pins.ts step.ts history.ts readers.ts fog.ts fog-quantities.ts
-               lantern.ts backward.ts observe.ts frames.ts recompute.ts vet.ts
+               lantern.ts backward.ts observe.ts frames.ts samples.ts recompute.ts vet.ts
                phi-table.ts trace.ts types.ts
-  player/      state.ts actions.ts rewards.ts frontier.ts save.ts
+  player/      state.ts actions.ts rewards.ts frontier.ts playback.ts (the shuttle's rules) save.ts
   bridge/      protocol.ts host.ts (the worker's code, also run headless in Node) sim.worker.ts
-               client.ts inspect.ts (dev inspector)
-  render/      SceneRenderer.ts three/ (graybox implementation)
+               client.ts inspect.ts (the dev page's state panel, M5)
+  render/      SceneRenderer.ts index.ts three/ (graybox implementation: graybox.ts textures.ts
+               fogPass.ts)
   ui/          Solid components, theme.css
   content/     schemas/ (Zod) load.ts data/
                data/tuning.json

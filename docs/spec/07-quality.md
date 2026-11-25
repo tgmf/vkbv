@@ -108,7 +108,7 @@ pass.
 | --- | --- | --- |
 | Re-run after an edit at 08:00 with the lantern edge at 12:00 (Marti live, the other cats in the fog, 240 ticks), in a worker | first streamed frames within `budgets.recomputeMs` (100 ms), median, on a developer laptop; then at least `budgets.rerunTps` (120) ticks per second; the test fails above 3× the time or below a third of the rate | Vitest (Node, same code as the worker: `tests/budget/rerun.test.ts`, `npm run bench`) and the debug panel |
 | Observe one tick in playback (at the lantern edge: advance the lantern and fog one tick) | ≤ `budgets.observeMs` (5 ms) median; the test fails above 3× | Vitest (`tests/budget/observe.test.ts`, `npm run bench`) |
-| Frame time while scrubbing, all 12 cats with ghosts | 60 fps on a mid-range laptop; no long task over 50 ms | manual, noted in the handoff |
+| Frame time while scrubbing, all 12 cats with ghosts | 60 fps on a mid-range laptop; no long task over 50 ms | Playwright (`tests/e2e/frame-time.spec.ts`, on the GPU when there is one; it records the renderer), noted in the handoff |
 | JavaScript, graybox build | ≤ 400 kB gzipped (three.js included) | build script prints sizes; CI fails above |
 | First load, local production build | interactive ≤ 3 s | Playwright |
 | Console | no errors or warnings during the scripted run | Playwright |

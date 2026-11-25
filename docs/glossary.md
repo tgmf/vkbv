@@ -106,7 +106,7 @@ One English and one Russian form per name, taken from the character and encyclop
 | Determinism | Same seed + log gives the same result in every browser: counter-based RNG keyed by seed, cat, tick, purpose; fixed-point maths; a precomputed σ table, never `Math.exp`. |  |
 | Perception | What a protagonist can sense at a tick: sight and hearing, reduced by rain, walls and distance. Can differ per character (Rokko follows several voices at once). Each event records what was perceivable. | Decided 2026-11-20. The only thing that collapses waves. |
 | Lantern | The area around a protagonist where the world is simulated tick by tick and perceived events collapse; the fog lies beyond. Crisp inside, ghosts outside, shrinking in the rain. Two lanterns when protagonists split up. | Signature look. |
-| Fog | Everything outside the lanterns, held as probabilities and computed, never simulated. | Decided 2026-11-21. The player sees it as ghosts. |
+| Fog | Everything outside the lanterns, held as probabilities and computed, never simulated. | Decided 2026-11-21. The player sees it blurred, with ghosts (Tagir, 2026-11-25). The same fog as the Map row below. |
 | Cat chain | One unwatched cat's probability over activity states, tick by tick. A state is an activity plus his changing stats in bands. | Code: chain. |
 | Activity | What a cat is doing, tied to a place (fishing at the pier). Walking between places is an activity too. | Defined once in a shared activity catalogue; no routine per cat. |
 | Decision function | The one function that turns drives into odds of choosing each activity. The fog calls it on banded stats, the lantern on exact stats. | Never reimplemented for the fog. |
