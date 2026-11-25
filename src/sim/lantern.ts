@@ -20,7 +20,7 @@ import {
   type Fog,
   type FogSetup,
 } from './fog';
-import { INACTIVE, type FogEvent } from './fog-quantities';
+import { INACTIVE, sourceKey, type FogEvent } from './fog-quantities';
 import { sample } from './math';
 import { gaze, imposed, matching, pickState, shows } from './observe';
 import { perceives } from './perception';
@@ -38,6 +38,7 @@ import type {
   SimEvent,
   SimState,
   WatchedFact,
+  WouldLink,
 } from './types';
 import { need } from './types';
 
@@ -64,6 +65,8 @@ export interface Wave {
   fogFx: NonNullable<StepResult['fogFx']>;
   incoming: SimEvent[];
   localCauses: number;
+  /** Lasting effects placements showed with their cause only in the fog (03 §15.3), in order. */
+  wouldLink: WouldLink[];
   /** The tick the lantern frayed (03 §16), or null. */
   fray: number | null;
   /** The last step's own events, for the watched fact of its tick (03 §15.2). */
@@ -115,6 +118,7 @@ export function initialWave(setup: FogSetup, followed: readonly CatId[], live = 
     fogFx: [],
     incoming: [],
     localCauses: 0,
+    wouldLink: [],
     fray: null,
     tickEvents: [],
     reopened: [],
@@ -167,6 +171,48 @@ function placedCat(
       left: cs.interrupt.left * c.tuning.fog.stepTicks,
     },
   };
+}
+
+/**
+ * Links on demand, deferred (03 §15.3; docs/questions.md M3-1): every `heard` a placed cat takes from
+ * the fog whose contributor heap has a source is a consequence with its cause only in the fog. It is
+ * explained by a local cause; the heap's largest source (its ppm mixed over the cases) is recorded as
+ * what would have been a link. `heard` is never a link, so no case already carries its cause. A
+ * storylet's own state events (`storylet:…`) are left out: they reach only its role holders, and the
+ * storylet's state collapses with evidence when it goes live (03 §13.4).
+ */
+function wouldLinks(fog: Fog, id: CatId, heard: readonly string[], t: number): WouldLink[] {
+  const out: WouldLink[] = [];
+  for (const n of heard) {
+    if (n.startsWith('storylet:')) continue;
+    const quantity = `heard:${id}:${n}`;
+    const mix = (x: number, w: number) => Math.trunc((x * w) / WAVE_TOTAL);
+    const sources: Record<string, WouldLink['top']> = {};
+    const keys: string[] = [];
+    for (const fc of fog.cases)
+      for (const e of fc.q.heaps[quantity] ?? []) {
+        const k = sourceKey(e);
+        const was = sources[k];
+        if (!was) keys.push(k);
+        sources[k] = {
+          source: e.source,
+          cats: e.cats,
+          place: e.place,
+          from: Math.min(was?.from ?? e.from, e.from),
+          to: Math.max(was?.to ?? e.to, e.to),
+          ppm: (was?.ppm ?? 0) + mix(e.ppm, fc.weight),
+        };
+      }
+    let top: WouldLink['top'] | undefined;
+    for (const k of keys.sort()) {
+      const s = sources[k];
+      if (s && (!top || s.ppm > top.ppm)) top = s;
+    }
+    if (!top) continue;
+    const p = fog.cases.reduce((a, fc) => a + mix(fc.q.heard[id]?.[n] ?? 0, fc.weight), 0);
+    out.push({ tick: t, cat: id, quantity, p, top });
+  }
+  return out;
 }
 
 /** Removes a cat from every case of the fog: it is live now. */
@@ -235,6 +281,7 @@ export function advance(
   const incoming: SimEvent[] = [];
   let fog = wave.fog;
   let localCauses = wave.localCauses;
+  let wouldLink = wave.wouldLink;
 
   // 2. the fog's step when a step boundary passes, reading the lantern; then release (03 §13.4)
   const stepped = fog.tick + K <= t;
@@ -315,11 +362,12 @@ export function advance(
       holds: true,
     });
     if (!after) localCauses += 1; // no consistent past: placed as seen, nothing else changes
+    const cs = placedCat(setup, after ?? fog, id, chosen.s, chosen.mean, t);
+    const shown = wouldLinks(fog, id, cs.heard, t);
+    localCauses += shown.length;
+    wouldLink = [...wouldLink, ...shown];
     fog = withoutCat(after ?? fog, id);
-    sim = {
-      ...sim,
-      cats: { ...sim.cats, [id]: placedCat(setup, after ?? fog, id, chosen.s, chosen.mean, t) },
-    };
+    sim = { ...sim, cats: { ...sim.cats, [id]: cs } };
     live = inCast(setup, [...live, id]);
     dwell[id] = c.tuning.lantern.dwellTicks;
     unseen[id] = 0;
@@ -454,6 +502,7 @@ export function advance(
     fogFx,
     incoming,
     localCauses,
+    wouldLink,
     fray,
     tickEvents: r.events,
     reopened,

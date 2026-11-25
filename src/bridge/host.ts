@@ -13,7 +13,7 @@ import { fogSetup, type FogSetup } from '../sim/fog';
 import { runHistory, type History } from '../sim/history';
 import { advance, type Wave } from '../sim/lantern';
 import { followedCats } from '../sim/readers';
-import { rerun, type Timeline } from '../sim/recompute';
+import { extendEdge, rerun, type Timeline } from '../sim/recompute';
 import type { Frame, Pin } from '../sim/types';
 import { vet, vettingContent } from '../sim/vet';
 import { inspectView } from './inspect';
@@ -179,8 +179,31 @@ export function createHost(files: HostFiles, deps: HostDeps): Host {
         const view = inspectView(c, inspected.history, msg.tick);
         return post({ kind: 'inspected', reqId: msg.reqId, view });
       }
-      case 'observe':
-        return fail(msg.reqId, 'not implemented'); // playback observation is M3's
+      case 'observe': {
+        // playback (03 §15.2): behind the edge the timeline already holds the tick's watched fact;
+        // at the edge the lantern and the fog advance one tick and the edge moves with it
+        const tl = current;
+        if (!tl) return fail(msg.reqId, 'no current wave');
+        const edge = tl.result.edge;
+        if (msg.tick < 0 || msg.tick > edge)
+          return fail(msg.reqId, `tick ${msg.tick} is past the lantern edge ${edge}`);
+        const fact = tl.views[msg.tick]?.[msg.cat];
+        if (!fact) return fail(msg.reqId, `no watched fact of ${msg.cat} at ${msg.tick}`);
+        let next = tl;
+        if (msg.tick === edge) {
+          const ext = extendEdge(setupOf(c, tl.seed), tl);
+          if (!ext) return fail(msg.reqId, `the timeline ends at ${edge}`);
+          next = ext;
+        }
+        // the fact joins the timeline's watched facts, so the next edit does not take it for one
+        const watched = next.watched.some((f) => f.tick === fact.tick && f.cat === fact.cat)
+          ? next.watched
+          : [...next.watched, fact].sort((a, b) => a.tick - b.tick || (a.cat < b.cat ? -1 : 1));
+        current = { ...next, watched };
+        const r = current.result;
+        const frames = { from: edge + 1, frames: r.frames.slice(edge + 1) };
+        return post({ kind: 'observed', reqId: msg.reqId, fact, frames, edge: r.edge, end: r.end });
+      }
       default: {
         const never: never = msg;
         throw new Error(`unknown message ${JSON.stringify(never)}`);

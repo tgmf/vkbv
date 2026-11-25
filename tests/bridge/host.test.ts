@@ -213,4 +213,41 @@ describe('the worker host (02 §3)', () => {
       events: ref.events[20],
     });
   });
+
+  it('observe: live at the edge, read behind it, refused past it (03 §15.2)', () => {
+    const h = harness();
+    const none = h.send({ kind: 'observe', tick: 0, cat: 'hero' });
+    expect(h.last(none)?.kind).toBe('error');
+    const fresh: Frontier = { story: 0, pastTicks: 0, storylets: [] };
+    const run = h.send({ ...recompute([glow], false), frontier: fresh });
+    h.drain();
+    expect(h.resultOf(run).edge).toBe(0); // a new game
+    const facts = [];
+    for (let t = 0; t < 64; t++) {
+      const id = h.send({ kind: 'observe', tick: t, cat: 'hero' });
+      const m = h.last(id);
+      if (m?.kind !== 'observed') throw new Error(JSON.stringify(m));
+      expect([m.fact.tick, m.edge, m.frames.from, m.frames.frames.length]).toEqual([t, t + 1, t + 1, 1]);
+      facts.push(m.fact);
+    }
+    // the same facts and frames as a re-run that runs to the same tick
+    const seen: Frontier = { story: 1000, pastTicks: 0, storylets: setup.main };
+    const re = rerunAll(setup, null, { pins: [glow], watched: [], frontier: seen });
+    expect(facts).toEqual(re.views.slice(0, 64).map((v) => v['hero']));
+    // behind the edge: the fact the timeline holds, no frames, the edge unchanged
+    const back = h.send({ kind: 'observe', tick: 12, cat: 'hero' });
+    const m = h.last(back);
+    expect(m?.kind === 'observed' && [m.fact, m.edge, m.frames.frames.length]).toEqual([
+      facts[12],
+      64,
+      0,
+    ]);
+    const past = h.send({ kind: 'observe', tick: 65, cat: 'hero' });
+    expect(h.last(past)?.kind).toBe('error');
+    // the observed facts are part of the timeline: an edit with them replays from the checkpoint
+    // before the edit (60), not from the first fact (0)
+    const edit = h.send({ ...recompute([glow, rumourAt(62, 2)], true), watched: facts });
+    h.drain();
+    expect(h.fromOf(edit)).toBe(60);
+  });
 });

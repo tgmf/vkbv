@@ -350,6 +350,10 @@ export interface Frame {
   rain: number;
   requirements: number[];
   progress: number;
+  /** P(visible) of each object with `visibleWhen` (04 §3.1, §8; 06 §2). */
+  visible: Record<ObjectId, number>;
+  /** The powers whose `availableWhen` holds in the lantern at this tick, or that have none (04 §3.2). */
+  powers: PowerId[];
 }
 
 /** Frames from tick `from` on, as a re-run streams them (02 §3). */
@@ -365,6 +369,20 @@ export interface Frontier {
   storylets: string[];
 }
 
+/**
+ * What would have been a link (03 §15.3, deferred; docs/questions.md M3-1): a lasting effect a
+ * placement showed whose cause is only in the fog, explained by a local cause instead. `p` is the
+ * effect's chance before it was shown; `top` the largest source in its contributor heap, its `ppm`
+ * mixed over the cases (its share of `p` says how much a link would have explained).
+ */
+export interface WouldLink {
+  tick: number;
+  cat: CatId;
+  quantity: string; // `heard:<cat>:<event>`
+  p: number;
+  top: { source: string; cats: CatId[]; place: string | null; from: number; to: number; ppm: number };
+}
+
 /** Debug numbers of a re-run (03 §17), per tick 0..edge; its time is added by the worker. */
 export interface RerunStats {
   cases: number[];
@@ -372,6 +390,7 @@ export interface RerunStats {
   states: number[];
   strain: number | null; // only when asked for (the debug panel is open)
   localCauses: number;
+  wouldLink: WouldLink[];
   ms: number; // the re-run's time, measured by the worker (0 from src/sim, which reads no clock)
 }
 

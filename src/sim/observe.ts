@@ -88,8 +88,10 @@ export function watch(
       const own = e.factIfPerceivedBy?.[P];
       if (own) facts.push(own);
     } else if (e.type === 'voice') {
+      // P's own voice is `voice:<hook>` (04 §7 reads it); another cat's, heard, `voice:<cat>:<hook>`
       const src = { pos: e.pos, node: e.node, radiusM: e.radiusM };
-      if (e.cat === P || perceives(c, sim, P, src, 'hearing')) names.push(`voice:${e.hook}`);
+      if (e.cat === P) names.push(`voice:${e.hook}`);
+      else if (perceives(c, sim, P, src, 'hearing')) names.push(`voice:${e.cat}:${e.hook}`);
     }
   }
   const setNow = events.flatMap((e) => (e.type === 'fact' ? [e.fact] : []));

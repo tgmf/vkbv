@@ -247,7 +247,9 @@ describe('placement (03 §15.1)', () => {
         const before = ws[i - 1];
         const w = ws[i];
         if (!before || !w) continue;
-        expect(w.localCauses).toBe(0);
+        // no placement without a consistent past (local causes besides those links on demand
+        // would have explained, which count too since M3: docs/questions.md M3-1)
+        expect(w.localCauses - w.wouldLink.length).toBe(0);
         // every cat still fogged: the hero sees none of its mass (placed, or ruled out)
         for (const def of tiny.cats)
           if (!w.lantern.live.includes(def.id)) expect(seenMass(setup, w, 'hero', def.id)).toBe(0);
@@ -444,4 +446,31 @@ describe('exactness on the tiny world (03 §18; M2 acceptance, many streams)', (
           c.tuning.fog.exactTolerancePpm,
         );
   }, 120_000);
+});
+
+describe('links on demand, deferred (03 §15.3; docs/questions.md M3-1)', () => {
+  it('a placed cat’s heard caused only in the fog is a local cause, and names what would have been a link', () => {
+    const setup = fogSetup(tiny, 2);
+    // the rumour reaches the fogged pal; the glow brings the hero out, where it places pal
+    const pins = [cardPin('rumour', { place: 'street.b' }, 2), powerPin('glow', 'home.room', 10)];
+    let w = initialWave(setup, ['hero']);
+    let before = w;
+    while (!w.lantern.live.includes('pal')) {
+      before = w;
+      w = advance(setup, w, pins, ['hero']);
+    }
+    expect(before.localCauses).toBe(0);
+    const rumour = w.wouldLink.find((x) => x.quantity === 'heard:pal:rumour');
+    expect(rumour?.tick).toBe(w.lantern.sim.tick);
+    expect(rumour?.top.source).toBe('ev:rumour'); // the heap's largest source
+    expect(rumour?.p).toBe(1_000_000);
+    expect(w.lantern.sim.cats['pal']?.heard).toContain('rumour');
+    // every record is one local cause; a storylet's own state events are not among them
+    expect(w.localCauses).toBe(w.wouldLink.length);
+    expect(w.wouldLink.some((x) => x.quantity.includes(':storylet:'))).toBe(false);
+    // without the rumour there is nothing of it to explain
+    let quiet = initialWave(setup, ['hero']);
+    while (!quiet.lantern.live.includes('pal')) quiet = advance(setup, quiet, pins.slice(1), ['hero']);
+    expect(quiet.wouldLink.some((x) => x.quantity === 'heard:pal:rumour')).toBe(false);
+  });
 });

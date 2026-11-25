@@ -34,7 +34,8 @@ export interface RerunRequest {
 
 /**
  * A computed timeline, held by the worker: the request it answers, the lantern and fog every
- * `waves.checkpointEvery` ticks (03 §17), the wave at the edge, and the result.
+ * `waves.checkpointEvery` ticks (03 §17), the wave at the edge and the one after it, each tick's
+ * watched facts, and the result.
  */
 export interface Timeline {
   seed: number;
@@ -43,8 +44,61 @@ export interface Timeline {
   /** Index k: the wave at tick k × `waves.checkpointEvery`, for every such tick up to the edge. */
   checkpoints: Wave[];
   edgeWave: Wave;
+  /** The wave of edge + 1, already stepped: live playback continues from it. Null once it ended. */
+  ahead: Wave | null;
+  /**
+   * Index t: each followed protagonist's watched fact of tick t (03 §15.2), for every tick up to the
+   * edge whose step was taken (`{}` for a last tick): playback behind the edge reads them.
+   */
+  views: Record<CatId, WatchedFact>[];
   result: RecomputeResult;
 }
+
+/** The followed protagonists' watched facts of the tick whose step led to `next`. */
+const viewOf = (setup: FogSetup, next: Wave, followed: readonly CatId[]) => {
+  const view: Record<CatId, WatchedFact> = {};
+  for (const P of followed)
+    view[P] = watch(setup, next.lantern.sim, next.tickEvents, next.lantern.live, P);
+  return view;
+};
+
+/**
+ * One tick of a timeline at wave `w`: the wave after its step (null at a last tick: the fray, the
+ * anchor's end, the chapter's end), its frame, and the protagonists' watched facts of it.
+ */
+function tickOf(
+  setup: FogSetup,
+  w: Wave,
+  prev: { wave: Wave; frame: Frame } | undefined,
+  pins: readonly Pin[],
+  followed: readonly CatId[],
+  watched: readonly WatchedFact[],
+): { next: Wave | null; frame: Frame; view: Record<CatId, WatchedFact> } {
+  const { c } = setup;
+  const sim = w.lantern.sim;
+  const reached = sim.anchor.reachedAt;
+  const terminal =
+    w.fray !== null ||
+    sim.tick >= c.world.ticks ||
+    (reached !== null && sim.tick >= reached + c.tuning.end.afterAnchorTicks);
+  const next = terminal ? null : advance(setup, w, pins, followed, watched);
+  return {
+    next,
+    frame: frameOf(setup, w, next, prev),
+    view: next ? viewOf(setup, next, followed) : {},
+  };
+}
+
+/** How a timeline ends at its last tick `w` (no step follows it). */
+const endAt = (w: Wave): RecomputeResult['end'] => {
+  const reached = w.lantern.sim.anchor.reachedAt;
+  if (reached !== null) return { kind: 'anchor', tick: reached };
+  if (w.fray !== null) return { kind: 'fray', tick: w.fray };
+  return { kind: 'chapterEnd', tick: w.lantern.sim.tick };
+};
+
+/** Whether the step that led to `w` frayed the lantern (`fraysIf` held there): the tick before ends it. */
+const frayedBefore = (w: Wave): boolean => w.fray !== null && w.fray < w.lantern.sim.tick;
 
 const factKey = (f: WatchedFact): string => `${f.tick}|${f.cat}|${f.digest}`;
 
@@ -113,6 +167,7 @@ export function* rerun(
   const from = start.lantern.sim.tick;
   const checkpoints = kept ? kept.checkpoints.slice(0, k + 1) : [start];
   const frames: Frame[] = kept ? kept.result.frames.slice(0, from) : [];
+  const views = kept ? kept.views.slice(0, from) : [];
   const old = kept?.result.stats;
   const stats: RerunStats = {
     cases: old ? old.cases.slice(0, from) : [],
@@ -120,6 +175,7 @@ export function* rerun(
     states: old ? old.states.slice(0, from) : [],
     strain: null,
     localCauses: 0,
+    wouldLink: [],
     ms: 0,
   };
   let reach: number | null = null;
@@ -127,23 +183,21 @@ export function* rerun(
     if (reach === null && f.progress >= story) reach = t;
   });
 
-  const passes = (t: number, frame: Frame, next: Wave | null): boolean => {
+  const passes = (t: number, frame: Frame, view: Record<CatId, WatchedFact>): boolean => {
     if (reach === null && frame.progress >= story) reach = t;
     if (t < e) return true;
     if (frame.progress > story) return false;
     if (reach !== null && t - reach > pastTicks) return false;
-    if (next === null) return true;
-    return followed.every((P) =>
-      watch(setup, next.lantern.sim, next.tickEvents, next.lantern.live, P).summary.storylets.every(
-        (key) => {
-          const id = key.slice(0, key.indexOf('.'));
-          return !setup.main.includes(id) || seenStorylets.includes(id);
-        },
-      ),
+    return Object.values(view).every((f) =>
+      f.summary.storylets.every((key) => {
+        const id = key.slice(0, key.indexOf('.'));
+        return !setup.main.includes(id) || seenStorylets.includes(id);
+      }),
     );
   };
-  const record = (t: number, w: Wave, frame: Frame) => {
+  const record = (t: number, w: Wave, frame: Frame, view: Record<CatId, WatchedFact>) => {
     frames.push(frame);
+    views.push(view);
     stats.cases.push(w.fog.cases.length);
     stats.live.push(w.lantern.live.length);
     stats.states.push(fogStateCount(w.fog));
@@ -153,48 +207,47 @@ export function* rerun(
   let w = start;
   let before: Wave | null = null; // the wave of tick t − 1, once replayed
   let edgeWave: Wave;
+  let ahead: Wave | null;
   let tested: Wave; // the wave whose `reopened` holds every fact tested up to the edge
   let end: RecomputeResult['end'];
   for (;;) {
-    const sim = w.lantern.sim;
-    const t = sim.tick;
-    if (before && w.fray !== null && w.fray < t) {
+    const t = w.lantern.sim.tick;
+    if (before && frayedBefore(w)) {
       // the lantern frayed in the step from t − 1 (`fraysIf` held there): that tick is the edge
       edgeWave = before;
+      ahead = null;
       tested = w;
-      end = { kind: 'fray', tick: w.fray };
+      end = { kind: 'fray', tick: w.fray ?? t - 1 };
       break;
     }
-    const reached = sim.anchor.reachedAt;
-    const terminal =
-      w.fray !== null ||
-      t >= c.world.ticks ||
-      (reached !== null && t >= reached + c.tuning.end.afterAnchorTicks);
-    const next = terminal ? null : advance(setup, w, pins, followed, watched);
     const pf = before && frames[t - 1];
-    const frame = frameOf(setup, w, next, before && pf ? { wave: before, frame: pf } : undefined);
-    if (!passes(t, frame, next)) {
+    const { next, frame, view } = tickOf(
+      setup,
+      w,
+      before && pf ? { wave: before, frame: pf } : undefined,
+      pins,
+      followed,
+      watched,
+    );
+    if (!passes(t, frame, view)) {
       // the edge is the tick before; at tick 0 the edge stays at 0
       edgeWave = before ?? w;
+      ahead = before ? w : next;
       tested = w;
       end = { kind: 'limit', tick: edgeWave.lantern.sim.tick };
       if (!before) {
-        record(t, w, frame);
+        record(t, w, frame, view);
         yield { tick: t, frame };
       }
       break;
     }
-    record(t, w, frame);
+    record(t, w, frame, view);
     yield { tick: t, frame };
     if (next === null) {
       edgeWave = w;
+      ahead = null;
       tested = w;
-      end =
-        reached !== null
-          ? { kind: 'anchor', tick: reached }
-          : w.fray !== null
-            ? { kind: 'fray', tick: w.fray }
-            : { kind: 'chapterEnd', tick: t };
+      end = endAt(w);
       break;
     }
     before = w;
@@ -209,6 +262,7 @@ export function* rerun(
   ];
   const breaks = reopened.filter((f) => Object.values(f.summary.paidBy).some((p) => p.length > 0));
   stats.localCauses = edgeWave.localCauses;
+  stats.wouldLink = edgeWave.wouldLink;
   if (req.strain) stats.strain = projectFrom(setup, edgeWave, pins).anchor;
   return {
     seed: setup.seed,
@@ -216,6 +270,8 @@ export function* rerun(
     watched,
     checkpoints,
     edgeWave,
+    ahead,
+    views,
     result: {
       frames,
       edge,
@@ -235,6 +291,59 @@ export function rerunAll(setup: FogSetup, prev: Timeline | null, req: RerunReque
     const r = it.next();
     if (r.done) return r.value;
   }
+}
+
+/**
+ * Live playback at the lantern edge (03 §15.2, 04 §6): the timeline one tick further, from the wave
+ * already stepped past the edge (`ahead`): one `advance`, the new edge's frame and watched facts, a
+ * checkpoint when due. No frontier limit: the frontier moves with the edge. It stops where a re-run
+ * would: the fray, the anchor's end, the chapter's end. Null when the timeline has ended.
+ */
+export function extendEdge(setup: FogSetup, tl: Timeline): Timeline | null {
+  const w = tl.ahead;
+  if (!w || tl.result.end.kind !== 'limit') return null;
+  const { c } = setup;
+  const r = tl.result;
+  const t = w.lantern.sim.tick;
+  const pf = r.frames[t - 1];
+  const { next, frame, view } = tickOf(
+    setup,
+    w,
+    pf && { wave: tl.edgeWave, frame: pf },
+    tl.pins,
+    followedCats(c),
+    tl.watched,
+  );
+  let ahead = next;
+  let end: RecomputeResult['end'] = next ? { kind: 'limit', tick: t } : endAt(w);
+  if (next && frayedBefore(next)) {
+    // the step from the new edge frayed the lantern: the timeline ends here (as a re-run would)
+    ahead = null;
+    end = { kind: 'fray', tick: next.fray ?? t };
+  }
+  const due = t % c.tuning.waves.checkpointEvery === 0;
+  return {
+    ...tl,
+    checkpoints: due ? [...tl.checkpoints, w] : tl.checkpoints,
+    edgeWave: w,
+    ahead,
+    views: [...tl.views, view],
+    result: {
+      ...r,
+      frames: [...r.frames, frame],
+      edge: t,
+      end,
+      gazeFacts: w.gazeFacts,
+      stats: {
+        ...r.stats,
+        cases: [...r.stats.cases, w.fog.cases.length],
+        live: [...r.stats.live, w.lantern.live.length],
+        states: [...r.stats.states, fogStateCount(w.fog)],
+        localCauses: w.localCauses,
+        wouldLink: w.wouldLink,
+      },
+    },
+  };
 }
 
 /**

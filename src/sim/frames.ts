@@ -5,13 +5,14 @@
 // `samples` (backward-sampled trajectories) and the smoothing of past ghosts wait for M5
 // (docs/questions.md M2-21): frames carry the fog's filtered odds.
 import type { Requirement } from '../content/schemas/chapter';
-import { fogStates, WAVE_TOTAL, type Fog, type FogSetup } from './fog';
+import { chance, test } from './conditions';
+import { fogStates, lanternReader, WAVE_TOTAL, type Fog, type FogSetup } from './fog';
 import { INACTIVE, or, times } from './fog-quantities';
 import type { LanternState, Wave } from './lantern';
 import { PPM } from './math';
 import { catNode, catPos } from './space';
-import type { CatId, Content, Frame, Ghost, SimEvent, SimState } from './types';
-import { need } from './types';
+import type { CatId, Content, Ctx, Frame, Ghost, SimEvent, SimState } from './types';
+import { need, newDecisionMemo } from './types';
 
 const ghostKey = (g: Ghost): string =>
   `${g.node}|${g.pos[0]}|${g.pos[1]}|${g.activity}|${g.interrupt ?? ''}`;
@@ -181,5 +182,40 @@ export function frameOf(
     rain: sim.weather.now === 'rain' ? PPM : 0,
     requirements,
     progress: progressOf(c, requirements),
+    ...targets(setup, wave),
   };
+}
+
+/**
+ * Objects' P(visible) and the powers available at the wave's tick (04 §3, §8): `visibleWhen` and
+ * `availableWhen` read as conditions do in the lantern, the fog through its reader (03 §13.3).
+ */
+function targets(setup: FogSetup, wave: Wave): Pick<Frame, 'visible' | 'powers'> {
+  const { c } = setup;
+  const sim = wave.lantern.sim;
+  let ctx: Ctx | null = null;
+  const at = (): Ctx =>
+    (ctx ??= {
+      c,
+      seed: setup.seed,
+      streams: {},
+      s: sim,
+      prev: sim,
+      t: sim.tick,
+      events: [],
+      pins: [],
+      pick: () => 0,
+      chanceN: 0,
+      memo: setup.memo,
+      decisions: newDecisionMemo(),
+      live: wave.lantern.live,
+      held: wave.lantern.heldStorylets,
+      fog: lanternReader(setup, wave.fog, sim.tick),
+    });
+  const visible: Record<string, number> = {};
+  for (const o of c.objects) if (o.visibleWhen) visible[o.id] = chance(at(), o.visibleWhen, {});
+  const powers = c.powers
+    .filter((p) => !p.availableWhen || test(at(), p.availableWhen, {}))
+    .map((p) => p.id);
+  return { visible, powers };
 }

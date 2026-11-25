@@ -44,7 +44,16 @@ export type WorkerToMain =
   // before the first patch's `from` are the current wave's; nothing past `upTo` exists yet.
   | { kind: 'rerun'; reqId: number; upTo: number; frames: FramesPatch }
   | { kind: 'result'; reqId: number; result: RecomputeResult }
-  | { kind: 'observed'; reqId: number; fact: WatchedFact; frames: FramesPatch }
+  // A watched fact (03 §15.2). At the lantern edge the edge moves one tick: `frames` holds the new
+  // edge's frame, and `edge` and `end` say where the timeline now stands; behind it `frames` is empty.
+  | {
+      kind: 'observed';
+      reqId: number;
+      fact: WatchedFact;
+      frames: FramesPatch;
+      edge: number;
+      end: RecomputeResult['end'];
+    }
   | { kind: 'history'; reqId: number; state: SimState; events: SimEvent[] }
   | { kind: 'inspected'; reqId: number; view: InspectView }
   | { kind: 'error'; reqId: number; message: string };

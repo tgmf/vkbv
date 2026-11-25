@@ -450,7 +450,7 @@ export function mixQuantities(
   return out;
 }
 
-const sourceKey = (x: Source): string => JSON.stringify([x.source, x.cats, x.place]);
+export const sourceKey = (x: Source): string => JSON.stringify([x.source, x.cats, x.place]);
 
 /** The `size` largest contributors by ppm, ties by source (03 §13.5). */
 function topSources(list: Contributor[], size: number): Contributor[] {
