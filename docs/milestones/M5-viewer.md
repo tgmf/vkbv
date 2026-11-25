@@ -35,6 +35,25 @@ hand yet.
 - Frames carry `visible` (objects' P(visible)) and `powers` (available at the tick):
   opacity of objects with `visibleWhen` (`06` §2) and the power buttons read them.
 
+## Where M4 left things (2026-11-25)
+
+- Fog knobs stay 1000/3 (Tagir). The re-run budget is not met: 84–101 ticks/s (budget
+  120), first frames 71–115 ms (100), on every pin set; observe at the edge 2.8 ms median,
+  mean 13 ms, slowest about 100 ms (M2-1, open). Budget frame time with that in mind, and
+  build `samples` and smoothing (item 8) knowing the re-run has no spare speed.
+- Golden playbacks of every pin set, seeds 1–3, are in `tests/golden/<set>.s<seed>.expected.json`.
+  The acceptance item below can use them: under `road_both`, requested seed 1 (vetted
+  49598663) meets Rokko at 18:50, and so do seeds 2 and 3 (vetted 3762896133 and 3754479982).
+  The note in "Where M2 left things" about seed 1 not reaching the meeting is out of date.
+- Live vetting of a typed seed now runs at the game's own knobs (`docs/questions.md` M4-1):
+  slower (tens of seconds to a few minutes), but a vetted seed is solvable as played.
+- `npm run check` now also runs the quick calibration (about 4 minutes on every core) and the
+  minimum-bar tests (`05` §5.2: solvable, every card visibly does something); the whole
+  check takes about 12 minutes. B2–B7 are measured by `npm run balance` and not enforced.
+- Open, bears on the ghosts: interrupts of 2–6 ticks on fogged cats (`tea_break`,
+  `something_shiny`) do not show; they may be lost inside a 5-tick fog step (`docs/questions.md`
+  M4-5).
+
 ## Build
 
 1. A Solid store holding: content, `PlayerState`, the latest result, playhead and

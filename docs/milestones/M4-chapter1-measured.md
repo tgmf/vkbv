@@ -42,6 +42,7 @@ recorded, and its balance is measured and reported so Tagir can decide.
    to the golden single histories; `npm run golden:update` covers both.
 2. Fog knobs: the re-run budget for every pin set and a full calibration, with the
    default knobs and with the candidates above. Report both; Tagir chooses (M2-1).
+   **As built:** Tagir kept 1000/3 (2026-11-25).
 3. `npm run balance`: measures B2 to B7 over seeds 1 to 50 and prints a table with
    each property, its measured value, and pass or fail. It does not fail the build.
 4. B9: the full calibration table with the chosen knobs; the quick run joins
@@ -58,13 +59,21 @@ recorded, and its balance is measured and reported so Tagir can decide.
 
 - [ ] B1 and B8 pass on Chapter 1; B9's full table is in the handoff, each miss
       explained by a trace (M2-23: misses are recorded, not chased).
-- [ ] Golden playbacks pass and are stable across two runs.
-- [ ] `npm run balance` runs in under five minutes and prints every property.
+- [ ] Golden playbacks pass and are stable across two runs. **As built:** seeds are vetted
+      live at the game's own fog knobs (`docs/questions.md` M4-1, fixed after review), and
+      the golden files also check that a recorded solution solves each seed.
+- [ ] `npm run balance` runs in under five minutes and prints every property. **Changed
+      (Tagir, 2026-11-25):** no time limit; it takes about 32 minutes on 20 processes.
 - [ ] Every failing balance property is a question in `docs/questions.md` with its
       measured value and the trace that explains it. Content and tuning are
-      unchanged.
+      unchanged. **As built:** M4-2 to M4-4 (B2, B3, B5, B6). Tagir accepted them as
+      placeholder content: B2–B7 stay measured, not enforced; a minimum bar is enforced
+      instead (solvable, every card visibly does something: `05` §5.2). The only tuning
+      change is M4-1's: `vetting.fog` removed.
 - [ ] The re-run budget (`npm run bench`) holds for every pin set with the chosen fog
-      knobs, or the handoff gives the numbers and the question is in M2-1.
+      knobs, or the handoff gives the numbers and the question is in M2-1. **As built:**
+      it does not hold at 1000/3 (84–101 ticks/s, first frames 71–115 ms); the numbers are
+      in M2-1, which stays open.
 
 ## Out of scope
 

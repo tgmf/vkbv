@@ -12,6 +12,14 @@ The teaching beats of `01` §2–§3 do not all happen on every vetted seed: on 
 him" is never taught (`docs/questions.md` M3-4). Record the seed with every playtest
 session so Gate A can judge the beats per seed.
 
+## Note from M4 (2026-11-25)
+
+The unprimed lure brings Marti out by 19:00 on 34% of seeds 1–50 and the one-prime lure on 66%
+(B2, B3; his question itch is usually a prime already by the rain), so on most seeds "prime him"
+is never taught (`docs/questions.md` M4-2). Tagir accepted this as placeholder content; Gate A
+should still note it per seed. A typed `?seed=` is vetted live at the game's own knobs: up to a
+few minutes before the day starts (M4-1); seeds from `vetted-seeds.json` start at once.
+
 ## Build
 
 1. The debug panel with all its tabs (`06` §10). Move the M5 dev mode into it and

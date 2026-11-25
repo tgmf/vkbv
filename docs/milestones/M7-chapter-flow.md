@@ -14,8 +14,9 @@ screen, and the graybox is complete as a game.
    playing", and Rokko's locked thread.
 4. New game flow with confirm; seed from `?seed=` or drawn from
    `src/content/data/ch1/vetted-seeds.json` (`04` §2); a typed seed is vetted live before
-   the first recompute, with a short "preparing the day" state. Measured in M2: a seed
-   that fails takes tens of seconds (seed 1 becomes 49598663 after about 20 s). Work for
+   the first recompute, with a "preparing the day" state. Since M4 live vetting runs at the
+   game's own fog knobs (`docs/questions.md` M4-1): seeds 1–6 took 33–156 s with every core
+   busy (seed 1 still becomes 49598663), so the state must hold up to a few minutes. Work for
    the first re-run may be done while the teaser plays (precompute at chapter load is
    allowed, Tagir 2026-11-25).
 5. Settings: language, text size, reduced motion, focus layer, assist mode, new game.
