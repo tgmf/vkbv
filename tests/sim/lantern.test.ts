@@ -470,7 +470,8 @@ describe('links on demand, deferred (03 §15.3; docs/questions.md M3-1)', () => 
     expect(w.wouldLink.some((x) => x.quantity.includes(':storylet:'))).toBe(false);
     // without the rumour there is nothing of it to explain
     let quiet = initialWave(setup, ['hero']);
-    while (!quiet.lantern.live.includes('pal')) quiet = advance(setup, quiet, pins.slice(1), ['hero']);
+    while (!quiet.lantern.live.includes('pal'))
+      quiet = advance(setup, quiet, pins.slice(1), ['hero']);
     expect(quiet.wouldLink.some((x) => x.quantity === 'heard:pal:rumour')).toBe(false);
   });
 });

@@ -1022,14 +1022,23 @@ as playback would (the draws of §15.1 do not depend on whether anyone watches),
 playing over re-run ticks watches what the re-run showed; only playback records watched
 facts and pays (`04` §7).
 
-### 15.3 Links on demand
+### 15.3 Links on demand (deferred past the demo)
 
-When a placement or a watched event shows a lasting effect (a fact, flag or `heard`)
-whose cause is in the fog and is not a link, the worker builds links from that
-quantity's contributor heap: each listed source becomes a link (while slots allow),
-the fog is recomputed from the earliest source's window, and the evidence is applied
-again. Seeing that Grisha knows the tale then makes Semyon more likely to have been at
-the bakery around 10:00. Sources that are not listed are explained by a local cause.
+Deferred past the demo; link slots are fixed at load (Tagir, 2026-11-25,
+`docs/questions.md` M3-1). The design kept for later: when a placement or a watched
+event shows a lasting effect (a fact, flag or `heard`) whose cause is in the fog and is
+not a link, the worker builds links from that quantity's contributor heap: each listed
+source becomes a link (while slots allow), the fog is recomputed from the earliest
+source's window, and the evidence is applied again. Seeing that Grisha knows the tale
+then makes Semyon more likely to have been at the bakery around 10:00.
+
+What the demo does instead: every such effect is explained by a **local cause** and
+counted in `stats.localCauses`. Today the effects detected are the `heard` a placed cat
+takes from the fog whose contributor heap has a source (a storylet's own state events
+excepted: the storylet collapses with its state, §13.4). Each is also recorded in
+`stats.wouldLink` with the heap's largest source and its share, so M4 can report how
+often a link would have explained what was seen. The contributor heaps stay: any later
+version needs them.
 
 ### 15.4 Gaze
 
@@ -1090,7 +1099,9 @@ A projection frays the same way on its own cases (`docs/questions.md` M2-12).
 need (`02` §4): per cat, the distinct `(position, activity, interrupt)` with their
 probabilities in ppm (a live cat has one at 1 000 000); per event kind and storylet
 state, the probability it happens at that tick; the probability it is raining; the
-probability each requirement item holds; and `samples`: `tuning.render.focusSamples`
+probability each requirement item holds; for each object with `visibleWhen`, the
+probability it is visible, and the powers whose `availableWhen` holds in the lantern at
+that tick (`04` §3, §8 judge targets in the frame at the playhead); and `samples`: `tuning.render.focusSamples`
 coherent trajectories for the renderer's focus layer (`06` §2), made by drawing a case
 by weight and then backward-sampling each fogged cat's chain in that case (purpose
 `"focus:" + k`, scope `render`, never `obs`). Frames are derived and never saved.
@@ -1120,7 +1131,7 @@ A re-run returns `{ frames, edge, end, reopened, breaks, gazeFacts, stats }` whe
 is the new lantern edge and `end` is `{ kind: 'anchor' | 'fray' | 'chapterEnd' |
 'limit', tick }`: how the lantern ends (`'limit'` when it stopped at the frontier limit;
 its tick is the edge). `stats` holds, per tick, the number of cases, live cats and fog
-states, plus re-run time, strain and `localCauses` (debug only).
+states, plus re-run time, strain, `localCauses` and `wouldLink` (§15.3) (debug only).
 
 ## 18. What must always hold (tests)
 

@@ -1,2 +1,6 @@
-// Placeholder: src/player is filled in a later milestone (spec 02 §2).
-export {};
+// The player layer (04): pure functions over the saved player state. It never simulates.
+export * from './actions';
+export * from './frontier';
+export * from './rewards';
+export * from './save';
+export * from './state';

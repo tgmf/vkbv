@@ -206,8 +206,11 @@ and the player can still go `pastTicks` beyond it.
 **The frontier limit** is where a re-run stops (`03` §17): the last tick `t` such that
 every tick `t'` from the edit up to `t`
 
-- shows Marti no main storylet (`03` §12.2) outside `frontier.storylets`: no state of
-  one would appear in a watched fact at `t'`;
+- shows Marti no main storylet (`03` §12.2) outside `frontier.storylets` before it: no
+  state of one appears in a watched fact of a tick from the edit up to `t' − 1`. The
+  limit is therefore the tick whose step shows the new story, and playback at the edge
+  watches it live; an edit's own pin is never cut by its own re-run (Tagir, 2026-11-25,
+  `docs/questions.md` M3-2);
 - has `progress(t') <= story`;
 - has `t' - reach <= pastTicks`, when `reach` exists;
 

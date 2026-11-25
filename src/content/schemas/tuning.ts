@@ -127,6 +127,7 @@ export const TuningSchema = z.strictObject({
       1,
     ),
     rerunTps: int('Ticks per second a re-run streams at, at least (07 §4)').min(1),
+    observeMs: int('Median time of one observe at the lantern edge, in playback (07 §4)').min(1),
   }),
   calibration: z.strictObject({
     seeds: int('Seeds in the full calibration run (07 §3)').min(1),

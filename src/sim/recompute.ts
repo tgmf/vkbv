@@ -141,8 +141,9 @@ export const fogStateCount = (fog: Fog): number =>
 /**
  * The re-run (03 §17). From the last checkpoint before the edit tick `e`, the wave advances a tick
  * at a time (imposing the watched facts, §15.5) and yields each tick's frame. From `e` on, a tick t
- * passes the frontier limit (04 §6) when its watched fact shows no main storylet outside
- * `frontier.storylets`, `progress(t) ≤ story`, and `t − reach ≤ pastTicks` once `reach` exists;
+ * passes the frontier limit (04 §6) when the watched fact of t − 1 shows no main storylet outside
+ * `frontier.storylets` (so the edge is the tick whose step shows it), `progress(t) ≤ story`, and
+ * `t − reach ≤ pastTicks` once `reach` exists;
  * the edge is the last tick before the first that fails, never past the fray or the chapter's end
  * (the anchor's end: `end.afterAnchorTicks` after it). Watched facts after the edge are reopened
  * without a test.
@@ -183,12 +184,15 @@ export function* rerun(
     if (reach === null && f.progress >= story) reach = t;
   });
 
-  const passes = (t: number, frame: Frame, view: Record<CatId, WatchedFact>): boolean => {
+  const passes = (t: number, frame: Frame): boolean => {
     if (reach === null && frame.progress >= story) reach = t;
     if (t < e) return true;
     if (frame.progress > story) return false;
     if (reach !== null && t - reach > pastTicks) return false;
-    return Object.values(view).every((f) =>
+    // a never-watched main storylet in the step from t − 1: the edge is t − 1, so playback at the
+    // edge watches it (Tagir, 2026-11-25, docs/questions.md M3-2); an edit's own pin is never cut
+    const shown = t - 1 >= e ? views[t - 1] : undefined;
+    return Object.values(shown ?? {}).every((f) =>
       f.summary.storylets.every((key) => {
         const id = key.slice(0, key.indexOf('.'));
         return !setup.main.includes(id) || seenStorylets.includes(id);
@@ -229,7 +233,7 @@ export function* rerun(
       followed,
       watched,
     );
-    if (!passes(t, frame, view)) {
+    if (!passes(t, frame)) {
       // the edge is the tick before; at tick 0 the edge stays at 0
       edgeWave = before ?? w;
       ahead = before ? w : next;

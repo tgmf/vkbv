@@ -543,4 +543,71 @@ players create (cards, the lure) and may bias the rest.
 Answer: Tagir, 2026-11-25: (a). `advance` and `wholeDayRun` take an observer that sees each tick's fog
 before evidence; `calibration.observedPpm` = 10 000.
 
+## M3-1 — Links on demand            (status: answered; revisit later)
+Where: `03` §15.3; `src/sim/lantern.ts` (`wouldLinks`)
+Question: Chapter 1's two link slots are taken at load (`roadDone`, `crewArrived`), so links on demand
+could never build a link there; building them means a per-fog link list, a "source" link kind and a
+replay of the fog from the source's window. Build now?
+Answer: Tagir, 2026-11-25: no. Keep the contributor heaps. A perceived consequence whose cause is only in
+the fog is a local cause (`stats.localCauses`) and is recorded with the heap's top contributor and its
+weight (`stats.wouldLink`); M4 reports the local-cause rate and how many had a strong contributor (say
+above 20%). Optional, not built: let a local cause name the top contributor for the story only, behind a
+knob off by default (it can contradict itself if that cat is seen elsewhere later; nothing displays it
+before M5). One test for the fallback. Spec: `03` §15.3 "deferred past the demo; link slots are fixed at
+load" (done).
+Revisit when M4's numbers are high, or a later chapter has a free slot. A cheaper first step then: a
+load-time link observed down to one case frees its slot from that tick (if Marti sees the crew arrive,
+`crewArrived` no longer needs one); building a link still needs the replay from the source's window, but
+a window after the slot frees keeps the replay short.
+Built (M3): the detected consequence is the `heard` a placed cat takes from the fog with a heap source (a
+storylet's own state events excepted).
+
+## M3-2 — A pin at the edge cut by its own re-run            (status: answered, spec updated)
+Where: `04` §6 (frontier limit) and §4 (pins past the new edge); `src/sim/recompute.ts` (`rerun`)
+Question: a pin placed at the edge tick E that starts a never-watched main storylet in the step from E:
+the limit as built in M2 ("every tick up to the edge shows no new main storylet") put the edge at E − 1,
+then §4 moved the new pin to E − 1, which started the story earlier again; the playhead ended past the edge.
+Options seen: (a) for the main-storylet rule, the edge is the tick whose step shows the new story;
+(b) exempt the edit's own pins from moving; (c) decide later.
+Answer: Tagir, 2026-11-25: (a). `04` §6 updated; M2's frontier-limit test now expects the edge at the
+tick of the first watched fact showing `lured` (it was the tick before).
+
+## M3-3 — Repeat by default reopens Marti's morning on seed 1            (status: open)
+Where: M3 acceptance ("pin `tea_break` on `town.roadworks` at 07:00 … every watched fact of Marti's
+morning still holds and nothing reopens"); `tests/player/ch1.test.ts`
+Measured (seed 1, Marti watched 05:40–10:00, then `tea_break@town.roadworks` at 07:00): the re-run reaches
+10:00 again, every fact before 09:00 holds, and 49 facts from 09:00 on reopen (`03` §15.5: Marti's own
+part differs). Trace: with the tea break the crew break at 07:20, Semyon tells the tale, and Marti, who
+holds a role in `crew_chatter`, overhears it through the window (M1-2): `crew_chatter.tale` at 100,
+`overheard` at 101, `scoffed` at 114; his `questionItch` is 1000 at 09:00 instead of 730, and
+`look_out_window` (which reads it) keeps him from `nap_sunbeam`: he reads instead. The edit genuinely
+changes his morning. The same at 07:00 or 08:00; at 08:40 from 08:55. `box` on the roadworks at 07:00
+reopens nothing, and the test shows repeat by default with it.
+Also seen: the fact at 07:21 that the edit left standing (Marti in the same place, same activity) still
+says he heard nothing, though in the new timeline he overheard the tale then: a kept fact keeps its old
+summary, because only position and activity are compared (M2-20 part 3).
+Options seen: (a) accept: the acceptance item assumed an edit Marti cannot notice, and this content lets
+him notice it; (b) M1-2 (b) or (c), so the tale reaches Marti only through the window's real perception
+(then it may still reach him: he is at the window); (c) change the brief's edit for the test.
+Chosen for now: the test asserts what happens (edge 10:00, facts before 09:00 hold, the trace) and shows
+"nothing reopens" with `box`.
+Answer:
+
+## M3-4 — Vetting passes seeds whose recorded solutions use a card the player cannot find            (status: open)
+Where: `04` §2 (vetting runs the recorded solutions' pins directly); `05` §5.1 (`lure_primed` pins
+`empty_teapot`, found only by watching Marti voice `teaCraving`, `05` economy `discoverHook`)
+Measured: seed 1 vets live to 49598663. There Marti's `teaCraving` starts at 632, above its voice threshold
+(600); a voice needs an upward crossing, so it never voices in the watched day and `empty_teapot` is never
+found. The three recorded solutions all pin it. The seed is still solvable: with that craving
+(`noFreshTea`) and the tale he overhears (`itchy`) Marti already has two primes, and the unprimed lure
+alone brings him out at 17:45 and to the meeting at 18:50 (the road is blocked anyway). So on this seed
+01 §3's "he goes to the door and turns back; prime him" beat does not happen, and the morning cards on
+the roadworks change nothing. The scripted playthrough (`tests/player/playthrough.ts`) follows what the
+seed does.
+Options seen: (a) vetting also checks that each pin's card can be obtained in the run (inspected objects
+are always reachable; hook cards need the hook voiced); (b) recorded solutions use only cards from
+objects; (c) a hook whose seeded value starts above `over` voices once early (content or engine); (d)
+accept, and judge the teaching beats per seed in M4.
+Answer:
+
 <!-- Gate notes and answers go above this line. -->

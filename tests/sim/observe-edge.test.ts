@@ -25,7 +25,9 @@ function play(setup: FogSetup, pins: Pin[], until: number): Timeline[] {
 }
 
 const chainSums = (fog: Fog): number[] =>
-  fog.cases.flatMap((fc) => Object.values(fc.cats).map((x) => x.chain.reduce((a, e) => a + e.p, 0)));
+  fog.cases.flatMap((fc) =>
+    Object.values(fc.cats).map((x) => x.chain.reduce((a, e) => a + e.p, 0)),
+  );
 
 describe('live playback at the edge (03 §15.2)', () => {
   it('a new game starts at edge 0, and each extension moves the edge one tick', () => {

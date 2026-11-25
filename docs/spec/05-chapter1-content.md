@@ -115,6 +115,7 @@ have **not** been checked against a model of this content; M4 measures them.
 | `render.displayBudget` | 24 | most cat markers drawn at rest (`06` §2) |
 | `budgets.recomputeMs` | 100 | from an edit to the re-run's first streamed frames (`07` §4) |
 | `budgets.rerunTps` | 120 | ticks per second a re-run streams at, at least (`07` §4) |
+| `budgets.observeMs` | 5 | median time of one observe at the lantern edge, in playback (`07` §4) |
 | `flags.telemetry` | true | |
 | `flags.assist` | false | assist-mode highlights default |
 | `flags.jumpToEdge` | false | a "jump to the edge" button and End key, for playtests only (`06` §3) |

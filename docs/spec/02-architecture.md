@@ -131,7 +131,9 @@ type WorkerToMain =
   | { kind: 'vetted'; reqId: number; seed: number }
   | { kind: 'rerun'; reqId: number; upTo: number; frames: FramesPatch }   // streamed progress
   | { kind: 'result'; reqId: number; result: RecomputeResult }
-  | { kind: 'observed'; reqId: number; fact: WatchedFact; frames: FramesPatch }
+  | { kind: 'observed'; reqId: number; fact: WatchedFact; frames: FramesPatch;
+      gazeFacts: GazeFact[]; edge: number; end: RecomputeResult['end'] } // at the edge: the new
+                                                          // edge's frame, Gaze there, where it ends
   | { kind: 'history'; reqId: number; state: SimState; events: SimEvent[] }
   | { kind: 'inspected'; reqId: number; view: InspectView }                 // dev inspector (M1.5)
   | { kind: 'error'; reqId: number; message: string };

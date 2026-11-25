@@ -54,16 +54,18 @@ const shows = (f: WatchedFact | undefined, storylet: string): boolean =>
   (f?.summary.storylets ?? []).some((k) => k.startsWith(`${storylet}.`));
 
 describe('the re-run stops at the frontier limit (04 §6)', () => {
-  it('just before a never-watched main storylet would reach the hero', () => {
+  it('at the tick whose step shows a never-watched main storylet to the hero (M3-2)', () => {
     const setup = fogSetup(tiny, 1);
     const pins = [glowAt(10)];
     const r = rerunAll(setup, null, req(pins, { story: 1000, pastTicks: 0, storylets: [] }));
     const facts = factsOf(setup, pins, 60);
     const first = facts.findIndex((f) => shows(f, 'lured'));
     expect(first).toBeGreaterThan(0);
-    expect(r.result.end).toEqual({ kind: 'limit', tick: first - 1 });
-    expect(r.result.edge).toBe(first - 1);
-    expect(r.result.frames.length).toBe(first); // ticks 0..edge, nothing past it
+    // playback at the edge watches it (docs/questions.md M3-2, Tagir 2026-11-25)
+    expect(r.result.end).toEqual({ kind: 'limit', tick: first });
+    expect(r.result.edge).toBe(first);
+    expect(r.result.frames.length).toBe(first + 1); // ticks 0..edge, nothing past it
+    expect(r.views[first]?.['hero']).toEqual(facts[first]);
     // once watched, the same storylet does not stop it
     const seen = rerunAll(
       setup,

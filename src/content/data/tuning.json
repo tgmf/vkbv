@@ -86,7 +86,8 @@
   },
   "budgets": {
     "recomputeMs": 100,
-    "rerunTps": 120
+    "rerunTps": 120,
+    "observeMs": 5
   },
   "calibration": {
     "seeds": 400,

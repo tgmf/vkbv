@@ -202,7 +202,16 @@ export function createHost(files: HostFiles, deps: HostDeps): Host {
         current = { ...next, watched };
         const r = current.result;
         const frames = { from: edge + 1, frames: r.frames.slice(edge + 1) };
-        return post({ kind: 'observed', reqId: msg.reqId, fact, frames, edge: r.edge, end: r.end });
+        const gazeFacts = r.gazeFacts.filter((g) => g.tick > edge);
+        return post({
+          kind: 'observed',
+          reqId: msg.reqId,
+          fact,
+          frames,
+          gazeFacts,
+          edge: r.edge,
+          end: r.end,
+        });
       }
       default: {
         const never: never = msg;

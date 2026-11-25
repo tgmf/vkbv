@@ -4,6 +4,7 @@ import type {
   CatId,
   FramesPatch,
   Frontier,
+  GazeFact,
   Pin,
   RecomputeResult,
   SimEvent,
@@ -45,12 +46,14 @@ export type WorkerToMain =
   | { kind: 'rerun'; reqId: number; upTo: number; frames: FramesPatch }
   | { kind: 'result'; reqId: number; result: RecomputeResult }
   // A watched fact (03 §15.2). At the lantern edge the edge moves one tick: `frames` holds the new
-  // edge's frame, and `edge` and `end` say where the timeline now stands; behind it `frames` is empty.
+  // edge's frame, `gazeFacts` what Gaze fixed there, and `edge` and `end` say where the timeline now
+  // stands; behind it both are empty.
   | {
       kind: 'observed';
       reqId: number;
       fact: WatchedFact;
       frames: FramesPatch;
+      gazeFacts: GazeFact[];
       edge: number;
       end: RecomputeResult['end'];
     }

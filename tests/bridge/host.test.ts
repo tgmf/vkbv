@@ -227,7 +227,12 @@ describe('the worker host (02 §3)', () => {
       const id = h.send({ kind: 'observe', tick: t, cat: 'hero' });
       const m = h.last(id);
       if (m?.kind !== 'observed') throw new Error(JSON.stringify(m));
-      expect([m.fact.tick, m.edge, m.frames.from, m.frames.frames.length]).toEqual([t, t + 1, t + 1, 1]);
+      expect([m.fact.tick, m.edge, m.frames.from, m.frames.frames.length]).toEqual([
+        t,
+        t + 1,
+        t + 1,
+        1,
+      ]);
       facts.push(m.fact);
     }
     // the same facts and frames as a re-run that runs to the same tick
