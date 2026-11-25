@@ -37,6 +37,7 @@ src/
                lantern.ts backward.ts observe.ts frames.ts samples.ts recompute.ts vet.ts
                phi-table.ts trace.ts types.ts
   player/      state.ts actions.ts rewards.ts frontier.ts playback.ts (the shuttle's rules) save.ts
+               targets.ts (what a held card or power can do, M6)
   bridge/      protocol.ts host.ts (the worker's code, also run headless in Node) sim.worker.ts
                client.ts inspect.ts (the dev page's state panel, M5)
   render/      SceneRenderer.ts index.ts three/ (graybox implementation: graybox.ts textures.ts
@@ -164,11 +165,20 @@ interface SceneView {                  // what the renderer gets every animation
   bubbles: { cat: CatId | null; node: NodeId; text: string }[]; // speech bubbles, text through t()
   labels: Readonly<Record<string, string>>;  // `node:<id>`, `cat:<id>` display text, through t()
   follow: CatId | null;                // the cat the camera follows; null once the player pans
+  // added in M6:
+  pointer: [number, number] | null;    // the pointer over the canvas (CSS px); the magnifying ring
+}                                      // and Gaze's ring sit there while something is held
+interface Highlight {                  // `held`: src/player's valid targets (06 §4)
+  cats: CatId[]; objects: ObjectId[]; places: NodeId[];
+  focus: Pick | null;                  // the keyboard's focused target, drawn with a focus ring
+  ring: number | null;                 // Gaze's radius in metres, under the pointer
 }
 interface SceneRenderer {
   mount(canvas: HTMLCanvasElement): void;
   render(view: SceneView, dtMs: number): void;
-  pick(x: number, y: number): Pick | null;   // what is under a screen point
+  pick(x: number, y: number): Pick | null;   // what is under a screen point; while something is
+                                             // held, a highlighted target before any other hit
+  screenOf(target: Pick): [number, number] | null; // where it was last drawn (M6: notices, tests)
   resize(width: number, height: number): void;
   dispose(): void;
 }

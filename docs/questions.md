@@ -764,47 +764,47 @@ unrevealed places are gone; unrevealed places keep their names and objects hidde
 is the circle around the places the protagonist sees (walls stop sight, `03` §4). `06` §2 and the
 glossary's second "Fog" row updated.
 
-## M6-1 — `road_*` by hand when `empty_teapot` cannot be found            (status: answered, defaults)
+## M6-1 — `road_*` by hand when `empty_teapot` cannot be found            (status: answered)
 Where: M6 acceptance ("A person can play `road_tea`, `road_box` and `road_both` by hand"); `05` §5.1; M3-4
 Question: the game plays the first vetted seed (4). There Marti never voices `teaCraving` in the day (nor on
 6, 7, 10; on 12 only at 17:58), so `empty_teapot` is never found, and every `road_*` set pins it at 15:10.
 Options seen: (a) as M3-4: play every pin of the set whose card the seed lets the player find, and assert
 what the seed does; (b) a seed where the card can be found (only the dev page's seed field gives one).
 Chosen for now: (a).
-Answer: Tagir, 2026-11-25: go with the defaults.
+Answer: Tagir, 2026-11-25: the M6 plan with these defaults approved ("lets go"). Tests: `tests/player/by-hand.*.test.ts`, `tests/e2e/interaction.spec.ts`.
 
-## M6-2 — Playback while an edit is in flight            (status: answered, defaults)
+## M6-2 — Playback while an edit is in flight            (status: answered, spec updated)
 Where: `06` §3 ("the playhead waits there and follows the stream"); `02` §3; `04` §4
 Question: playback watches and pays, and Cancel must leave everything as it was, so nothing can be watched
 on a preview before it lands. Should the playhead follow the stream as a scrub, or wait?
 Options seen: (a) the shuttle pauses while an edit is previewed or waits for the break alert, and no other
 edit starts meanwhile; (b) forward during the stream is a scrub up to the arrived tick, observing nothing.
 Chosen for now: (a).
-Answer: Tagir, 2026-11-25: go with the defaults.
+Answer: Tagir, 2026-11-25: the M6 plan with these defaults approved ("lets go"). Spec updated: `06` §3.
 
-## M6-3 — Which story dots pulse after an edit            (status: answered, defaults)
+## M6-3 — Which story dots pulse after an edit            (status: answered, spec updated)
 Where: `06` §6 edit feedback 1 ("Story dots that appear, disappear or move pulse"); `06` §3 ("Unwatched
 story is never shown")
 Question: story dots come only from watched facts, so an edit can remove dots (reopened facts) but not
 add or move them. What pulses?
 Chosen for now: the dots that disappear pulse out over about 2 seconds, and the new changed-unwatched
 marks pulse.
-Answer: Tagir, 2026-11-25: go with the defaults.
+Answer: Tagir, 2026-11-25: the M6 plan with these defaults approved ("lets go"). Spec updated: `06` §6.
 
-## M6-4 — What the presence strip shades            (status: answered, defaults)
+## M6-4 — What the presence strip shades            (status: answered, spec updated)
 Where: `06` §3 track 5; glossary "Presence strip" ("when actable cats were at the spot under a held card")
 Chosen for now: over a place, P(at least one cat the held thing can act on stands there), cats being
 independent: for a card, the cats its cat branch may target (else every cat); for a power, the cats its
 `affects` allows (absent = every cat). Over a cat: P(it stands at a revealed place). Over an object:
 P(visible). Computed in `src/player/targets.ts`.
-Answer: Tagir, 2026-11-25: go with the defaults.
+Answer: Tagir, 2026-11-25: the M6 plan with these defaults approved ("lets go"). Spec updated: `06` §3.
 
-## M6-5 — Tab order            (status: answered, defaults)
+## M6-5 — Tab order            (status: answered, spec updated)
 Where: `06` §8 ("Tab / Shift+Tab: through valid targets while holding; through pins otherwise"), M5-4
 ("the lure is held from its button (or Tab to it)")
 Question: Tab must also reach buttons such as Lure, and `06` §8 gives no key to inspect.
 Chosen for now: while something is held, Tab cycles through the valid targets only; otherwise the
 ordinary tab order, which holds the pins, the buttons and the objects (Enter on an object inspects it).
-Answer: Tagir, 2026-11-25: go with the defaults.
+Answer: Tagir, 2026-11-25: the M6 plan with these defaults approved ("lets go"). Spec updated: `06` §8.
 
 <!-- Gate notes and answers go above this line. -->

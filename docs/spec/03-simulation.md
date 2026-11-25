@@ -1107,7 +1107,9 @@ probability it is visible, and the powers whose `availableWhen` holds in the lan
 that tick (`04` §3, §8 judge targets in the frame at the playhead); for the viewer (`06`
 §2, M5): each edge with a `when` and its probability of being closed, the lantern's running
 effects, Gaze circles in their window, each followed protagonist's sight range and the places
-it sees, and the lines voiced at that tick. Beside the frames, `samples`:
+it sees, and the lines voiced at that tick; for the timeline (`06` §3, M6), each pin before the tick
+with its P(fired by this tick): the lantern's pin state, or the fog's P(fired) over its cases. Beside
+the frames, `samples`:
 `tuning.render.focusSamples` coherent trajectories for the renderer's focus layer (`06` §2),
 made by drawing a case by weight and then backward-sampling each fogged cat's ghosts in that
 case (purpose `"focus:" + k`, scope `render`, never `obs`). The fog records no transitions, so
