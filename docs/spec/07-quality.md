@@ -126,6 +126,15 @@ unprimed, prime and place it again, watch the walk, scroll to the morning, pin c
 on the roadworks, play forward to the anchor, see the end screen. A screenshot at each
 step into `test-results/`.
 
+Script what the vetted seed does, not the reference story word for word (`docs/questions.md`
+M3-3, M3-4; the headless `tests/player/playthrough.ts` is the model). Seed 1 is vetted to
+49598663, where `empty_teapot` can never be found (Marti's teaCraving starts above its voice
+threshold), the unprimed lure already brings him out (17:45) and he meets Rokko at 18:50, so
+there is no "turns back, prime him" step; the morning cards on the roadworks change nothing
+there. A morning edit on the roadworks can reopen Marti's own later facts (he overhears the
+crew's tale through the window): assert the marks and break alerts it gives, never "nothing
+reopens".
+
 `tests/e2e/smoke.spec.ts`: load, no console errors, timeline visible, Space toggles
 playback, the language switch changes the town name, reload restores the save,
 panning the camera does not change `watched`.

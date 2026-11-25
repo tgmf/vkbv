@@ -5,6 +5,13 @@ to judge Gate A.
 
 **Read first:** `06-ui.md` §10; `07-quality.md` §4, §6, §7; `docs/playtest-kit.md`.
 
+## Note from M3 (2026-11-25)
+
+The teaching beats of `01` §2–§3 do not all happen on every vetted seed: on 49598663 (seed
+1) `empty_teapot` is never found and the unprimed lure already brings Marti out, so "prime
+him" is never taught (`docs/questions.md` M3-4). Record the seed with every playtest
+session so Gate A can judge the beats per seed.
+
 ## Build
 
 1. The debug panel with all its tabs (`06` §10). Move the M5 dev mode into it and

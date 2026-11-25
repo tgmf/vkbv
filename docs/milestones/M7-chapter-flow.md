@@ -20,7 +20,10 @@ screen, and the graybox is complete as a game.
    allowed, Tagir 2026-11-25).
 5. Settings: language, text size, reduced motion, focus layer, assist mode, new game.
 6. Russian for every interface string and hint.
-7. `tests/e2e/first-playthrough.spec.ts` and `tests/e2e/smoke.spec.ts` (`07` §5).
+7. `tests/e2e/first-playthrough.spec.ts` and `tests/e2e/smoke.spec.ts` (`07` §5). Script what
+   seed 1's vetted seed (49598663) does, as `tests/player/playthrough.ts` does headless: the
+   unprimed lure already works there and `empty_teapot` is never found (`07` §5,
+   `docs/questions.md` M3-3, M3-4).
 
 ## Acceptance
 

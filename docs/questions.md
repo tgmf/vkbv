@@ -572,7 +572,7 @@ Options seen: (a) for the main-storylet rule, the edge is the tick whose step sh
 Answer: Tagir, 2026-11-25: (a). `04` §6 updated; M2's frontier-limit test now expects the edge at the
 tick of the first watched fact showing `lured` (it was the tick before).
 
-## M3-3 — Repeat by default reopens Marti's morning on seed 1            (status: open)
+## M3-3 — Repeat by default reopens Marti's morning on seed 1            (status: tracked as test matter)
 Where: M3 acceptance ("pin `tea_break` on `town.roadworks` at 07:00 … every watched fact of Marti's
 morning still holds and nothing reopens"); `tests/player/ch1.test.ts`
 Measured (seed 1, Marti watched 05:40–10:00, then `tea_break@town.roadworks` at 07:00): the re-run reaches
@@ -591,9 +591,10 @@ him notice it; (b) M1-2 (b) or (c), so the tale reaches Marti only through the w
 (then it may still reach him: he is at the window); (c) change the brief's edit for the test.
 Chosen for now: the test asserts what happens (edge 10:00, facts before 09:00 hold, the trace) and shows
 "nothing reopens" with `box`.
-Answer:
+Answer: Tagir, 2026-11-25: not blocking; track it as test matter. Tests assert what the seed does; notes
+where tests meet it: `07` §5, the M7 brief.
 
-## M3-4 — Vetting passes seeds whose recorded solutions use a card the player cannot find            (status: open)
+## M3-4 — Vetting passes seeds whose recorded solutions use a card the player cannot find            (status: tracked as test matter)
 Where: `04` §2 (vetting runs the recorded solutions' pins directly); `05` §5.1 (`lure_primed` pins
 `empty_teapot`, found only by watching Marti voice `teaCraving`, `05` economy `discoverHook`)
 Measured: seed 1 vets live to 49598663. There Marti's `teaCraving` starts at 632, above its voice threshold
@@ -608,6 +609,8 @@ Options seen: (a) vetting also checks that each pin's card can be obtained in th
 are always reachable; hook cards need the hook voiced); (b) recorded solutions use only cards from
 objects; (c) a hook whose seeded value starts above `over` voices once early (content or engine); (d)
 accept, and judge the teaching beats per seed in M4.
-Answer:
+Answer: Tagir, 2026-11-25: vetting cannot check every player action, even on the tiny world, so (a) is
+out. Not blocking; track it as test matter: scripted playthroughs follow what the vetted seed does.
+Notes where tests and playtests meet it: `07` §5, the M7 and M8 briefs, the M4 brief.
 
 <!-- Gate notes and answers go above this line. -->
