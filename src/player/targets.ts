@@ -168,3 +168,18 @@ export function pinStatus(view: PlayerView, c: Content, pin: Pin): PinStatus {
   }
   return { fizzled, reason: fizzled ? reasonOf(c, pin) : null, firesAt };
 }
+
+/** The cards in the hand, in content order (06 §4; 1 to 9 hold the nth, 06 §8). */
+export const handOf = (p: PlayerState, c: Content): CardId[] =>
+  c.cards.map((x) => x.id).filter((id) => p.cards[id]?.zone === 'hand');
+
+/** The draw and discard counts shown by the hand under rule `discard` (06 §4), or null otherwise. */
+export function piles(p: PlayerState, c: Content): { draw: number; discard: number } | null {
+  if (c.tuning.player.playedCardRule !== 'discard') return null;
+  const discard = Object.values(p.cards).filter((x) => x.zone === 'discard').length;
+  return { draw: p.drawPile.length, discard };
+}
+
+/** A unique card's pin: it cannot be dragged or withdrawn (04 §3.3, 06 §3: drawn with a lock). */
+export const isLocked = (c: Content, pin: Pin): boolean =>
+  pin.kind === 'card' && (c.card[pin.card]?.unique ?? false);

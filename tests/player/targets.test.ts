@@ -3,7 +3,10 @@
 import { describe, expect, it } from 'vitest';
 import { movePin, playCard, usePower, type Target } from '../../src/player/actions';
 import {
+  handOf,
   heldRefusal,
+  isLocked,
+  piles,
   holdRefusal,
   needsConfirm,
   pinStatus,
@@ -220,5 +223,40 @@ describe('pins on the timeline: how they fired (06 §3)', () => {
     const v = viewOf(tiny, [moved]);
     expect(pinStatus(v, tiny, moved).fizzled).toBeGreaterThan(0);
     expect(pinStatus(v, tiny, moved).reason).toBe('hidden');
+  });
+});
+
+describe('the hand, the piles and locked pins (06 §3, §4)', () => {
+  it('the hand is the cards in zone hand, in content order', () => {
+    const p = inHand(game(tiny), 'scare', 'poke');
+    expect(handOf(p, tiny)).toEqual(['poke', 'scare']);
+    expect(handOf(game(tiny), tiny)).toEqual([]);
+  });
+
+  it('the piles show only under rule discard: the draw pile and the discard zone', () => {
+    const p = game(tiny);
+    expect(piles(p, tiny)).toBeNull();
+    const discard = {
+      ...tiny,
+      tuning: {
+        ...tiny.tuning,
+        player: { ...tiny.tuning.player, playedCardRule: 'discard' as const },
+      },
+    };
+    const q = {
+      ...p,
+      drawPile: ['poke'],
+      cards: { ...p.cards, poke: { zone: 'draw' as const }, scare: { zone: 'discard' as const } },
+    };
+    expect(piles(q, discard)).toEqual({ draw: 1, discard: 1 });
+  });
+
+  it('a unique card’s pin is locked; others and powers are not', () => {
+    const poke = tiny.card['poke'];
+    if (!poke) throw new Error('no poke');
+    const unique: Content = { ...tiny, card: { ...tiny.card, poke: { ...poke, unique: true } } };
+    expect(isLocked(unique, cardPin('poke', { cat: 'hero' }, 1))).toBe(true);
+    expect(isLocked(tiny, cardPin('poke', { cat: 'hero' }, 1))).toBe(false);
+    expect(isLocked(tiny, powerPin('glow', 'home.room', 1))).toBe(false);
   });
 });

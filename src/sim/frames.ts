@@ -214,13 +214,18 @@ function pinsFired(sim: SimState, fog: Fog, pins: readonly Pin[]): Record<string
       continue;
     }
     if (!fog.cases.some((fc) => fc.q.pins[pin.id])) continue;
-    out[pin.id] = Math.min(
-      PPM,
-      fog.cases.reduce(
-        (a, fc) => a + Math.trunc(((fc.q.pins[pin.id]?.fired ?? 0) * fc.weight) / WAVE_TOTAL),
-        0,
-      ),
-    );
+    const each = fog.cases.map((fc) => fc.q.pins[pin.id]?.fired ?? 0);
+    // the same in every case: that value exactly (a sum of truncated shares can fall short of it)
+    const first = each[0] ?? 0;
+    out[pin.id] = each.every((x) => x === first)
+      ? first
+      : Math.min(
+          PPM,
+          fog.cases.reduce(
+            (a, fc, i) => a + Math.trunc(((each[i] ?? 0) * fc.weight) / WAVE_TOTAL),
+            0,
+          ),
+        );
   }
   return out;
 }

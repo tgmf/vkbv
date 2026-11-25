@@ -9,7 +9,7 @@ import { PPM } from '../../src/sim/math';
 import { rangeBetween } from '../../src/sim/perception';
 import { catNode } from '../../src/sim/space';
 import type { Frame, Pin } from '../../src/sim/types';
-import { cardPin, makeCtx, powerPin, tiny } from './helpers';
+import { cardPin, ch1Coarse, makeCtx, powerPin, tiny } from './helpers';
 
 const glow = powerPin('glow', 'home.room', 0);
 const gazePin = powerPin('gaze', 'street.c', 20);
@@ -171,4 +171,26 @@ describe('frames for the viewer (06 §2)', () => {
     expect(dead.length).toBeGreaterThan(0);
     for (const f of dead) expect(f.pins[noBranch.id]).toBe(0);
   });
+
+  it('a pin the fog holds that fired in every case reads 1 000 000 exactly, however many cases', () => {
+    // Chapter 1, a card on a fogged crew cat in the morning: several cases, every one fired
+    const setup = fogSetup(ch1Coarse, 4);
+    const pin = cardPin('something_shiny', { cat: 'gavrila' }, 200);
+    let w = initialWave(setup, ['marti']);
+    let checked = 0;
+    while (w.lantern.sim.tick < 260) {
+      const next = advance(setup, w, [pin], ['marti']);
+      const f = frameOf(setup, w, next, undefined, [pin]);
+      if (
+        w.lantern.sim.tick > 205 &&
+        w.fog.cases.length > 1 &&
+        !w.lantern.live.includes('gavrila')
+      ) {
+        expect(f.pins[pin.id]).toBe(PPM);
+        checked += 1;
+      }
+      w = next;
+    }
+    expect(checked).toBeGreaterThan(0);
+  }, 120_000);
 });
