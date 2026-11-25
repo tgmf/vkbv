@@ -665,7 +665,7 @@ primes in practice. Seed 1 (vetted 49598663): itch 1000 at 17:35, out at 17:45.
 Options seen: (a) change the content (the itch's window rise or decay, or the `itchy` threshold) so the
 morning does not prime him; (b) change B2/B3 to count primes as they stand at the lure; (c) accept.
 Chosen for now: none; content and tuning unchanged.
-Answer: Tagir, 2026-11-25: accepted: Chapter 1 is placeholder content. B2–B7 stay measured (`npm run balance`, printed in each handoff) and are not enforced. What is enforced is a minimum bar: the chapter is solvable on every vetted seed, and every card of the demo deck visibly does something (`05` §5.2, `07` §1; tests `tests/golden/playback.s*.test.ts` "solvable" and `tests/sim/cards-visible.test.ts`). Spec updated.
+Answer: Tagir, 2026-11-25: accepted: Chapter 1 is placeholder content. B2–B7 stay measured (`npm run balance`, printed in each handoff) and are not enforced. What is enforced is a minimum bar: the chapter is solvable on every vetted seed, and every card of the demo deck visibly does something (`05` §5.2, `07` §1; tests `tests/golden/playback.s*.test.ts` "solvable" and `tests/sim/cards-visible.test.ts`). Spec updated. Measured again after the M4-1 fix (seeds vetted at the game's knobs): B2 34.0%, B3 66.0%, B4 94.0%, B5 no subset ≥ 50% (`tea_break` 44.0–44.9%, the rest 29.0–29.8%), B6 44 / 39 / 44 of 50, B7 50/50; a recorded solution solves every one of the 50 seeds (`docs/handoff/M4.md`, After review).
 
 ## M4-3 — B5: no subset of the road pins blocks the road on average            (status: answered, spec updated)
 Where: `05` §5.2 B5; `ch1/cards.json` (`tea_break`, `box`, `sudden_flea`, `something_shiny`);
@@ -688,7 +688,7 @@ seed sample: the pace gap of M2-8.)
 Options seen: (a) content: the roadworks' `box` tag (or the crate) and the other cards' strength; (b) change
 B5; (c) accept.
 Chosen for now: none; content and tuning unchanged.
-Answer: Tagir, 2026-11-25: accepted: Chapter 1 is placeholder content. B2–B7 stay measured (`npm run balance`, printed in each handoff) and are not enforced. What is enforced is a minimum bar: the chapter is solvable on every vetted seed, and every card of the demo deck visibly does something (`05` §5.2, `07` §1; tests `tests/golden/playback.s*.test.ts` "solvable" and `tests/sim/cards-visible.test.ts`). Spec updated.
+Answer: Tagir, 2026-11-25: accepted: Chapter 1 is placeholder content. B2–B7 stay measured (`npm run balance`, printed in each handoff) and are not enforced. What is enforced is a minimum bar: the chapter is solvable on every vetted seed, and every card of the demo deck visibly does something (`05` §5.2, `07` §1; tests `tests/golden/playback.s*.test.ts` "solvable" and `tests/sim/cards-visible.test.ts`). Spec updated. Measured again after the M4-1 fix (seeds vetted at the game's knobs): B2 34.0%, B3 66.0%, B4 94.0%, B5 no subset ≥ 50% (`tea_break` 44.0–44.9%, the rest 29.0–29.8%), B6 44 / 39 / 44 of 50, B7 50/50; a recorded solution solves every one of the 50 seeds (`docs/handoff/M4.md`, After review).
 
 ## M4-4 — B6: the road solutions fray on 15–18 of 50 seeds            (status: answered, spec updated)
 Where: `05` §5.2 B6 (`road_tea`, `road_box`, `road_both` do not fray on at least 45 of 50 seeds)
@@ -709,6 +709,6 @@ Options seen: (a) content (the lure's pull on a primed Marti, the detour and tur
 (b) vetting at the game's knobs (M4-1), so a vetted seed is one the solutions solve as played; (c) change
 B6; (d) accept.
 Chosen for now: none; content and tuning unchanged.
-Answer: Tagir, 2026-11-25: accepted: Chapter 1 is placeholder content. B2–B7 stay measured (`npm run balance`, printed in each handoff) and are not enforced. What is enforced is a minimum bar: the chapter is solvable on every vetted seed, and every card of the demo deck visibly does something (`05` §5.2, `07` §1; tests `tests/golden/playback.s*.test.ts` "solvable" and `tests/sim/cards-visible.test.ts`). Spec updated.
+Answer: Tagir, 2026-11-25: accepted: Chapter 1 is placeholder content. B2–B7 stay measured (`npm run balance`, printed in each handoff) and are not enforced. What is enforced is a minimum bar: the chapter is solvable on every vetted seed, and every card of the demo deck visibly does something (`05` §5.2, `07` §1; tests `tests/golden/playback.s*.test.ts` "solvable" and `tests/sim/cards-visible.test.ts`). Spec updated. Measured again after the M4-1 fix (seeds vetted at the game's knobs): B2 34.0%, B3 66.0%, B4 94.0%, B5 no subset ≥ 50% (`tea_break` 44.0–44.9%, the rest 29.0–29.8%), B6 44 / 39 / 44 of 50, B7 50/50; a recorded solution solves every one of the 50 seeds (`docs/handoff/M4.md`, After review).
 
 <!-- Gate notes and answers go above this line. -->
