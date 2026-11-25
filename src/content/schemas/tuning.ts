@@ -45,7 +45,9 @@ export const TuningSchema = z.strictObject({
     maxLinks: int('Links besides the weather (03 §13.5)').min(0),
     linkFloorPpm: ppm('A lasting meeting effect becomes a link above this, about 5%'),
     contributors: int('Contributor heap size per fact, flag and heard (03 §13.5)').min(1),
-    frayBelowPpm: ppm('The lantern, and a projection, fray below this chance of reaching the anchor (03 §16)'),
+    frayBelowPpm: ppm(
+      'The lantern, and a projection, fray below this chance of reaching the anchor (03 §16)',
+    ),
     exactTolerancePpm: ppm('Tiny-world exactness test tolerance (03 §18)'),
   }),
   behaviour: z.strictObject({
@@ -127,7 +129,9 @@ export const TuningSchema = z.strictObject({
   }),
   calibration: z.strictObject({
     seeds: int('Seeds in the full calibration run (07 §3)').min(1),
-    seedsQuick: int('Seeds in the quick calibration (npm run calibrate -- --quick; not in npm run check, docs/questions.md M2-23)').min(1),
+    seedsQuick: int(
+      'Seeds in the quick calibration (npm run calibrate -- --quick; not in npm run check, docs/questions.md M2-23)',
+    ).min(1),
     minPerBucket: int('Pairs a probability bucket needs to be checked').min(1),
     tolerancePpm: ppm('Largest allowed gap between predicted and observed frequency'),
     observedPpm: ppm(
