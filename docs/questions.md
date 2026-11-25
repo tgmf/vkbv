@@ -126,6 +126,17 @@ Update 2026-11-25 (item 13, `tests/budget/rerun.test.ts`): the re-run that `07` 
 08:00, edge at 12:00, Marti live) takes 72 ms to the first frames (budget 100) at 111 ticks/s (budget 120)
 with the default knobs; `minStatePpm` 3000 gives 156, 2 bands 138 (calibration with them not run). The
 fog's steps take 78% of the time. Tagir allows precompute at chapter load if needed.
+Update 2026-11-25 (M4, item 2): the three settings measured side by side; `docs/handoff/M4.md` has the full
+tables. Re-run budget (`npm run bench`, every pin set, seeds 1–3 medians; budget 100 ms, 120 ticks/s):
+| knobs | first frames | ticks/s | observe median / mean | calibration, 400 seeds (`road_both`; `untouched`) | time |
+| --- | --- | --- | --- | --- | --- |
+| 1000/3 (default) | 71–115 ms | 84–101 | 2.8 / 13.1 ms | rates pass; 3 bucket misses (roadBlocked 10–20%, 50–60%, 70–80%); 1 (roadBlocked 60–70%) | 1 360 s |
+| 3000/3 | 50–71 ms | 144–168 | 1.8 / 9.1 ms | roadBlocked rate misses (38.4 vs 57.5; 24.0 vs 40.5); 6 bucket misses each | 849 s |
+| 1000/2 | 57–66 ms | 137–148 | 2.0 / 9.2 ms | anchor.meeting rate misses (43.7 vs 31.3), every bucket passes; 1 (roadBlocked 40–50%: 45.3 vs 34.2) | 1 005 s |
+`bands` also sets the decision-trigger keys of live cats, so 1000/2 changes single histories (the reference)
+too: `martiOut` observed 67.3% against 66.5%, and every golden single history would change. 3000/3 changes
+the fog only.
+Chosen for now: none (Tagir chooses, M4).
 
 ## M2-2 — Anchor conditioning with nothing drawn past the lantern edge            (status: answered)
 Where: `03` §14, `05` §4 `waves.anchorConditioning`; glossary Anchor ("unwatched waves lean toward it")
