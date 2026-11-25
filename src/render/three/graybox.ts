@@ -30,7 +30,14 @@ import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRe
 import type { Content } from '../../content/schemas/content';
 import type { CatId, Ghost, NodeId } from '../../sim/types';
 import type { Pick, SceneRenderer, SceneView } from '../SceneRenderer';
-import { catTexture, rainTexture, softDisc, stripeTexture } from './textures';
+import { createFogPass } from './fogPass';
+import {
+  catTexture,
+  lanternMaskTexture,
+  lanternTexture,
+  rainTexture,
+  stripeTexture,
+} from './textures';
 
 const PPM = 1_000_000;
 const PITCH = (55 * Math.PI) / 180; // camera elevation above the ground
@@ -39,6 +46,8 @@ const ZOOM = { min: 0.4, max: 5 };
 const CAT_PX = 34; // cat billboard height on screen
 const MAX_PER_PLACE = 4; // cat markers at one place before the rest join its cluster
 const FOCUS_FADE_MS = 250;
+/** The lantern texture's crisp edge sits at 0.975 of its radius: the disc is drawn this much larger. */
+const LANTERN_OVERSCAN = 1 / 0.975;
 const MAX_BUBBLES = 3; // lines shown at once over one cat or place
 const LABELS_FROM_ZOOM = 0.75; // place names pile up when zoomed further out
 
@@ -54,6 +63,14 @@ function renderRandom(seed: number): () => number {
 }
 
 const lerp = (a: number, b: number, f: number) => a + (b - a) * f;
+
+/** A lantern's observed area on the ground: centre and radius in metres. */
+interface Area {
+  x: number;
+  z: number;
+  r: number;
+}
+const AREA_EASE_MS = 120; // how fast the area follows a change (a door, the rain)
 
 interface Marker {
   cat: CatId;
@@ -85,8 +102,8 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
   let size = { w: 1, h: 1 };
   let time = 0;
   const random = renderRandom(opts.seed);
-  const disc = softDisc();
   const rain = rainTexture();
+  const fogPass = createFogPass(lanternMaskTexture());
   const stripes = stripeTexture();
 
   // --- places, edges, fog, labels ---------------------------------------------------------------
@@ -99,9 +116,7 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
     return new Color('#47524a');
   };
   const places: Record<NodeId, { mesh: Mesh<BoxGeometry, MeshBasicMaterial>; base: Color }> = {};
-  const fog: Record<NodeId, Mesh> = {};
   const labels: Record<string, CSS2DObject> = {};
-  const fogMat = new MeshBasicMaterial({ color: '#1e2127' });
   for (const n of c.nodes) {
     const s = placeSize(n.id);
     const mesh = new Mesh(
@@ -112,11 +127,6 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
     mesh.userData = { pick: { kind: 'place', id: n.id } satisfies Pick };
     scene.add(mesh);
     places[n.id] = { mesh, base: baseColour(n.id) };
-    const f = new Mesh(new BoxGeometry(s + 0.6, 0.5, s + 0.6), fogMat);
-    f.position.set(n.pos[0], 0.3, n.pos[1]);
-    f.renderOrder = 1;
-    scene.add(f);
-    fog[n.id] = f;
     const label = cssLabel('scene-label');
     label.position.set(n.pos[0], 0.5, n.pos[1] + s / 2 + 0.6);
     scene.add(label);
@@ -178,7 +188,6 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
     opacity: 0,
     depthWrite: false,
   });
-  const rainOver: Record<NodeId, Mesh> = {};
   for (const n of c.nodes) {
     if (n.indoor) continue;
     const s = placeSize(n.id) + 2;
@@ -187,7 +196,6 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
     m.position.set(n.pos[0], 0.6, n.pos[1]);
     m.renderOrder = 4;
     scene.add(m);
-    rainOver[n.id] = m;
   }
   // the camera stays over the map: its target within the places' bounds, a margin around them
   const xs = c.nodes.map((n) => n.pos[0]);
@@ -200,16 +208,11 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
   };
 
   // --- lantern, pools ------------------------------------------------------------------------------
+  // The lantern: the area the protagonist observes, not a light. An even tint, a crisp outline with a
+  // small decorative fade (Tagir, 2026-11-25); the outline sits at his sight range.
   const lantern = new Mesh(
-    new CircleGeometry(1, 48),
-    new MeshBasicMaterial({
-      map: disc,
-      color: '#ffe7a8',
-      transparent: true,
-      opacity: 0.07,
-      blending: AdditiveBlending,
-      depthWrite: false,
-    }),
+    new CircleGeometry(LANTERN_OVERSCAN, 96),
+    new MeshBasicMaterial({ map: lanternTexture(), transparent: true, depthWrite: false }),
   );
   lantern.rotation.x = -Math.PI / 2;
   lantern.renderOrder = 5;
@@ -267,6 +270,8 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
   );
   path.renderOrder = 7;
   scene.add(path);
+
+  const areas: Area[] = [];
 
   // --- the focus layer's trajectory choice ----------------------------------------------------------
   const focus = { k: 0, prev: -1, since: 0, last: -Infinity };
@@ -328,11 +333,48 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
   };
 
   // --- one frame ------------------------------------------------------------------------------------
-  function markersOf(view: SceneView): { shown: Marker[]; folded: Record<NodeId, Set<CatId>> } {
+  /**
+   * The area each lantern observes (06 §2): outdoors a disc of the sight range around the
+   * protagonist; indoors, where walls stop sight (03 §4), the circle around the places it sees.
+   */
+  function observedArea(view: SceneView, l: SceneView['lanterns'][number]): Area {
+    const node = view.frame.cats[l.cat]?.[0]?.node;
+    const seen = view.frame.lanterns.find((x) => x.cat === l.cat)?.seen ?? [];
+    if (!node || !c.node[node]?.indoor || seen.length === 0)
+      return { x: l.pos[0], z: l.pos[1], r: l.sightM };
+    const pts = seen.flatMap((id) => {
+      const p = c.node[id]?.pos;
+      return p ? [{ p, half: placeSize(id) / 2 }] : [];
+    });
+    if (pts.length === 0) return { x: l.pos[0], z: l.pos[1], r: l.sightM };
+    const x = pts.reduce((a, q) => a + q.p[0], 0) / pts.length;
+    const z = pts.reduce((a, q) => a + q.p[1], 0) / pts.length;
+    const r =
+      Math.max(...pts.map((q) => Math.hypot(q.p[0] - x, q.p[1] - z) + q.half * Math.SQRT2)) + 1;
+    return { x, z, r: Math.min(r, l.sightM) };
+  }
+
+  /** Each lantern's observed area, eased toward where it should be (a door, the rain). */
+  function areasOf(view: SceneView, dtMs: number): Area[] {
+    const k = 1 - Math.exp(-dtMs / AREA_EASE_MS);
+    return view.lanterns.map((l, i) => {
+      const goal = observedArea(view, l);
+      const was = areas[i];
+      const now = was
+        ? { x: lerp(was.x, goal.x, k), z: lerp(was.z, goal.z, k), r: lerp(was.r, goal.r, k) }
+        : goal;
+      areas[i] = now;
+      return now;
+    });
+  }
+
+  function markersOf(
+    view: SceneView,
+    lit: readonly Area[],
+  ): { shown: Marker[]; folded: Record<NodeId, Set<CatId>> } {
     const { frame, next, frac } = view;
-    const lit = view.lanterns.map((l) => ({ ...l, r2: l.sightM * l.sightM }));
     const inLantern = (x: number, z: number) =>
-      lit.some((l) => (l.pos[0] - x) ** 2 + (l.pos[1] - z) ** 2 <= l.r2);
+      lit.some((l) => (l.x - x) ** 2 + (l.z - z) ** 2 <= l.r * l.r);
     const held = new Set(view.held?.cats ?? []);
     const all: Marker[] = [];
     for (const def of c.cats) {
@@ -345,7 +387,7 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
           x = lerp(x, after[0].pos[0], frac);
           z = lerp(z, after[0].pos[1], frac);
         }
-        const protagonist = lit.some((l) => l.cat === def.id);
+        const protagonist = view.lanterns.some((l) => l.cat === def.id);
         const d = Math.hypot(x - target.x, z - target.z);
         const score = protagonist
           ? 4 * PPM
@@ -427,30 +469,31 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
     }
     placeCamera();
 
-    // places, fog, labels
+    // places, labels; the fog is everything outside the lanterns (fogPass.ts)
+    const lit = areasOf(view, dtMs);
+    const inLantern = (x: number, z: number) =>
+      lit.some((l) => (l.x - x) ** 2 + (l.z - z) ** 2 <= l.r * l.r);
     for (const n of c.nodes) {
       const p = places[n.id];
       const open = revealed.has(n.id);
       if (p)
         p.mesh.material.color.copy(p.base).lerp(new Color('#ffffff'), seen.has(n.id) ? 0.18 : 0);
-      const f = fog[n.id];
-      if (f) f.visible = !open;
-      const r = rainOver[n.id];
-      if (r) r.visible = open;
       const label = labels[`node:${n.id}`];
       if (label) {
+        // an unrevealed place's name is not known yet; names outside the lantern are in the fog
         label.visible = open && zoom >= LABELS_FROM_ZOOM;
+        label.element.classList.toggle('fogged', !inLantern(n.pos[0], n.pos[1]));
         const text = view.labels[`node:${n.id}`] ?? n.id;
         if (label.element.textContent !== text) label.element.textContent = text;
       }
     }
     for (const e of c.edges) {
       const m = edges[e.id];
-      if (m) m.visible = revealed.has(e.a) || revealed.has(e.b);
+      if (m) m.visible = true;
       const bar = barriers[e.id];
       if (bar) {
         const p = (view.frame.closed[e.id] ?? 0) / PPM;
-        bar.visible = p > 0 && (revealed.has(e.a) || revealed.has(e.b));
+        bar.visible = p > 0;
         bar.material.opacity = p;
       }
     }
@@ -467,15 +510,15 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
     if (motion) rain.offset.set(time * 0.4, time * 1.6);
 
     // the lantern
-    const l = view.lanterns[0];
+    const l = lit[0];
     lantern.visible = l !== undefined;
     if (l) {
-      lantern.position.set(l.pos[0], 0.45, l.pos[1]);
-      lantern.scale.setScalar(Math.max(1, l.sightM));
+      lantern.position.set(l.x, 0.45, l.z);
+      lantern.scale.setScalar(Math.max(1, l.r));
     }
 
     // cats: markers within the display budget, clusters, the focus layer
-    const { shown, folded } = markersOf(view);
+    const { shown, folded } = markersOf(view, lit);
     let focusOn = view.settings.focusLayer && motion && view.samples !== null;
     const K = c.tuning.render.focusSamples;
     if (focusOn) {
@@ -554,6 +597,7 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
       if (!p) continue;
       const o = cssAt('cluster', ci++);
       o.element.textContent = `+${cats.size}`;
+      o.element.classList.toggle('fogged', !inLantern(p[0], p[1]));
       o.position.set(p[0] + placeSize(node) / 2, 0.6, p[1] - placeSize(node) / 2);
     }
     hideFrom('cluster', ci);
@@ -606,7 +650,7 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
       canvasEl.dataset['focus'] = focusOn ? String(focus.k) : 'off';
       canvasEl.dataset['pulse'] = motion ? 'on' : 'off';
     }
-    gl.render(scene, camera);
+    fogPass.render(gl, scene, camera, lit);
     css.render(scene, camera);
   }
 
@@ -656,6 +700,8 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
     resize(width, height) {
       size = { w: Math.max(1, width), h: Math.max(1, height) };
       gl?.setSize(size.w, size.h, false);
+      const ratio = gl?.getPixelRatio() ?? 1;
+      fogPass.setSize(size.w * ratio, size.h * ratio);
       css.setSize(size.w, size.h);
       placeCamera();
     },
@@ -668,6 +714,7 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
         canvasEl.removeEventListener('wheel', onWheel);
       }
       css.domElement.remove();
+      fogPass.dispose();
       gl?.dispose();
       gl = null;
     },

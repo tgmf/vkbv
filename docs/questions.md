@@ -751,4 +751,17 @@ Where: `06` §8
 Answer: Tagir, 2026-11-25: L is shuttle forward only. `06` §8 updated: G holds Gaze; the lure is held
 from its button (or Tab to it), with no letter key of its own.
 
+## M5-5 — The lantern and the fog as the viewer draws them            (status: answered, spec updated)
+Where: `06` §2 (lantern, places); glossary "Fog" (two rows: Waves and Map)
+Answer: Tagir, 2026-11-25, after reviewing M5:
+- The lantern is the space around a protagonist that is observed (uncovered), not a light source,
+  and the area does not fade. Its outline may carry a small decorative fade, as in a real-time
+  strategy game.
+- The fog blurs everything behind it. Asked which fog (outside the lantern, or the unrevealed map):
+  "it is the same".
+Built: everything outside the lanterns is drawn blurred (a post-processing pass); the opaque blocks over
+unrevealed places are gone; unrevealed places keep their names and objects hidden. Indoors the lantern
+is the circle around the places the protagonist sees (walls stop sight, `03` §4). `06` §2 and the
+glossary's second "Fog" row updated.
+
 <!-- Gate notes and answers go above this line. -->

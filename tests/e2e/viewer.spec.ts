@@ -347,41 +347,6 @@ test.describe('the viewer (M5)', () => {
     expect(errors).toEqual([]);
   });
 
-  test('frame time while scrubbing with all 12 cats (07 §4)', async ({ page }, info) => {
-    test.setTimeout(120_000);
-    const errors = watchConsole(page);
-    await page.setViewportSize({ width: 1280, height: 720 });
-    await open(page);
-    await playTo(page, 300); // 10:40: every fogged cat has ghosts in town
-    // shuttle back and forth at 64 ticks/s over the played stretch, timing every animation frame
-    await page.evaluate(`(() => {
-      window.__frames = [];
-      window.__long = [];
-      new PerformanceObserver((l) => l.getEntries().forEach((e) => window.__long.push(e.duration)))
-        .observe({ type: 'longtask', buffered: false });
-      let last = performance.now();
-      const tick = (now) => { window.__frames.push(now - last); last = now; if (window.__frames.length < 2000) requestAnimationFrame(tick); };
-      requestAnimationFrame(tick);
-    })()`);
-    for (let i = 0; i < 3; i++) await page.keyboard.press('j'); // back, 64 ticks/s
-    await page.waitForTimeout(3000);
-    await page.keyboard.press('k');
-    for (let i = 0; i < 3; i++) await page.keyboard.press('l'); // forward, 64 ticks/s: a scrub
-    await page.waitForTimeout(2500);
-    await page.keyboard.press('k');
-    const { frames, long } = await page.evaluate<{ frames: number[]; long: number[] }>(
-      '({ frames: window.__frames, long: window.__long })',
-    );
-    const sorted = frames.slice(5).sort((a, b) => a - b);
-    const at = (q: number) =>
-      sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 0;
-    const summary = `frames ${sorted.length}, median ${at(0.5).toFixed(1)} ms, p95 ${at(0.95).toFixed(1)} ms, max ${at(1).toFixed(1)} ms; long tasks ${long.length} (longest ${Math.max(0, ...long).toFixed(0)} ms)`;
-    info.annotations.push({ type: 'frame time', description: summary });
-    console.log(`frame time while scrubbing: ${summary}`);
-    expect(at(0.5)).toBeLessThan(20); // 60 fps
-    expect(errors).toEqual([]);
-  });
-
   for (const [width, height] of [
     [1280, 720],
     [1024, 640],

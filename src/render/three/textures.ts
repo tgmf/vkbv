@@ -1,5 +1,5 @@
-// Canvas-drawn textures for the graybox (06 §2): cut-out cat silhouettes in their `look` colours, a
-// soft disc for the lantern and glows, rain streaks, barrier stripes. Placeholder art only.
+// Canvas-drawn textures for the graybox (06 §2): cut-out cat silhouettes in their `look` colours,
+// rain streaks, barrier stripes. Placeholder art only.
 import { CanvasTexture, RepeatWrapping, SRGBColorSpace } from 'three';
 
 function canvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
@@ -75,15 +75,34 @@ export function catTexture(look: Readonly<Record<string, unknown>>): CanvasTextu
   return texture(el);
 }
 
-/** A white disc fading to transparent: the lantern, glows, focus halos. */
-export function softDisc(): CanvasTexture {
-  const [el, g] = canvas(128, 128);
-  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+/**
+ * The lantern's outline (06 §2): an even, faint tint inside, then a crisp edge with a narrow
+ * decorative fade on both sides, as a vision circle in a real-time strategy game. The area itself does
+ * not fade.
+ */
+export function lanternTexture(): CanvasTexture {
+  const [el, g] = canvas(512, 512);
+  const grad = g.createRadialGradient(256, 256, 0, 256, 256, 256);
+  grad.addColorStop(0, 'rgba(207,216,227,0.04)');
+  grad.addColorStop(0.93, 'rgba(207,216,227,0.04)');
+  grad.addColorStop(0.968, 'rgba(207,216,227,0.14)');
+  grad.addColorStop(0.975, 'rgba(207,216,227,0.5)');
+  grad.addColorStop(0.982, 'rgba(207,216,227,0.14)');
+  grad.addColorStop(1, 'rgba(207,216,227,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 512, 512);
+  return texture(el);
+}
+
+/** The fog's mask of a lantern (fogPass.ts): white, opaque inside, fading out over its last few per cent. */
+export function lanternMaskTexture(): CanvasTexture {
+  const [el, g] = canvas(256, 256);
+  const grad = g.createRadialGradient(128, 128, 0, 128, 128, 128);
   grad.addColorStop(0, 'rgba(255,255,255,1)');
-  grad.addColorStop(0.7, 'rgba(255,255,255,0.6)');
+  grad.addColorStop(0.95, 'rgba(255,255,255,1)');
   grad.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = grad;
-  g.fillRect(0, 0, 128, 128);
+  g.fillRect(0, 0, 256, 256);
   return texture(el);
 }
 

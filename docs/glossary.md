@@ -269,7 +269,7 @@ Terms borrowed from research on curated emergent narrative (Ryan; Kreminski's Fe
 | Region | A seamless area from room to city scale, reached by long journeys. Opened regions are islands on the world map. | Full game. The ship is a moving region. |
 | Zoom tier | One of four views: room, street, district or city, world map. Presentation only: zoom never changes what collapses. | Full game. |
 | World map | The illustrated top view: opened regions, regions in fog, travel routes. | Full game. |
-| Fog | Unrevealed map. Cards can't be played there. | Opposite of revealed map. |
+| Fog | The same fog as under Waves: everything outside the lanterns, drawn blurred. A place not yet in the revealed map is in it like any other; its name and objects stay hidden and cards can't be played there. | Tagir, 2026-11-25: one fog, not two (`docs/questions.md` M5-5). Opposite of the lantern; "not revealed" is the revealed map's opposite. |
 | Viewport | What is on screen. Free to pan anywhere; pure presentation that shows the wave and never collapses anything. |  |
 | Cluster | Overlapping cats drawn as one marker; the focused cat or the card's target draws on top. |  |
 | Salience | The ranking that decides which cats the map shows at rest, within a display budget. |  |
