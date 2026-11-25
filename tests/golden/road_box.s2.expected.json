@@ -1,39 +1,47 @@
 {
  "seed": 2,
- "vettedSeed": 2,
+ "vettedSeed": 3762896133,
  "end": {
-  "kind": "fray",
-  "tick": 1130
+  "kind": "anchor",
+  "tick": 790
  },
- "watchedHash": "35556e93",
+ "watchedHash": "4273be0b",
  "checkpoints": {
-  "0": "823fcd47",
-  "60": "e4db730c",
-  "120": "140f7751",
-  "180": "3ef3b2fb",
-  "240": "7c81901d",
-  "300": "6eef4976",
-  "360": "e2b47eec",
-  "420": "56a62956",
-  "480": "5c28d8e2",
-  "540": "358804ac",
-  "600": "368761b3",
-  "660": "1df510c9",
-  "720": "71236871",
-  "780": "a29a8ee4",
-  "840": "63cd2d0e",
-  "900": "243927e2",
-  "960": "5745f13b",
-  "1020": "10a8c0e4",
-  "1080": "4793317f"
+  "0": "67199624",
+  "60": "b4341502",
+  "120": "a48e2bf7",
+  "180": "4cab26f4",
+  "240": "8f64599e",
+  "300": "3fce3a94",
+  "360": "f60a5fe2",
+  "420": "08cae08a",
+  "480": "3cfc99a4",
+  "540": "cbc9a819",
+  "600": "2e9241db",
+  "660": "33624737",
+  "720": "faabedab",
+  "780": "c1aadba2"
  },
  "watched": {
   "door_lure.home": 0,
-  "rain_started": 678,
+  "crew_chatter.tale": 71,
+  "crew_chatter.overheard": 72,
+  "crew_chatter.scoffed": 82,
+  "rain_started": 656,
   "door_lure.at_door": 715,
-  "door_lure.back_inside": 730,
-  "ogryzok_trade.ignores": 730,
-  "boat_sails": 1130
+  "door_lure.out": 725,
+  "marti_out_in_rain": 728,
+  "ogryzok_trade.sizing_up": 729,
+  "blocked_road.facing": 734,
+  "blocked_road.toward_steps": 735,
+  "ogryzok_trade.ignores": 735,
+  "marti_on_beach": 743,
+  "marti_soaked": 749,
+  "chain_on_beach.noticed": 750,
+  "chain_on_beach.following": 755,
+  "under_the_boat.hidden": 763,
+  "under_the_boat.tail_spotted": 766,
+  "under_the_boat.meeting": 790
  },
  "fog": {
   "0": {
@@ -42,94 +50,69 @@
    "states": 11
   },
   "60": {
-   "cases": 3,
+   "cases": 2,
    "live": 1,
-   "states": 553
+   "states": 365
   },
   "120": {
-   "cases": 3,
+   "cases": 2,
    "live": 1,
-   "states": 617
+   "states": 397
   },
   "180": {
-   "cases": 3,
+   "cases": 2,
    "live": 1,
-   "states": 550
+   "states": 293
   },
   "240": {
    "cases": 2,
    "live": 1,
-   "states": 404
+   "states": 416
   },
   "300": {
    "cases": 2,
    "live": 1,
-   "states": 376
+   "states": 310
   },
   "360": {
    "cases": 2,
    "live": 1,
-   "states": 364
+   "states": 299
   },
   "420": {
    "cases": 2,
    "live": 1,
-   "states": 410
+   "states": 336
   },
   "480": {
    "cases": 2,
    "live": 1,
-   "states": 352
+   "states": 298
   },
   "540": {
    "cases": 2,
    "live": 1,
-   "states": 355
+   "states": 298
   },
   "600": {
    "cases": 2,
    "live": 1,
-   "states": 368
+   "states": 349
   },
   "660": {
    "cases": 2,
    "live": 1,
-   "states": 374
+   "states": 391
   },
   "720": {
    "cases": 2,
    "live": 1,
-   "states": 584
+   "states": 567
   },
   "780": {
-   "cases": 2,
-   "live": 1,
-   "states": 436
-  },
-  "840": {
-   "cases": 2,
-   "live": 1,
-   "states": 447
-  },
-  "900": {
-   "cases": 2,
-   "live": 1,
-   "states": 411
-  },
-  "960": {
-   "cases": 2,
-   "live": 1,
-   "states": 402
-  },
-  "1020": {
-   "cases": 2,
-   "live": 1,
-   "states": 329
-  },
-  "1080": {
-   "cases": 2,
-   "live": 1,
-   "states": 258
+   "cases": 1,
+   "live": 2,
+   "states": 73
   }
  }
 }

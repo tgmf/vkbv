@@ -84,9 +84,3 @@ export function vet(
   }
   return { seed: requested, verdicts };
 }
-
-/** The content with `vetting.fog`'s coarser knobs, for live vetting of a typed or bookmarked seed. */
-export const vettingContent = (c: Content): Content => ({
-  ...c,
-  tuning: { ...c.tuning, fog: { ...c.tuning.fog, ...c.tuning.vetting.fog } },
-});

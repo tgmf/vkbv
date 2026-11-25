@@ -10,7 +10,7 @@ import { canonicalJson, hashState } from '../../src/sim/hash';
 import { extendEdge, rerunAll, type Timeline } from '../../src/sim/recompute';
 import { hash32 } from '../../src/sim/rng';
 import type { Content } from '../../src/sim/types';
-import { vet, vettingContent } from '../../src/sim/vet';
+import { vet } from '../../src/sim/vet';
 import { ch1 } from '../sim/helpers';
 
 /** Ticks of the readable checkpoint hashes and fog sizes (07 §2's example). */
@@ -21,7 +21,7 @@ export const sets = parsePinSets(PINSETS_FILE, ch1);
 /** The requested seed vetted live, with the recorded solutions of `vetting.solutions` (04 §2). */
 export function vetted(c: Content, requested: number): number {
   const solutions = c.tuning.vetting.solutions.map((name) => sets[name] ?? []);
-  return vet(vettingContent(c), requested, solutions).seed;
+  return vet(c, requested, solutions).seed;
 }
 
 /** One playback, as `07` §2's expected file. */
@@ -69,17 +69,28 @@ const hex = (h: number) => h.toString(16).padStart(8, '0');
 export function goldenPlaybacks(requested: number): void {
   describe(`golden playbacks, requested seed ${requested}`, () => {
     let seed = 0;
+    const played = new Map<string, string>();
+    const play = (name: string) => {
+      const out = played.get(name) ?? playback(ch1, name, requested, seed);
+      played.set(name, out);
+      return out;
+    };
     beforeAll(() => {
       seed = vetted(ch1, requested);
     }, 300_000);
     it.each(Object.keys(sets))(
       '%s',
       async (name) => {
-        await expect(playback(ch1, name, requested, seed)).toMatchFileSnapshot(
-          `./${name}.s${requested}.expected.json`,
-        );
+        await expect(play(name)).toMatchFileSnapshot(`./${name}.s${requested}.expected.json`);
       },
       300_000,
     );
+    // the minimum bar of 05 §5.2: a vetted seed is solvable as played (docs/questions.md M4-1)
+    it('solvable: a recorded solution reaches the anchor', () => {
+      const ends = ch1.tuning.vetting.solutions.map(
+        (name) => (JSON.parse(play(name)) as { end: { kind: string } }).end.kind,
+      );
+      expect(ends).toContain('anchor');
+    }, 300_000);
   });
 }

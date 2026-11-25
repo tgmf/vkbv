@@ -62,10 +62,6 @@
     "minPpm": 300000,
     "minStorylets": 2,
     "minStoryletSharePerMille": 100,
-    "fog": {
-      "minStatePpm": 20000,
-      "bands": 2
-    },
     "maxCandidates": 20
   },
   "player": {

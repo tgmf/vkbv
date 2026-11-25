@@ -5,8 +5,9 @@ import { loadChapter } from '../../src/content/load';
 import { fogSetup } from '../../src/sim/fog';
 import { hash32 } from '../../src/sim/rng';
 import type { Content, Pin } from '../../src/sim/types';
-import { checkSeed, vet, vettingContent } from '../../src/sim/vet';
-import { ch1, TINY_DIR, tuning } from './helpers';
+import { wholeDayRun } from '../../src/sim/recompute';
+import { checkSeed, vet } from '../../src/sim/vet';
+import { TINY_DIR, tuning } from './helpers';
 
 /** The tiny world, its vetting asking only for the hero out (it has no crew, rain or Rokko). */
 const tinyVet = (more: Partial<typeof tuning.vetting> = {}): Content =>
@@ -91,10 +92,13 @@ describe('seed vetting (04 §2)', () => {
     expect(v.pass).toBe(v.storylets >= strict.storylets.length);
   });
 
-  it('live vetting uses the coarser vetting.fog knobs', () => {
-    const live = vettingContent(ch1);
-    expect(live.tuning.fog.minStatePpm).toBe(ch1.tuning.vetting.fog.minStatePpm);
-    expect(live.tuning.fog.bands).toBe(ch1.tuning.vetting.fog.bands);
-    expect(live.tuning.fog.stepTicks).toBe(ch1.tuning.fog.stepTicks);
+  it('a vetted seed is solved by a recorded solution played at the game’s knobs (M4-1)', () => {
+    const c = tinyVet();
+    for (const requested of [1, 2, 3]) {
+      const { seed, verdicts } = vet(c, requested, [solution]);
+      if (!verdicts.at(-1)?.pass) continue; // none passed: the requested seed is kept
+      const w = wholeDayRun(fogSetup(c, seed), solution);
+      expect(w.lantern.sim.anchor.reachedAt).not.toBeNull();
+    }
   });
 });

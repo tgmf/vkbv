@@ -12,7 +12,7 @@ import { runHistory } from '../../src/sim/history';
 import { advance, initialWave } from '../../src/sim/lantern';
 import { rerunAll, type RerunRequest } from '../../src/sim/recompute';
 import type { Frame, Frontier, Pin, RecomputeResult } from '../../src/sim/types';
-import { vet, vettingContent } from '../../src/sim/vet';
+import { vet } from '../../src/sim/vet';
 import { TINY_DIR, tuning } from '../sim/helpers';
 
 const chapter = readChapterDir(TINY_DIR);
@@ -168,7 +168,7 @@ describe('the worker host (02 §3)', () => {
     );
   });
 
-  it('vets a requested seed live with the coarser vetting.fog knobs (04 §2)', () => {
+  it('vets a requested seed live with the game’s own knobs (04 §2, docs/questions.md M4-1)', () => {
     const vetting = { ...tuning.vetting, solutions: ['solution'], requireFacts: ['heroOut'] };
     const h = harness({ vetting });
     const c = loadChapter(chapter, { ...tuning, vetting });
@@ -178,7 +178,7 @@ describe('the worker host (02 §3)', () => {
     ];
     for (const requested of [1, 3]) {
       const id = h.send({ kind: 'vet', requestedSeed: requested });
-      const { seed } = vet(vettingContent(c), requested, [solution]);
+      const { seed } = vet(c, requested, [solution]);
       expect(h.last(id)).toEqual({ kind: 'vetted', reqId: id, seed });
     }
     const bad = harness({ vetting: { ...vetting, solutions: ['nope'] } });

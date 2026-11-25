@@ -1,45 +1,41 @@
 {
  "seed": 2,
- "vettedSeed": 2,
+ "vettedSeed": 3762896133,
  "end": {
   "kind": "fray",
-  "tick": 1130
+  "tick": 1105
  },
- "watchedHash": "c177090a",
+ "watchedHash": "2de6077e",
  "checkpoints": {
-  "0": "823fcd47",
-  "60": "e4db730c",
-  "120": "140f7751",
-  "180": "3ef3b2fb",
-  "240": "ae9d4637",
-  "300": "65435a4c",
-  "360": "dbc4fd17",
-  "420": "10622faf",
-  "480": "7e3e3eee",
-  "540": "22db573e",
-  "600": "7ef5745f",
-  "660": "32a2549b",
-  "720": "cd50c1a1",
-  "780": "bc72de41",
-  "840": "b434a6b4",
-  "900": "99324201",
-  "960": "7bb34d25",
-  "1020": "d4febf9b",
-  "1080": "8f98d4fa"
+  "0": "67199624",
+  "60": "b4341502",
+  "120": "a48e2bf7",
+  "180": "4cab26f4",
+  "240": "385ebaf6",
+  "300": "bc0fba64",
+  "360": "b85d9335",
+  "420": "a228df8f",
+  "480": "f385f977",
+  "540": "111d9616",
+  "600": "ca6fee21",
+  "660": "6cbcd79a",
+  "720": "55651208",
+  "780": "4032907d",
+  "840": "33bc1287",
+  "900": "5ace2313",
+  "960": "b91cb982",
+  "1020": "91c2ca65",
+  "1080": "c0a49e73"
  },
  "watched": {
   "door_lure.home": 0,
-  "crew_chatter.tale": 230,
-  "crew_chatter.overheard": 231,
-  "crew_chatter.scoffed": 241,
-  "rain_started": 678,
+  "crew_chatter.tale": 71,
+  "crew_chatter.overheard": 72,
+  "crew_chatter.scoffed": 82,
+  "rain_started": 656,
   "door_lure.at_door": 1100,
   "door_lure.out": 1105,
-  "blocked_road.facing": 1114,
-  "blocked_road.toward_steps": 1120,
-  "marti_on_beach": 1128,
-  "chain_on_beach.noticed": 1130,
-  "boat_sails": 1130
+  "boat_sails": 1105
  },
  "fog": {
   "0": {
@@ -48,94 +44,94 @@
    "states": 11
   },
   "60": {
-   "cases": 3,
+   "cases": 2,
    "live": 1,
-   "states": 553
+   "states": 365
   },
   "120": {
-   "cases": 3,
+   "cases": 2,
    "live": 1,
-   "states": 617
+   "states": 397
   },
   "180": {
-   "cases": 3,
+   "cases": 2,
    "live": 1,
-   "states": 550
+   "states": 293
   },
   "240": {
    "cases": 2,
    "live": 1,
-   "states": 497
+   "states": 413
   },
   "300": {
    "cases": 2,
    "live": 1,
-   "states": 377
+   "states": 304
   },
   "360": {
    "cases": 2,
    "live": 1,
-   "states": 358
+   "states": 289
   },
   "420": {
    "cases": 2,
    "live": 1,
-   "states": 396
+   "states": 333
   },
   "480": {
    "cases": 2,
    "live": 1,
-   "states": 352
+   "states": 300
   },
   "540": {
    "cases": 2,
    "live": 1,
-   "states": 356
+   "states": 298
   },
   "600": {
    "cases": 2,
    "live": 1,
-   "states": 363
+   "states": 336
   },
   "660": {
    "cases": 2,
    "live": 1,
-   "states": 371
+   "states": 387
   },
   "720": {
    "cases": 2,
    "live": 1,
-   "states": 590
+   "states": 563
   },
   "780": {
    "cases": 2,
    "live": 1,
-   "states": 512
+   "states": 508
   },
   "840": {
    "cases": 2,
    "live": 1,
-   "states": 480
+   "states": 465
   },
   "900": {
    "cases": 2,
    "live": 1,
-   "states": 448
+   "states": 421
   },
   "960": {
    "cases": 2,
    "live": 1,
-   "states": 435
+   "states": 427
   },
   "1020": {
    "cases": 2,
    "live": 1,
-   "states": 352
+   "states": 402
   },
   "1080": {
    "cases": 2,
    "live": 1,
-   "states": 276
+   "states": 266
   }
  }
 }

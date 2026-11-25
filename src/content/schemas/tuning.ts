@@ -91,10 +91,6 @@ export const TuningSchema = z.strictObject({
       "The solutions' runs must enter at least the smaller of this many authored storylets… (04 §2)",
     ).min(0),
     minStoryletSharePerMille: int('… and this share of them, rounded up (04 §2)').min(0).max(1000),
-    fog: z.strictObject({
-      minStatePpm: ppm('Live vetting of a typed or bookmarked seed: fog.minStatePpm (04 §2)'),
-      bands: int('Live vetting of a typed or bookmarked seed: fog.bands (04 §2)').min(1),
-    }),
     maxCandidates: int('Seeds tried before vetting gives up').min(1),
   }),
   player: z.strictObject({

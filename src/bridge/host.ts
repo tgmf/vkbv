@@ -15,7 +15,7 @@ import { advance, type Wave } from '../sim/lantern';
 import { followedCats } from '../sim/readers';
 import { extendEdge, rerun, type Timeline } from '../sim/recompute';
 import type { Frame, Pin } from '../sim/types';
-import { vet, vettingContent } from '../sim/vet';
+import { vet } from '../sim/vet';
 import { inspectView } from './inspect';
 import type { MainToWorker, WorkerToMain } from './protocol';
 
@@ -135,11 +135,11 @@ export function createHost(files: HostFiles, deps: HostDeps): Host {
     if (!c) return fail(msg.reqId, 'not initialised');
     switch (msg.kind) {
       case 'vet': {
-        // live vetting of a typed or bookmarked seed, with the coarser fog knobs (04 §2)
+        // live vetting of a typed or bookmarked seed, with the game's own knobs (04 §2, M4-1)
         const missing = c.tuning.vetting.solutions.filter((name) => !pinsets[name]);
         if (missing.length > 0) return fail(msg.reqId, `unknown pin sets: ${missing.join(', ')}`);
         const solutions = c.tuning.vetting.solutions.map((name) => pinsets[name] ?? []);
-        const { seed } = vet(vettingContent(c), msg.requestedSeed, solutions);
+        const { seed } = vet(c, msg.requestedSeed, solutions);
         return post({ kind: 'vetted', reqId: msg.reqId, seed });
       }
       case 'recompute':

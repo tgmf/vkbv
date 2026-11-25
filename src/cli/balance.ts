@@ -7,7 +7,7 @@ import { advance, initialWave, type Wave } from '../sim/lantern';
 import { followedCats } from '../sim/readers';
 import { wholeDayRun } from '../sim/recompute';
 import type { Content, Pin } from '../sim/types';
-import { vet, vettingContent } from '../sim/vet';
+import { vet } from '../sim/vet';
 
 /** 05 §5.2's properties as data: the pin sets each reads, its threshold, and B5's four pins. */
 export const BALANCE = {
@@ -85,7 +85,7 @@ export function balanceSeed(
   requested: number,
 ): SeedBalance {
   const solutions = c.tuning.vetting.solutions.map((name) => sets[name] ?? []);
-  const seed = vet(vettingContent(c), requested, solutions).seed;
+  const seed = vet(c, requested, solutions).seed;
   const setup = fogSetup(c, seed);
   const pinsOf = (name: string) => {
     const pins = sets[name];
