@@ -9,25 +9,25 @@ import { PPM } from '../../src/sim/math';
 import { rangeBetween } from '../../src/sim/perception';
 import { catNode } from '../../src/sim/space';
 import type { Frame, Pin } from '../../src/sim/types';
-import { makeCtx, powerPin, tiny } from './helpers';
+import { cardPin, makeCtx, powerPin, tiny } from './helpers';
 
 const glow = powerPin('glow', 'home.room', 0);
 const gazePin = powerPin('gaze', 'street.c', 20);
 const PINS: Pin[] = [glow, gazePin];
 
-function framed(seed: number, until: number) {
+function framed(seed: number, until: number, pins: Pin[] = PINS) {
   const setup = fogSetup(tiny, seed);
   const waves: Wave[] = [initialWave(setup, ['hero'])];
   const frames: Frame[] = [];
   for (let t = 0; t < until; t++) {
     const w = waves[t];
     if (!w) throw new Error('no wave');
-    const next = advance(setup, w, PINS, ['hero']);
+    const next = advance(setup, w, pins, ['hero']);
     waves.push(next);
     const before = waves[t - 1];
     const pf = frames[t - 1];
     frames.push(
-      frameOf(setup, w, next, before && pf ? { wave: before, frame: pf } : undefined, PINS),
+      frameOf(setup, w, next, before && pf ? { wave: before, frame: pf } : undefined, pins),
     );
   }
   return { setup, waves, frames };
@@ -141,5 +141,34 @@ describe('frames for the viewer (06 §2)', () => {
       expect(JSON.parse(JSON.stringify(frames))).toEqual(frames);
     }
     expect(storylet).toBeGreaterThan(0);
+  });
+
+  it('give each pin before the tick its chance of having fired (06 §3: fizzled pins)', () => {
+    const crate = cardPin('magnet', { object: 'crate' }, 2); // hidden until crateShown: pending
+    const wrong = cardPin('nap_now', { cat: 'hero' }, 3); // bound to pal: never fires on the hero
+    const onPal = cardPin('poke', { cat: 'pal' }, 6); // a fogged cat: the fog's
+    const noBranch = cardPin('scare', { cat: 'pal' }, 7); // scare has no cat branch
+    const pins = [glow, crate, wrong, onPal, noBranch];
+    const { waves, frames } = framed(1, 40, pins);
+    for (const f of frames)
+      for (const pin of pins) if (pin.tick >= f.tick) expect(f.pins[pin.id]).toBeUndefined();
+    expect(frames[1]?.pins[glow.id]).toBe(PPM);
+    expect(frames[3]?.pins[crate.id]).toBe(0);
+    expect(frames[4]?.pins[wrong.id]).toBe(0);
+    for (const f of frames.slice(4)) expect(f.pins[wrong.id]).toBe(0);
+    // the crate's pin fires once the crate shows in the lantern
+    const shown = waves.findIndex((w) => w.lantern.sim.facts.includes('crateShown'));
+    for (const f of frames.slice(3))
+      expect(f.pins[crate.id]).toBe(
+        waves[f.tick]?.lantern.sim.pins[crate.id] === 'fired' ? PPM : 0,
+      );
+    if (shown < 0) expect(frames[39]?.pins[crate.id]).toBe(0);
+    // pins on a fogged cat are read from the fog: a valid one fires, one with no branch never does
+    const seen = frames.filter((f) => f.pins[onPal.id] !== undefined);
+    expect(seen.length).toBeGreaterThan(0);
+    for (const f of seen) expect(f.pins[onPal.id]).toBe(PPM);
+    const dead = frames.filter((f) => f.pins[noBranch.id] !== undefined);
+    expect(dead.length).toBeGreaterThan(0);
+    for (const f of dead) expect(f.pins[noBranch.id]).toBe(0);
   });
 });

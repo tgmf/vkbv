@@ -4,6 +4,7 @@
 // the player unchanged and the reason.
 import type { Content } from '../content/schemas/content';
 import { followedCats } from '../sim/readers';
+import { need } from '../sim/types';
 import type {
   CardId,
   CatId,
@@ -99,6 +100,38 @@ export function inspect(
 }
 
 /**
+ * Why a card cannot be played on a target at the playhead now (04 §3.1), or null when it can. The
+ * hand's targets (`targetsOf`) and `playCard` ask this one function.
+ */
+export function cardRefusal(
+  p: PlayerState,
+  view: PlayerView,
+  c: Content,
+  card: CardId,
+  target: Target,
+): Refusal | null {
+  const def = c.card[card];
+  if (!def || p.cards[card]?.zone !== 'hand') return 'cardNotInHand';
+  if (p.playhead > view.edge) return 'pastEdge';
+  const onSource = 'object' in target && def.special?.on === target.object;
+  const special = onSource && !p.specialsUsed.includes(card);
+  const branch = 'cat' in target ? def.on.cat : 'object' in target ? def.on.object : def.on.place;
+  if (!branch && !special) return onSource ? 'specialUsed' : 'noBranch';
+  if ('place' in target) return p.revealed.includes(target.place) ? null : 'placeNotRevealed';
+  if ('object' in target) return objectRefusal(c, p, view, target.object);
+  if (def.bound !== null && def.bound !== target.cat) return 'wrongCat';
+  const ghosts = frameAt(view, p.playhead)?.cats[target.cat] ?? [];
+  if (!ghosts.some((g) => g.p > 0 && p.revealed.includes(g.node))) return 'catNowhereRevealed';
+  return null;
+}
+
+/** Whether playing a card on a target is its special (04 §3.1): its own source object, the first time. */
+export const isSpecial = (p: PlayerState, c: Content, card: CardId, target: Target): boolean =>
+  'object' in target &&
+  c.card[card]?.special?.on === target.object &&
+  !p.specialsUsed.includes(card);
+
+/**
  * Play a card at the playhead (04 §3.1). On the card's own source object, the first time, the pin is
  * the special (the UI has shown its confirm step). Where the card goes depends on the played-card
  * rule; a unique card is spent under every rule.
@@ -109,24 +142,10 @@ export function playCard(
   c: Content,
   { card, target }: { card: CardId; target: Target },
 ): ActionResult {
-  const def = c.card[card];
-  if (!def || p.cards[card]?.zone !== 'hand') return no(p, 'cardNotInHand');
-  if (p.playhead > view.edge) return no(p, 'pastEdge');
-  const onSource = 'object' in target && def.special?.on === target.object;
-  const special = onSource && !p.specialsUsed.includes(card);
-  const branch = 'cat' in target ? def.on.cat : 'object' in target ? def.on.object : def.on.place;
-  if (!branch && !special) return no(p, onSource ? 'specialUsed' : 'noBranch');
-  if ('place' in target && !p.revealed.includes(target.place)) return no(p, 'placeNotRevealed');
-  if ('object' in target) {
-    const refused = objectRefusal(c, p, view, target.object);
-    if (refused) return no(p, refused);
-  }
-  if ('cat' in target) {
-    if (def.bound !== null && def.bound !== target.cat) return no(p, 'wrongCat');
-    const ghosts = frameAt(view, p.playhead)?.cats[target.cat] ?? [];
-    if (!ghosts.some((g) => g.p > 0 && p.revealed.includes(g.node)))
-      return no(p, 'catNowhereRevealed');
-  }
+  const refused = cardRefusal(p, view, c, card, target);
+  if (refused) return no(p, refused);
+  const def = need(c.card, card, 'card');
+  const special = isSpecial(p, c, card, target);
   const rule = c.tuning.player.playedCardRule;
   const zone: CardZone = def.unique ? 'spent' : rule;
   let player = withPin(p, (id, seq) => ({
@@ -147,6 +166,26 @@ export function playCard(
   return { player };
 }
 
+/**
+ * Why a power cannot be placed at the playhead now (04 §3.2), or null when it can; without a place,
+ * whether it can be held at all (the power buttons, 06 §5). `usePower` asks this one function.
+ */
+export function powerRefusal(
+  p: PlayerState,
+  view: PlayerView,
+  c: Content,
+  power: PowerId,
+  place: NodeId | null,
+): Refusal | null {
+  const def = c.power[power];
+  if (!def) return 'notAvailable';
+  if (p.playhead > view.edge) return 'pastEdge';
+  if (place !== null && !p.revealed.includes(place)) return 'placeNotRevealed';
+  if (!(frameAt(view, p.playhead)?.powers.includes(power) ?? false)) return 'notAvailable';
+  if (p.charge < def.cost) return 'chargeShort';
+  return null;
+}
+
 /** Place a power at the playhead (04 §3.2): paid now, never refunded. */
 export function usePower(
   p: PlayerState,
@@ -154,13 +193,10 @@ export function usePower(
   c: Content,
   { power, place }: { power: PowerId; place: NodeId },
 ): ActionResult {
-  const def = c.power[power];
-  if (!def) return no(p, 'notAvailable');
-  if (p.playhead > view.edge) return no(p, 'pastEdge');
-  if (!p.revealed.includes(place)) return no(p, 'placeNotRevealed');
-  if (!(frameAt(view, p.playhead)?.powers.includes(power) ?? false)) return no(p, 'notAvailable');
-  if (p.charge < def.cost) return no(p, 'chargeShort');
-  const player = withPin({ ...p, charge: p.charge - def.cost }, (id, seq) => ({
+  const refused = powerRefusal(p, view, c, power, place);
+  if (refused) return no(p, refused);
+  const cost = need(c.power, power, 'power').cost;
+  const player = withPin({ ...p, charge: p.charge - cost }, (id, seq) => ({
     id,
     seq,
     tick: p.playhead,

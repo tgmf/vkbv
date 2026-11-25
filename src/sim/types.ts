@@ -373,6 +373,12 @@ export interface Frame {
    * storylets), so the UI shows only lines the protagonist perceived.
    */
   lines: FrameLine[];
+  /**
+   * P(each pin has fired by this tick), for pins whose tick is before it (06 §3: a pin that fizzled is
+   * drawn hollow or half-filled): the lantern's pin state, or the fog's mixture over its cases for a pin
+   * the fog holds. A pin neither has seen yet is left out.
+   */
+  pins: Record<PinId, number>;
 }
 
 export interface FrameLine {

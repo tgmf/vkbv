@@ -196,7 +196,33 @@ export function frameOf(
     gazes: gazesAt(c, pins, sim.tick),
     lanterns: lanternsOf(c, wave),
     lines: linesOf(c, sim, next?.tickEvents ?? []),
+    pins: pinsFired(sim, wave.fog, pins),
   };
+}
+
+/**
+ * P(fired by this tick) of each pin before it (06 §3): 1 000 000 or 0 where the lantern holds the pin's
+ * state; otherwise the fog's P(fired) over its cases (03 §13.6); left out where neither has seen it.
+ */
+function pinsFired(sim: SimState, fog: Fog, pins: readonly Pin[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const pin of pins) {
+    if (pin.tick >= sim.tick) continue;
+    const live = sim.pins[pin.id];
+    if (live !== undefined) {
+      out[pin.id] = live === 'fired' ? PPM : 0;
+      continue;
+    }
+    if (!fog.cases.some((fc) => fc.q.pins[pin.id])) continue;
+    out[pin.id] = Math.min(
+      PPM,
+      fog.cases.reduce(
+        (a, fc) => a + Math.trunc(((fc.q.pins[pin.id]?.fired ?? 0) * fc.weight) / WAVE_TOTAL),
+        0,
+      ),
+    );
+  }
+  return out;
 }
 
 /** The lines of a step's events (06 §2): followed protagonists' voices, storylet states with text. */

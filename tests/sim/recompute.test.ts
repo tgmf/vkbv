@@ -230,7 +230,9 @@ describe('re-run properties (20 random pin sets)', () => {
       let w: Wave = near.edgeWave;
       while (w.lantern.sim.tick < to) {
         const next = advance(setup, w, pins, ['hero']);
-        expect(frameOf(setup, w, next)).toEqual(far.result.frames[w.lantern.sim.tick]);
+        expect(frameOf(setup, w, next, undefined, pins)).toEqual(
+          far.result.frames[w.lantern.sim.tick],
+        );
         w = next;
       }
       expect(hashState(w.lantern.sim)).toBe(hashState(far.edgeWave.lantern.sim));
@@ -308,7 +310,17 @@ describe('re-run invariants (03 §18)', () => {
     const pins = [glowAt(0)];
     const a = rerunAll(setup, null, req(pins, open(setup)));
     const b = rerunAll(setup, null, req([...pins, ...invalid], open(setup)));
-    expect(b.result.frames).toEqual(a.result.frames);
+    // a frame's pin status of the invalid pins is their fizzle (06 §3); everything else is unchanged
+    const without = (f: Frame): Frame => {
+      const pins = Object.fromEntries(
+        Object.entries(f.pins).filter(([id]) => id !== 'x1' && id !== 'x2'),
+      );
+      return { ...f, pins };
+    };
+    expect(b.result.frames.map(without)).toEqual(a.result.frames);
+    expect(b.result.frames.slice(21).every((f) => f.pins['x1'] === 0 && f.pins['x2'] === 0)).toBe(
+      true,
+    );
     expect(b.result.end).toEqual(a.result.end);
     expect(canonicalJson(b.edgeWave.fog)).toBe(canonicalJson(a.edgeWave.fog));
     const strip = (w: Wave) => ({ ...w.lantern.sim, pins: {} });
