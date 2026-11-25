@@ -711,7 +711,7 @@ B6; (d) accept.
 Chosen for now: none; content and tuning unchanged.
 Answer: Tagir, 2026-11-25: accepted: Chapter 1 is placeholder content. B2–B7 stay measured (`npm run balance`, printed in each handoff) and are not enforced. What is enforced is a minimum bar: the chapter is solvable on every vetted seed, and every card of the demo deck visibly does something (`05` §5.2, `07` §1; tests `tests/golden/playback.s*.test.ts` "solvable" and `tests/sim/cards-visible.test.ts`). Spec updated. Measured again after the M4-1 fix (seeds vetted at the game's knobs): B2 34.0%, B3 66.0%, B4 94.0%, B5 no subset ≥ 50% (`tea_break` 44.0–44.9%, the rest 29.0–29.8%), B6 44 / 39 / 44 of 50, B7 50/50; a recorded solution solves every one of the 50 seeds (`docs/handoff/M4.md`, After review).
 
-## M4-5 — Short interrupts on fogged cats do not show            (status: open, to trace)
+## M4-5 — Short interrupts on fogged cats do not show            (status: answered, deferred to the playtests)
 Where: `03` §13.2 (interrupts in chains, counted in fog steps), §13.6 (pins on fogged targets);
 `tests/sim/cards-visible.test.ts`; found while probing for the minimum bar (M4)
 Measured (seed 4, card at 08:00 on each cat, frames of the next three hours compared with no card):
@@ -725,5 +725,6 @@ Options seen: (a) trace it (one fogged cat, a 3-tick interrupt at a step boundar
 tick) and fix the fog if it drops what a live cat would show; (b) leave it until playtests show the
 cards feel dead on other cats.
 Chosen for now: none; tracked with the other open fog issues.
-Answer:
+Answer: Tagir, 2026-11-25: (b), leave it until the playtests (M8, Gate A): trace it then if the cards feel dead on other cats.
+
 <!-- Gate notes and answers go above this line. -->

@@ -19,6 +19,9 @@ The unprimed lure brings Marti out by 19:00 on 34% of seeds 1–50 and the one-p
 is never taught (`docs/questions.md` M4-2). Tagir accepted this as placeholder content; Gate A
 should still note it per seed. A typed `?seed=` is vetted live at the game's own knobs: up to a
 few minutes before the day starts (M4-1); seeds from `vetted-seeds.json` start at once.
+Left for the playtests (Tagir, `docs/questions.md` M4-5): `tea_break` and `something_shiny` played on
+a cat other than Marti change nothing visible (their short interrupts may be lost in the fog). If
+players find those cards dead, trace M4-5 then.
 
 ## Build
 

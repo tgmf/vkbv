@@ -52,7 +52,7 @@ hand yet.
   check takes about 12 minutes. B2–B7 are measured by `npm run balance` and not enforced.
 - Open, bears on the ghosts: interrupts of 2–6 ticks on fogged cats (`tea_break`,
   `something_shiny`) do not show; they may be lost inside a 5-tick fog step (`docs/questions.md`
-  M4-5).
+  M4-5; Tagir: leave it until the playtests).
 
 ## Build
 
