@@ -284,6 +284,12 @@ test.describe('the viewer (M5)', () => {
     await page.keyboard.press('ArrowLeft');
     await expect.poll(() => playhead(page)).toBe(base + 2);
     expect(await watched(page)).toBe(seen);
+    // room to shuttle back: from tick 2 the shuttle reached the start and stopped before the second J
+    // on a slow machine (CI, software WebGL)
+    for (let i = 3; i <= 30; i++) {
+      await page.keyboard.press('ArrowRight');
+      await expect.poll(() => playhead(page)).toBe(base + i);
+    }
     await page.keyboard.press('j');
     await expect(speed).toHaveAttribute('data-dir', 'back');
     await page.keyboard.press('j');
