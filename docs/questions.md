@@ -827,9 +827,9 @@ Still open:
 1. When to build it: in M8 (the playtest build), or a milestone of its own before the playtests.
 2. Flicker: answered (Tagir, 2026-11-26): a pulse, not a flicker. Each marker draws a cycle length in a
    perceptible window (about 15–30 ticks, roughly 3–8 s) and shows for probability × cycle length in one
-   stretch. `06` §2 updated. Open within it: the cycle in real seconds or in game ticks (ticks freeze it
-   while paused and speed it up with the shuttle); opacity while lit (full, or still the probability); with
-   reduced motion, a still marker at opacity = probability.
+   stretch. The cycle is counted in ticks: "we only use ticks to count anything everywhere" (Tagir,
+   2026-11-26). `06` §2 updated. Proposed, not yet confirmed: full opacity while lit (time already shows the
+   probability); with reduced motion, a still marker at opacity = probability.
 3. "Almost" stories: does the marker only stand out, or does it also name the cards in hand that would
    advance it (and ring them while one is held)?
 4. Disruption warnings: what counts as disrupting (a forming match's chance falling below a knob, or by a
