@@ -1,6 +1,8 @@
 // Frame time while scrubbing with all 12 cats (07 §4: 60 fps, no long task over 50 ms), measured on
 // the GPU when the machine has one: headless Chromium otherwise draws WebGL with SwiftShader, a
-// software renderer, the worst case. The renderer used is recorded with the numbers.
+// software renderer, the worst case. The renderer used is recorded with the numbers. The 60 fps budget is
+// for a mid-range laptop (07 §4), so it is checked only on a hardware renderer: in software (CI's runners
+// have no GPU) the test records the numbers and checks the console alone (Tagir, 2026-11-26).
 import { expect, test, type Page } from '@playwright/test';
 
 test.use({
@@ -64,6 +66,7 @@ test('frame time while scrubbing with all 12 cats (07 §4)', async ({ page }, in
     `(longest ${Math.max(0, ...long).toFixed(0)} ms)`;
   info.annotations.push({ type: 'frame time', description: summary });
   console.log(`frame time while scrubbing: ${summary}`);
-  expect(at(0.5)).toBeLessThan(20); // 60 fps
+  const software = /SwiftShader|llvmpipe|software/i.test(renderer);
+  if (!software) expect(at(0.5)).toBeLessThan(20); // 60 fps
   expect(errors).toEqual([]);
 });
