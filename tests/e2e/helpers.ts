@@ -15,14 +15,37 @@ export function watchConsole(page: Page): string[] {
   return out;
 }
 
-/** Opens the game and waits for its first re-run (the edge at 0). */
-export async function openGame(page: Page, query = ''): Promise<void> {
+/**
+ * Opens a new game on `seed` (4, the first vetted seed, unless asked), skips the teaser and waits for
+ * the day's first re-run (the edge at 0). A seed not on the offline list is vetted live first: give
+ * `vetMs` for it.
+ */
+export async function openGame(page: Page, seed = 4, vetMs = 30_000): Promise<void> {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto(`./${query}`);
+  await page.goto(`./?seed=${seed}`);
   await expect(page.locator('html')).toHaveAttribute('data-sim', 'ready');
+  await skipTeaser(page, vetMs);
   await expect(page.getByTestId('scene')).toHaveAttribute('data-tick', '0', { timeout: 30_000 });
   await expect(page.getByTestId('playhead')).toHaveAttribute('data-streamed', '');
 }
+
+/** Skips the teaser with a key and waits until the day has started (vetting may take a while). */
+export async function skipTeaser(page: Page, vetMs = 30_000): Promise<void> {
+  await expect(page.getByTestId('teaser')).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.shell')).toHaveAttribute('data-phase', 'play', { timeout: vetMs });
+}
+
+/** Waits after a reload until the saved day has been re-run (no teaser). */
+export async function resumed(page: Page): Promise<void> {
+  await expect(page.locator('html')).toHaveAttribute('data-sim', 'ready');
+  await expect(page.locator('.shell')).toHaveAttribute('data-phase', 'play', { timeout: 120_000 });
+  await expect(page.getByTestId('playhead')).toHaveAttribute('data-streamed', '');
+}
+
+/** The save as the page holds it (04 §9). */
+export const saveOf = (page: Page): Promise<string | null> =>
+  page.evaluate(() => localStorage.getItem('acfw.ch1.v2'));
 
 export const num = async (page: Page, testId: string, attr: string): Promise<number> =>
   Number(await page.getByTestId(testId).getAttribute(attr));

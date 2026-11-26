@@ -132,6 +132,8 @@ test.describe.serial('interaction (M6), one day on seed 4', () => {
     await playToEnd(page);
     await expect(page.getByTestId('place-town.roadworks')).toHaveAttribute('data-revealed', 'true');
     await expect(page.getByTestId('strike')).toHaveCount(1);
+    // the end screen (M7) after the strike: keep playing
+    await page.getByTestId('keep-playing').click({ timeout: 20_000 });
 
     // back to the morning: the roadworks take cards now
     await zoomOut(page);
