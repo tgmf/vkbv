@@ -889,4 +889,16 @@ Answer: Tagir, 2026-11-26, on the M8 plan:
    same debug panel open on a page that shows no teaser and saves nothing, so experiments never overwrite
    a game; `?debug=1` and the backquote open the same panel on the normal page (`02` §6, `06` §10).
 
+## M8-2 — Frame time on Playwright's WebKit for Windows            (status: open)
+Where: `07` §4 (60 fps while scrubbing, checked on a hardware renderer, Tagir 2026-11-26); `tests/e2e/frame-time.spec.ts`, marked `QUESTION(M8-2)`
+Question: the local three-engine run (M8) measures the scrubbing frame time on Chromium (ANGLE D3D11,
+median 16.7 ms) and Firefox (median 8.3 ms), both on the GPU. Playwright's WebKit on Windows is not
+Safari: it reports its renderer as "Apple GPU" (masked), and draws at a median 70 ms. Whether that is
+software rendering cannot be read from the page.
+Options seen: (a) treat a masked renderer on a non-Mac as unknown: record, do not judge (chosen for now);
+(b) judge it like a hardware renderer (the test fails on Windows); (c) judge Safari only on a Mac, by hand
+before release.
+Chosen for now: (a), with (c) recommended before release.
+Answer:
+
 <!-- Gate notes and answers go above this line. -->

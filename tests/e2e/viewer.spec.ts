@@ -216,8 +216,11 @@ test.describe('the viewer (M5)', () => {
       `new Promise((r) => requestAnimationFrame(() => r(document.querySelector('[data-testid="scene"]').dataset.tick)))`,
     );
     expect(Number(drawn)).toBe(t);
-    // dragging forward again stops at where the drag began (the playhead), never past the edge
-    const past = await tickX(page, end + 30);
+    // dragging forward again stops at where the drag began (the playhead), never past the edge: to the
+    // bar's far end, inside the window (a synthetic move off the window reads as x 0 in Firefox)
+    const bar = await page.getByTestId('timeline').locator('svg').boundingBox();
+    if (!bar) throw new Error('no timeline');
+    const past = { x: Math.min((await tickX(page, end + 30)).x, bar.x + bar.width - 2), y: from.y };
     await page.mouse.move(past.x, past.y, { steps: 8 });
     await page.mouse.up();
     expect(await playhead(page)).toBe(end);

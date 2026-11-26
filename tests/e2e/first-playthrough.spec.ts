@@ -61,7 +61,12 @@ async function waitHint(page: Page, id: string): Promise<void> {
       async () => {
         const h = page.getByTestId('hint');
         const now = (await h.count()) > 0 ? await h.getAttribute('data-hint') : null;
-        if (now !== null && now !== id) await page.getByTestId('hint-dismiss').click();
+        // dismiss that hint only: the one waited for may replace it before the click lands (WebKit)
+        if (now !== null && now !== id)
+          await page
+            .locator(`[data-testid="hint"][data-hint="${now}"] [data-testid="hint-dismiss"]`)
+            .click({ timeout: 1000 })
+            .catch(() => undefined);
         return now;
       },
       { timeout: 90_000, intervals: [250] },
@@ -185,6 +190,7 @@ test('the first playthrough, seed 1', async ({ page }) => {
   const popup = page.waitForEvent('popup');
   await page.getByTestId('end-follow').click(); // `cta_click`
   await (await popup).close();
+  await page.bringToFront(); // the popup took the focus: some engines stop animation frames behind it
   // Rokko's thread, locked, with its line on hover
   await page.getByTestId('locked-thread').hover();
   await expect(page.getByTestId('locked-tip')).toBeVisible();

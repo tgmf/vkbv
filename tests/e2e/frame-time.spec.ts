@@ -24,8 +24,12 @@ test('frame time while scrubbing with all 12 cats (07 §4)', async ({ page }, in
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('./?dev=1&seed=49598663');
   await expect(page.getByTestId('scene')).toHaveAttribute('data-tick', '0', { timeout: 30_000 });
+  // the renderer: Firefox gives it as RENDERER (its debug extension is deprecated and warns); Chromium
+  // and WebKit say only "WebKit WebGL" there and give it through the extension
   const renderer = await page.evaluate<string>(
     `(() => { const gl = document.createElement('canvas').getContext('webgl2');
+      const r = gl.getParameter(gl.RENDERER);
+      if (!/WebKit WebGL/.test(r)) return r;
       const e = gl.getExtension('WEBGL_debug_renderer_info');
       return e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : 'unknown'; })()`,
   );
@@ -39,8 +43,9 @@ test('frame time while scrubbing with all 12 cats (07 §4)', async ({ page }, in
   await page.evaluate(`(() => {
     window.__frames = [];
     window.__long = [];
-    new PerformanceObserver((l) => l.getEntries().forEach((e) => window.__long.push(e.duration)))
-      .observe({ type: 'longtask', buffered: false });
+    if (PerformanceObserver.supportedEntryTypes.includes('longtask'))
+      new PerformanceObserver((l) => l.getEntries().forEach((e) => window.__long.push(e.duration)))
+        .observe({ type: 'longtask', buffered: false });
     let last = performance.now();
     const step = (now) => {
       window.__frames.push(now - last);
@@ -67,6 +72,10 @@ test('frame time while scrubbing with all 12 cats (07 §4)', async ({ page }, in
   info.annotations.push({ type: 'frame time', description: summary });
   console.log(`frame time while scrubbing: ${summary}`);
   const software = /SwiftShader|llvmpipe|software/i.test(renderer);
-  if (!software) expect(at(0.5)).toBeLessThan(20); // 60 fps
+  // QUESTION(M8-2): Playwright's WebKit on Windows is not Safari, and it masks its renderer as "Apple
+  // GPU", so hardware cannot be told from software there: it is recorded, not judged, like software
+  const unknown =
+    renderer === 'unknown' || (renderer === 'Apple GPU' && process.platform !== 'darwin');
+  if (!software && !unknown) expect(at(0.5)).toBeLessThan(20); // 60 fps
   expect(errors).toEqual([]);
 });

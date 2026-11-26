@@ -29,8 +29,15 @@ import {
 
 const OBJECTS = ['melmans_whistle', 'chipped_teacup', 'odds_jar', 'flea_comb', 'old_box'];
 const CREW = ['gavrila', 'bublik', 'pip', 'semyon'];
-/** A screenshot, and the page's heap and DOM size beside it (test-results/m6-memory.txt). */
+/**
+ * A screenshot, and the page's heap and DOM size beside it (test-results/m6-memory.txt). The sizes come
+ * from a CDP session, which only Chromium has; the other engines take the screenshot alone.
+ */
 const shot = async (page: Page, name: string) => {
+  if (page.context().browser()?.browserType().name() !== 'chromium') {
+    await page.screenshot({ path: `test-results/m6-${name}.png` });
+    return;
+  }
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Performance.enable');
   const { metrics } = await cdp.send('Performance.getMetrics');
