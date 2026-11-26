@@ -204,7 +204,14 @@ function Spark(props: { label: string; values: readonly number[]; at: number; te
       <figcaption>
         {props.label}: {props.values[props.at] ?? '—'} at the playhead · max {max()}
       </figcaption>
-      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={props.label}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        width="100%"
+        height={H}
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={props.label}
+      >
         <polyline points={points()} fill="none" stroke="currentColor" stroke-width="1" />
         <line x1={x()} x2={x()} y1="0" y2={H} stroke="#f2c230" stroke-width="1" />
       </svg>
