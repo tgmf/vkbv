@@ -146,6 +146,9 @@ export function frameOf(
 ): Frame {
   const { c } = setup;
   const sim = wave.lantern.sim;
+  // one read-only context for the frame's conditions (targets, forming stories), built when first needed
+  let ctx: Ctx | null = null;
+  const at = (): Ctx => (ctx ??= lanternCtx(setup, wave));
   const cats: Record<CatId, Ghost[]> = {};
   for (const { id } of c.cats) {
     if (wave.lantern.live.includes(id)) {
@@ -185,7 +188,7 @@ export function frameOf(
     rain: sim.weather.now === 'rain' ? PPM : 0,
     requirements,
     progress: progressOf(c, requirements),
-    ...targets(setup, wave),
+    ...targets(setup, at),
     effects: sim.effects.map((e) => ({
       pin: e.pin,
       kind: e.kind,
@@ -197,7 +200,7 @@ export function frameOf(
     lanterns: lanternsOf(c, wave),
     lines: linesOf(c, sim, next?.tickEvents ?? []),
     pins: pinsFired(sim, wave.fog, pins),
-    forming: formingOf(setup, wave),
+    forming: formingOf(setup, wave, at),
   };
 }
 
@@ -209,11 +212,10 @@ export function frameOf(
  * (read as the lantern reads the fog); a storylet waiting in a state whose every exit is shut (the
  * lure's `home` before any lure is near) is not forming.
  */
-function formingOf(setup: FogSetup, wave: Wave): Frame['forming'] {
+function formingOf(setup: FogSetup, wave: Wave, at: () => Ctx): Frame['forming'] {
   const { c } = setup;
   const chances = storyletChances(c, wave.fog, wave.lantern);
   const out: Frame['forming'] = [];
-  let ctx: Ctx | null = null;
   for (const sl of c.storylets) {
     const roles = wave.lantern.heldStorylets.includes(sl.id)
       ? fogRoles(wave.fog, sl.id)
@@ -224,9 +226,7 @@ function formingOf(setup: FogSetup, wave: Wave): Frame['forming'] {
     let best = 0;
     for (const [st, x] of Object.entries(chances[sl.id] ?? {})) {
       const exits = st === INACTIVE ? [] : (sl.states[st]?.exits ?? []);
-      ctx ??= lanternCtx(setup, wave);
-      const at = ctx;
-      if (!exits.some((e) => !e.gate || test(at, e.gate, scope))) continue;
+      if (!exits.some((e) => !e.gate || test(at(), e.gate, scope))) continue;
       p += x;
       if (x > best) {
         best = x;
@@ -366,10 +366,8 @@ function lanternCtx(setup: FogSetup, wave: Wave): Ctx {
  * `visibleWhen`, `availableWhen` and `when` read as conditions do in the lantern, the fog through its
  * reader (03 §13.3).
  */
-function targets(setup: FogSetup, wave: Wave): Pick<Frame, 'visible' | 'powers' | 'closed'> {
+function targets(setup: FogSetup, at: () => Ctx): Pick<Frame, 'visible' | 'powers' | 'closed'> {
   const { c } = setup;
-  let ctx: Ctx | null = null;
-  const at = (): Ctx => (ctx ??= lanternCtx(setup, wave));
   const visible: Record<string, number> = {};
   for (const o of c.objects) if (o.visibleWhen) visible[o.id] = chance(at(), o.visibleWhen, {});
   const powers = c.powers
