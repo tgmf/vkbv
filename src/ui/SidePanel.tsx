@@ -2,6 +2,7 @@
 // number), one button per power (disabled with the reason), the journal (discovered hooks with the line
 // that revealed them, inspected objects) and the line log, with drive keys highlighted (06 §2).
 import { createMemo, For, Show } from 'solid-js';
+import type { PowerDef } from '../content/schemas/chapter';
 import { holdRefusal } from '../player/targets';
 import { clockText } from './clock';
 import type { Game } from './game';
@@ -55,6 +56,10 @@ export function SidePanel(props: { game: Game; text: Text }) {
     return out;
   });
   const log = () => lines().slice(-LOG_MAX).reverse();
+  /** A power's button pulses with its hint (06 §7): `power` the lure's, `gaze` Gaze's. */
+  const pulses = (p: PowerDef) =>
+    (ui().hint === 'power' && p.effects.some((e) => e.prim === 'attract')) ||
+    (ui().hint === 'gaze' && p.effects.some((e) => e.prim === 'collapse'));
   const revealedBy = (hook: string) => lines().find((l) => l.shows === `voice:${hook}`);
 
   return (
@@ -64,6 +69,7 @@ export function SidePanel(props: { game: Game; text: Text }) {
         <div
           class="meter"
           data-testid="charge"
+          data-pulse={ui().hint === 'barely' ? 'true' : 'false'}
           data-charge={ui().player.charge}
           role="img"
           aria-label={props.text('ui.panel.charge')}
@@ -95,6 +101,7 @@ export function SidePanel(props: { game: Game; text: Text }) {
                 <button
                   type="button"
                   data-testid={`power-${p.id}`}
+                  data-pulse={pulses(p) ? 'true' : 'false'}
                   aria-pressed={held() ? 'true' : 'false'}
                   aria-describedby={`why-${p.id}`}
                   disabled={why() !== null || ui().pending !== null}
@@ -113,7 +120,11 @@ export function SidePanel(props: { game: Game; text: Text }) {
       <section>
         <h2>{props.text('ui.panel.journal')}</h2>
         <h3>{props.text('ui.panel.hooks')}</h3>
-        <ul class="journal" data-testid="journal-hooks">
+        <ul
+          class="journal"
+          data-testid="journal-hooks"
+          data-pulse={ui().hint === 'notready' ? 'true' : 'false'}
+        >
           <For each={ui().player.journal.hooks}>
             {(h) => (
               <li data-hook={h}>

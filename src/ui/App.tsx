@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, onSettled, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, onSettled, Show } from 'solid-js';
 import type { SimClient } from '../bridge/client';
 import type { Pin } from '../bridge/protocol';
 import type { TuningRow } from '../content/schemas';
@@ -7,9 +7,12 @@ import { handOf } from '../player/targets';
 import { BreakAlert } from './BreakAlert';
 import { clockText } from './clock';
 import { DevPanel } from './DevPanel';
+import { EndScreen, HintLine, TeaserCard } from './Flow';
 import type { Game } from './game';
 import { Hand } from './Hand';
+import { reducedMotion } from './motion';
 import { createSceneHandle } from './scene';
+import { Settings } from './Settings';
 import { SidePanel } from './SidePanel';
 import { Targets } from './Targets';
 import { Timeline } from './Timeline';
@@ -28,7 +31,6 @@ function switchLocale(next: Locale): void {
   setLocaleSignal(next);
   document.documentElement.lang = next;
 }
-
 export interface AppProps {
   tuningRows: TuningRow[];
   game: Game;
@@ -36,6 +38,8 @@ export interface AppProps {
   pinsets: Record<string, Pin[]>;
   seed: number;
   dev: boolean;
+  /** Starts a new day after the settings' confirm step. */
+  newGame: () => void;
 }
 
 /** The layout of 06 §1: top bar, world view, side panel, hand, the break alert and the timeline. */
@@ -53,10 +57,35 @@ export function App(props: AppProps) {
   const followName = () =>
     tr('ui.follow', { name: tr(c().cat[ui().player.followed[0] ?? '']?.nameKey ?? '') });
 
+  // the settings act on the whole page (06 §8): language, text size, reduced motion
+  createEffect(
+    () => ui().settings,
+    (s) => {
+      if (s.lang !== locale()) switchLocale(s.lang);
+      document.documentElement.style.fontSize = `${s.textSize}%`;
+      document.documentElement.dataset['motion'] = reducedMotion(s.reducedMotion)
+        ? 'reduce'
+        : 'full';
+    },
+  );
+
   onSettled(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
       const g = props.game;
+      if (e.key === '`') {
+        setDebug((d) => !d);
+        e.preventDefault();
+        return;
+      }
+      // any key skips the teaser (06 §9); nothing else acts before the day starts
+      if (ui().phase !== 'play') {
+        if (ui().phase === 'teaser') {
+          g.skipTeaser();
+          e.preventDefault();
+        }
+        return;
+      }
       // 1 to 9 hold the nth card in hand; G holds Gaze (06 §8, docs/questions.md M5-4)
       if (/^[1-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const card = handOf(ui().player, c())[Number(e.key) - 1];
@@ -80,9 +109,6 @@ export function App(props: AppProps) {
         return;
       }
       switch (e.key) {
-        case '`':
-          setDebug((d) => !d);
-          break;
         case 'g':
         case 'G': {
           const gaze = c().powers.find((p) => p.effects.some((x) => x.prim === 'collapse'));
@@ -125,17 +151,28 @@ export function App(props: AppProps) {
       }
       e.preventDefault();
     };
+    // a click anywhere skips the teaser too
+    const onPointer = () => {
+      if (ui().phase === 'teaser') props.game.skipTeaser();
+    };
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPointer);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPointer);
+    };
   });
 
   return (
-    <div class="shell">
+    <div class="shell" data-phase={ui().phase}>
       <header class="topbar">
         <h1 data-testid="town">{tr('ui.town')}</h1>
         <span class="clock" data-testid="clock">
           {clockText(c(), ui().playhead)}
         </span>
+        <Show when={!props.dev}>
+          <Settings game={props.game} text={tr} newGame={props.newGame} />
+        </Show>
         <div class="lang" role="group" aria-label={tr('ui.language')}>
           <For each={LOCALES}>
             {(l) => (
@@ -143,7 +180,10 @@ export function App(props: AppProps) {
                 type="button"
                 data-testid={`locale-${l}`}
                 aria-pressed={locale() === l ? 'true' : 'false'}
-                onClick={() => switchLocale(l)}
+                onClick={() => {
+                  switchLocale(l);
+                  props.game.setSettings({ lang: l });
+                }}
               >
                 {tr(`ui.locale.${l}`)}
               </button>
@@ -159,14 +199,16 @@ export function App(props: AppProps) {
           labels={labels}
           text={tr}
           followName={followName}
-          focusLayer={true}
         />
+        <TeaserCard game={props.game} text={tr} />
         <Targets game={props.game} scene={scene} text={tr} />
       </main>
       <SidePanel game={props.game} text={tr} />
       <Hand game={props.game} scene={scene} text={tr} />
       <BreakAlert game={props.game} text={tr} />
       <Timeline game={props.game} text={tr} />
+      <EndScreen game={props.game} text={tr} />
+      <HintLine game={props.game} text={tr} />
       <Show when={props.dev}>
         <DevPanel game={props.game} sim={props.sim} pinsets={props.pinsets} seed={props.seed} />
       </Show>

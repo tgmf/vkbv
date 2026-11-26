@@ -213,5 +213,6 @@
   "ui.end.locked_rokko": "Утро Рокко — отдельная нить. За ней пока нельзя пойти.",
   "ui.hint.inspect": "Присмотрись к вещам в квартире. Каждая что-то помнит.",
   "ui.hint.scroll": "Потяни таймлайн назад. Всё, чего ты не видел, ещё не решено.",
-  "ui.hint.fray": "Отсюда встреча уже невозможна. Что-то раньше должно измениться."
+  "ui.hint.fray": "Отсюда встреча уже невозможна. Что-то раньше должно измениться.",
+  "ui.end.line": "[[TODO writer: one line that closes Chapter 1 on the end screen, after the meeting under the boat]]"
 }

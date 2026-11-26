@@ -16,7 +16,7 @@ body {
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.4 var(--font);
+  font: 0.875rem/1.4 var(--font);
 }
 
 #app,
@@ -50,7 +50,7 @@ body {
 
 .topbar h1 {
   margin: 0;
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .lang button {
@@ -89,7 +89,7 @@ body {
 
 .debug h2 {
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .debug table {
@@ -120,7 +120,7 @@ body {
 }
 
 .topbar .clock {
-  font: 16px/1 var(--mono);
+  font: 1rem/1 var(--mono);
   margin-right: auto;
 }
 
@@ -172,7 +172,7 @@ button[aria-pressed='true'] {
 }
 
 .scene-label {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--muted);
   white-space: nowrap;
 }
@@ -184,14 +184,14 @@ button[aria-pressed='true'] {
 }
 
 .scene-name {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--text);
   text-shadow: 0 1px 2px #000;
 }
 
 .scene-cluster {
-  font-size: 14px;
+  font-size: 0.875rem;
   padding: 0 6px;
   border-radius: 10px;
   background: rgb(0 0 0 / 0.6);
@@ -213,7 +213,7 @@ button[aria-pressed='true'] {
   border-radius: 10px;
   background: #f4f1e8;
   color: #1b1d22;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .follow {
@@ -233,13 +233,13 @@ button[aria-pressed='true'] {
 
 .side h2 {
   margin: 8px 0 4px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 
 .side h3 {
   margin: 4px 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: normal;
   color: var(--muted);
 }
@@ -282,7 +282,7 @@ button[aria-pressed='true'] {
 
 .card .text,
 .card .hint {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
@@ -348,7 +348,7 @@ button[aria-pressed='true'] {
 }
 
 .power .why {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 
@@ -444,7 +444,7 @@ mark.drive {
 
 .inspect h2 {
   margin: 0 0 6px;
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .inspect .found {
@@ -469,7 +469,7 @@ mark.drive {
 
 .break-alert h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .break-alert ul {
@@ -524,7 +524,7 @@ mark.drive {
 .timeline .hour text,
 .timeline .playhead text {
   fill: var(--muted);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .timeline .rain {
@@ -591,7 +591,7 @@ mark.drive {
 }
 
 .timeline .pin .why {
-  font-size: 14px;
+  font-size: 0.875rem;
   fill: var(--text);
   paint-order: stroke;
   stroke: var(--bg);
@@ -641,7 +641,7 @@ mark.drive {
 
 .timeline .pin text {
   fill: var(--text);
-  font-size: 14px;
+  font-size: 0.875rem;
   text-anchor: middle;
 }
 
@@ -674,20 +674,234 @@ mark.drive {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .timeline .stream,
-  .timeline .pulse,
-  .timeline .arrive,
-  .timeline .ripple,
-  .timeline .fly-home,
-  .card[data-arrived='true'] {
-    animation: none;
-  }
+/* --- the chapter's flow (M7): teaser, hints, strike, end screen, locked thread, settings --------- */
+.teaser {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 40px 32px;
+  background: linear-gradient(to bottom, rgb(20 22 27 / 0.85), transparent 45%);
+  pointer-events: none;
+}
 
-  .timeline .pin,
-  .meter .fill {
-    transition: none;
+.teaser .line {
+  max-width: 40em;
+  margin: 0;
+  font-size: 1.25rem;
+  text-align: center;
+}
+
+.teaser .skip {
+  pointer-events: auto;
+  color: var(--muted);
+  background: none;
+  border: none;
+}
+
+.teaser .preparing {
+  margin: 0;
+  font-size: 1.125rem;
+  color: var(--accent);
+  animation: pulse 1.6s ease-in-out infinite alternate;
+}
+
+.teaser .notice-line {
+  margin: 0;
+  color: var(--muted);
+}
+
+.shell[data-phase='teaser'] :is(.side, .hand, .timeline),
+.shell[data-phase='preparing'] :is(.side, .hand, .timeline) {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.hint {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  max-width: 28em;
+  padding: 6px 6px 6px 12px;
+  color: var(--text);
+  background: rgb(52 57 68 / 0.96);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.4);
+  pointer-events: none; /* never blocks input (06 §7) */
+}
+
+.hint button {
+  pointer-events: auto;
+  min-width: 28px;
+  padding: 0 6px;
+}
+
+[data-pulse='true'] {
+  animation: hint-pulse 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes hint-pulse {
+  from {
+    box-shadow: 0 0 0 0 rgb(255 210 120 / 0);
   }
+  to {
+    box-shadow: 0 0 0 4px rgb(255 210 120 / 0.55);
+  }
+}
+
+.timeline .strike {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: strike-land 0.7s cubic-bezier(0.3, 1.6, 0.6, 1);
+}
+
+@keyframes strike-land {
+  from {
+    transform: translateY(-40px) scale(1.8);
+    opacity: 0;
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    transform: none;
+  }
+}
+
+.locked-thread {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  height: 20px;
+  margin-bottom: 4px;
+  padding: 0 6px;
+  color: var(--muted);
+  background: repeating-linear-gradient(-45deg, #2a2d34 0 6px, #30343c 6px 12px);
+  border-radius: 3px;
+  opacity: 0.7;
+}
+
+.locked-thread .tip {
+  position: absolute;
+  bottom: 24px;
+  left: 0;
+  display: none;
+  max-width: 32em;
+  padding: 6px 10px;
+  color: var(--text);
+  background: rgb(52 57 68 / 0.97);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.locked-thread:hover .tip,
+.locked-thread:focus .tip {
+  display: block;
+}
+
+.end-screen {
+  position: fixed;
+  z-index: 25;
+  top: 72px;
+  left: 50%;
+  width: min(36em, 80vw);
+  transform: translateX(-50%);
+  padding: 20px 24px;
+  background: rgb(38 41 48 / 0.96);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.5);
+}
+
+.end-screen h2 {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+}
+
+.end-screen .buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.end-screen a.button {
+  padding: 4px 10px;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.settings-wrap {
+  position: relative;
+}
+
+.settings {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 18em;
+  padding: 12px;
+  background: rgb(38 41 48 / 0.97);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.settings fieldset {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.settings legend {
+  margin-bottom: 4px;
+}
+
+.settings label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings [aria-pressed='true'] {
+  border-color: var(--accent);
+}
+
+/* reduced motion: the setting, or the system when it says so (06 §8) */
+html[data-motion='reduce']
+  :is(
+    .timeline .stream,
+    .timeline .pulse,
+    .timeline .arrive,
+    .timeline .ripple,
+    .timeline .fly-home,
+    .timeline .strike,
+    .card[data-arrived='true'],
+    [data-pulse='true'],
+    .teaser .preparing
+  ) {
+  animation: none;
+}
+
+html[data-motion='reduce'] :is(.timeline .pin, .meter .fill) {
+  transition: none;
+}
+
+html[data-motion='reduce'] [data-pulse='true'] {
+  outline: 3px solid rgb(255 210 120 / 0.8);
 }
 
 /* --- dev page (?dev=1) ---------------------------------------------------------------------- */
@@ -716,7 +930,7 @@ mark.drive {
 
 .dev h3 {
   margin: 10px 0 4px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--accent);
 }
 

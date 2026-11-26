@@ -34,6 +34,8 @@ export function Timeline(props: { game: Game; text: Text }) {
     return () => ro.disconnect();
   });
 
+  /** Rokko's locked thread after the anchor (06 §9): the name of the anchor's `lockedThread` cat. */
+  const lockedName = () => c().cat[c().anchor.afterAnchor.lockedThread]?.nameKey ?? '';
   const span = () => Math.max(ui().span, 1);
   const x = (t: number) => PAD + (t / span()) * (width() - 2 * PAD);
   const tickAt = (px: number) => Math.round(((px - PAD) / (width() - 2 * PAD)) * span());
@@ -509,6 +511,23 @@ export function Timeline(props: { game: Game; text: Text }) {
             }}
           </For>
         </svg>
+        <Show when={ui().player.anchorWatched}>
+          <div
+            class="locked-thread"
+            data-testid="locked-thread"
+            tabindex="0"
+            aria-label={`${props.text(lockedName())}. ${props.text(c().anchor.afterAnchor.endKey)}`}
+            style={{ 'margin-left': `${PAD}px`, width: `${Math.max(0, width() - 2 * PAD)}px` }}
+          >
+            <span class="lock" aria-hidden="true">
+              🔒
+            </span>
+            <span class="name">{props.text(lockedName())}</span>
+            <span class="tip" role="tooltip" data-testid="locked-tip">
+              {props.text(c().anchor.afterAnchor.endKey)}
+            </span>
+          </div>
+        </Show>
       </div>
     </section>
   );

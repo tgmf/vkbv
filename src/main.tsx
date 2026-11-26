@@ -7,6 +7,7 @@ import vetted from './content/data/ch1/vetted-seeds.json';
 import uiEn from './content/data/ui/en.json';
 import uiRu from './content/data/ui/ru.json';
 import { addTables } from './i18n/t';
+import { load, SAVE_KEY, store } from './player/save';
 import { App, ContentErrorScreen } from './ui/App';
 import { createGame } from './ui/game';
 import './ui/theme.css';
@@ -37,16 +38,43 @@ try {
   addTables(content.text);
   const sim = createSimClient();
   const dev = query.get('dev') === '1';
-  // Until M7's new-game flow, the first vetted seed; the dev page plays a typed seed as it is
-  // (docs/questions.md M5-3).
   const typed = Number(query.get('seed'));
-  const seed = dev && Number.isInteger(typed) && typed > 0 ? typed : (vetted.seeds[0] ?? 1);
+  const typedSeed = Number.isInteger(typed) && typed > 0 ? typed : null;
   const pinsets = parsePinSets(PINSETS_FILE, content);
-  const game = createGame(content, sim);
+
+  // Saving (04 §9): the dev page plays a typed seed as it is (docs/questions.md M5-3) and saves nothing.
+  // A saved game is resumed whatever the URL says; the seed in the URL is always the game's requested
+  // seed, so the address can be bookmarked or shared (Tagir, M7).
+  const storage = window.localStorage;
+  const saved = dev ? null : load(storage);
+  const broken = !dev && saved === null && storage.getItem(SAVE_KEY) !== null;
+  const game = createGame(content, sim, {
+    ...(saved && { settings: saved.settings }),
+    ...(!dev && { save: (p, s) => store(storage, p, s) }),
+  });
+  const showSeed = (requested: number) => {
+    const url = new URL(location.href);
+    url.searchParams.set('seed', String(requested));
+    history.replaceState(history.state, '', url);
+  };
+  /** A new day: the typed seed, or one drawn from the offline list (04 §2). */
+  const newDay = (requested: number | null, notice?: string) => {
+    const r = requested ?? vetted.seeds[Math.floor(Math.random() * vetted.seeds.length)] ?? 1;
+    showSeed(r);
+    // a seed on the offline list is already vetted: vetting it again gives itself (decisions.md, M7)
+    game.newDay(r, vetted.seeds.includes(r) ? r : null, notice);
+  };
+  const seed = saved?.player.seedRequested ?? typedSeed ?? vetted.seeds[0] ?? 1;
   void sim.request({ kind: 'init', tuning }).then((reply) => {
     document.documentElement.dataset['sim'] = reply.kind; // "ready"; read by the smoke test
-    if (reply.kind === 'ready') game.start(seed, dev ? (pinsets['untouched'] ?? []) : [], dev);
+    if (reply.kind !== 'ready') return;
+    if (dev) game.start(typedSeed ?? vetted.seeds[0] ?? 1, pinsets['untouched'] ?? [], true);
+    else if (saved) {
+      showSeed(saved.player.seedRequested);
+      game.resume(saved.player);
+    } else newDay(typedSeed, broken ? 'ui.save.broken' : undefined);
   });
+  addEventListener('pagehide', () => game.persist());
   render(
     () => (
       <App
@@ -56,6 +84,7 @@ try {
         pinsets={pinsets}
         seed={seed}
         dev={dev}
+        newGame={() => newDay(null)}
       />
     ),
     root,

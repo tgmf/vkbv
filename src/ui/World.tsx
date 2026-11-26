@@ -5,8 +5,10 @@
 import { createSignal, For, onSettled, Show } from 'solid-js';
 import type { Target } from '../player/actions';
 import { createGrayboxRenderer, type Bubble, type SceneView } from '../render';
+import { reducedMotion } from './motion';
 import type { Game } from './game';
 import { pickAt, targetKey, toPick, toTarget, type SceneHandle } from './scene';
+import { teaserView } from './teaser';
 
 export interface WorldProps {
   game: Game;
@@ -15,7 +17,6 @@ export interface WorldProps {
   labels: () => Readonly<Record<string, string>>;
   text: (key: string, p?: Record<string, string | number>) => string;
   followName: () => string;
-  focusLayer: boolean;
 }
 
 const lerp = (a: number, b: number, f: number) => a + (b - a) * f;
@@ -26,7 +27,7 @@ export function World(props: WorldProps) {
   let canvas: HTMLCanvasElement | undefined;
   let box: HTMLDivElement | undefined;
   const [follow, setFollow] = createSignal(true);
-  const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let teaser: { labels: Readonly<Record<string, string>>; view: SceneView | null } | null = null;
   let revealed: { list: readonly string[]; set: ReadonlySet<string> } = {
     list: [],
     set: new Set(),
@@ -43,6 +44,16 @@ export function World(props: WorldProps) {
   };
 
   const viewAt = (now: number): SceneView | null => {
+    const settings = ui().settings;
+    const motionOff = reducedMotion(settings.reducedMotion);
+    // before the day starts: the teaser's scene (06 §9); while preparing, nothing new is drawn (the
+    // teaser's last image stays), so the scene never reports a tick before the day has one
+    if (ui().phase === 'teaser') {
+      const labels = props.labels();
+      if (teaser?.labels !== labels) teaser = { labels, view: teaserView(c(), labels, motionOff) };
+      return teaser.view;
+    }
+    if (ui().phase !== 'play') return null;
     const { player, view, frac } = props.game.now();
     const tick = player.playhead;
     const frame = view.frames[tick];
@@ -83,15 +94,27 @@ export function World(props: WorldProps) {
           : null,
       previousPath: props.game.previousPath(now),
       settings: {
-        focusLayer: props.focusLayer,
-        assist: c().tuning.flags.assist,
-        reducedMotion: motionQuery.matches,
+        focusLayer: settings.focusLayer,
+        // QUESTION(M7-1): no milestone builds assist-mode highlights; the renderer draws none yet
+        assist: settings.assist,
+        reducedMotion: motionOff,
       },
       bubbles,
       labels: props.labels(),
-      follow: follow() ? (player.followed[0] ?? null) : null,
+      // the strike (06 §9): the view holds on the meeting for the ticks after it
+      follow: follow() || struck(tick) ? (player.followed[0] ?? null) : null,
       pointer: pointer && rect ? [pointer[0] - rect.left, pointer[1] - rect.top] : null,
     };
+  };
+
+  /** The playhead is in the ticks after a watched anchor, where the timeline ends. */
+  const struck = (tick: number): boolean => {
+    const { player, view } = props.game.now();
+    return (
+      player.anchorWatched &&
+      view.end.kind === 'anchor' &&
+      tick >= view.end.tick - c().tuning.end.afterAnchorTicks
+    );
   };
 
   /** Where a target is, relative to the world view (notices, the confirm step). */

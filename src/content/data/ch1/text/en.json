@@ -213,5 +213,6 @@
   "ui.end.locked_rokko": "Rokko's morning is a thread of its own. It isn't ready to be followed yet.",
   "ui.hint.inspect": "Look closer at things in the flat. Each one remembers something.",
   "ui.hint.scroll": "Drag the timeline back. Nothing you haven't seen is settled yet.",
-  "ui.hint.fray": "From here on, the meeting can't happen. Something earlier has to change."
+  "ui.hint.fray": "From here on, the meeting can't happen. Something earlier has to change.",
+  "ui.end.line": "[[TODO writer: one line that closes Chapter 1 on the end screen, after the meeting under the boat]]"
 }

@@ -35,7 +35,8 @@ import {
   type Shuttle,
   type ShuttleKey,
 } from '../player/playback';
-import { newGame, type PlayerState, type PlayerView } from '../player/state';
+import type { Settings } from '../player/save';
+import { addSorted, newGame, type PlayerState, type PlayerView } from '../player/state';
 import {
   handOf,
   heldRefusal,
@@ -46,7 +47,38 @@ import {
   type Held,
   type Targets,
 } from '../player/targets';
+import {
+  dismissHint,
+  NO_HINTS,
+  othersInView,
+  stepHints,
+  triggered,
+  type HintId,
+  type HintState,
+} from './hints';
 import { storyDots } from './story';
+
+/**
+ * Where the day is (M7): the teaser before a new day (06 §9), "preparing the day" while the seed is
+ * vetted live or the first re-run is out, then play.
+ */
+export type Phase = 'teaser' | 'preparing' | 'play';
+
+/** The settings a first visit starts with (06 §8). */
+export const defaultSettings = (c: Content): Settings => ({
+  lang: 'en',
+  textSize: 100,
+  reducedMotion: 'system',
+  focusLayer: true,
+  assist: c.tuning.flags.assist,
+  volume: 100,
+});
+
+export interface GameOptions {
+  settings?: Settings;
+  /** Saves the player and the settings (04 §9); absent on the dev page, which saves nothing. */
+  save?: (player: PlayerState, settings: Settings) => void;
+}
 
 export interface View extends PlayerView {
   samples: TickSamples[];
@@ -110,6 +142,7 @@ const NOTICE_MS = 2500;
 const DOTS_MS = 2000;
 const PATH_MS = 5000;
 const SPAN_MS = 500; // the bar rescaling to a new edge after an edit
+const HINTS_EVERY_MS = 250; // how often the hints' triggers and the end screen are checked
 
 export interface Game {
   readonly content: Content;
@@ -117,7 +150,22 @@ export interface Game {
   readonly ui: UiState;
   /** Plain state for the animation loop. */
   now(): { player: PlayerState; view: View; shuttle: Shuttle; frac: number };
+  /** The dev page: a seed played as given, with pins, no teaser and no saving. */
   start(seed: number, pins: Pin[], revealAll: boolean): void;
+  /**
+   * A new day (M7): the teaser plays while the seed is vetted (when `seed` is null) and the first
+   * re-run runs; `notice` is a text key shown meanwhile (a save that could not be read).
+   */
+  newDay(requested: number, seed: number | null, notice?: string): void;
+  /** A saved game: re-run from tick 0 to the frontier limit (04 §6), the playhead where it was. */
+  resume(saved: PlayerState): void;
+  skipTeaser(): void;
+  dismissHint(): void;
+  /** Closes the end screen and leaves the day open (06 §9). */
+  keepPlaying(): void;
+  setSettings(patch: Partial<Settings>): void;
+  /** Saves now (the page is being left). */
+  persist(): void;
   press(key: ShuttleKey): void;
   /** Scrub to a tick (a click, a drag, Home, End): within 0..edge, observes nothing. */
   scrubTo(tick: number): void;
@@ -173,6 +221,13 @@ export interface UiState {
   inspecting: { object: string; card: string | null } | null;
   /** Cards that just reached the hand (they arrive with a short animation). */
   arrived: string[];
+  phase: Phase;
+  bootNotice: string | null;
+  /** The hint showing now (06 §7). */
+  hint: HintId | null;
+  endOpen: boolean;
+  settings: Settings;
+  seen: string[];
 }
 
 const emptyView = (): View => ({
@@ -195,8 +250,12 @@ const viewOf = (r: RecomputeResult): View => ({
 
 const pinsKey = (pins: readonly Pin[]): string => JSON.stringify(pins);
 
-export function createGame(content: Content, sim: SimClient): Game {
+export function createGame(content: Content, sim: SimClient, opts: GameOptions = {}): Game {
   const c = content;
+  const flow = c.tuning.flow;
+  const gazeId = c.powers.find((p) => p.effects.some((e) => e.prim === 'collapse'))?.id;
+  const lureId = c.powers.find((p) => p.effects.some((e) => e.prim === 'attract'))?.id;
+  const costOf = (id: string | undefined) => (id ? (c.power[id]?.cost ?? 0) : Infinity);
   let player = newGame(c, 0, 0);
   let view = emptyView();
   let shuttle: Shuttle = PAUSED;
@@ -225,6 +284,29 @@ export function createGame(content: Content, sim: SimClient): Game {
   /** An action asked for while an observe was out: it runs when the reply has been applied. */
   let waiting: (() => void) | null = null;
   let locate: (t: Target) => [number, number] | null = () => null;
+  // M7: the day's phase, settings, saving, hints and the end screen
+  // nothing plays, triggers a hint or saves until a day starts (start, newDay, resume)
+  let phase: Phase = 'preparing';
+  let teaserUntil = 0;
+  let ready = false; // the first re-run of the day has arrived
+  let bootNotice: string | null = null;
+  let settings: Settings = opts.settings ?? defaultSettings(c);
+  let seen: string[] = [];
+  let lastSave = 0;
+  let hints: HintState = NO_HINTS;
+  let lastHints = 0;
+  let playbackMs = 0;
+  let lastHead = 0;
+  let ticksAfterBack: number | null = null;
+  let pinnedOnProtagonistAt: number | null = null;
+  let lurePlaced = false;
+  let heldWithOther = false;
+  let endOpen = false;
+  let endClosed = false;
+  let states: { watched: readonly WatchedFact[]; set: Set<string> } = {
+    watched: [],
+    set: new Set(),
+  };
 
   const minSpan = () => Math.max(c.tuning.timeline.minSpanTicks, 1);
   const targetsNow = (): Targets | null => (held ? targetsOf(player, view, c, held) : null);
@@ -252,6 +334,12 @@ export function createGame(content: Content, sim: SimClient): Game {
     notices: [],
     inspecting: null,
     arrived: [],
+    phase,
+    bootNotice: null,
+    hint: null,
+    endOpen: false,
+    settings,
+    seen: [],
   });
   const sync = () => {
     const targets = targetsNow();
@@ -285,7 +373,92 @@ export function createGame(content: Content, sim: SimClient): Game {
       d.notices = markRaw(notices);
       d.inspecting = inspecting;
       d.arrived = markRaw(arrived);
+      d.phase = phase;
+      d.bootNotice = bootNotice;
+      d.hint = hints.visible?.id ?? null;
+      d.endOpen = endOpen;
+      d.settings = settings;
+      d.seen = markRaw(seen);
     });
+  };
+
+  /** Saves the committed player (never an edit's preview) with what was shown and the settings. */
+  const persist = () => {
+    if (!opts.save || !ready) return;
+    opts.save({ ...player, seen }, settings);
+    lastSave = performance.now();
+  };
+
+  const see = (id: string) => {
+    if (seen.includes(id)) return;
+    seen = addSorted(seen, id);
+    persist();
+  };
+
+  /** What the hint triggers read (06 §7), gathered from the controller's state. */
+  const hintFacts = (nowMs: number) => {
+    if (states.watched !== player.watched)
+      states = {
+        watched: player.watched,
+        set: new Set(player.watched.flatMap((f) => f.summary.storylets)),
+      };
+    return {
+      playing: phase === 'play',
+      playbackMs,
+      ticksAfterBack,
+      inspected: player.journal.stories.length,
+      hand: handOf(player, c).length,
+      found: Object.values(player.cards).filter((x) => x.zone !== 'unfound').length,
+      sincePinnedOnProtagonist:
+        pinnedOnProtagonistAt === null ? null : nowMs - pinnedOnProtagonistAt,
+      playhead: player.playhead,
+      atFray:
+        view.end.kind === 'fray' && view.streamedUpTo === null && player.playhead === view.edge,
+      charge: player.charge,
+      lureCost: costOf(lureId),
+      gazeCost: costOf(gazeId),
+      lurePlaced,
+      watchedStates: states.set,
+      heldWithOther,
+      endClosed,
+    };
+  };
+
+  const updateHints = (nowMs: number) => {
+    const r = stepHints(hints, seen, triggered(hintFacts(nowMs), flow), nowMs, flow.hintMs);
+    const changed = r.state.visible?.id !== hints.visible?.id;
+    hints = r.state;
+    if (r.seen.length !== seen.length) {
+      seen = r.seen;
+      persist();
+    }
+    if (changed) sync();
+  };
+
+  /** The end screen opens once, after the strike: playback has stopped at the anchor's end and the
+   * last line has gone (06 §9). */
+  const checkEnd = (nowMs: number) => {
+    if (endOpen || seen.includes('end') || !player.anchorWatched || pending || busy) return;
+    if (view.end.kind !== 'anchor' || view.streamedUpTo !== null) return;
+    if (player.playhead !== view.edge || shuttle.dir !== 'pause') return;
+    if (shown.some((l) => l.until > nowMs)) return;
+    endOpen = true;
+    see('end');
+    sync();
+  };
+
+  /** Forgets everything shown and noticed in the last playthrough. */
+  const newPlaythrough = (p: PlayerState) => {
+    seen = [...p.seen];
+    hints = NO_HINTS;
+    playbackMs = 0;
+    lastHead = p.playhead;
+    ticksAfterBack = null;
+    pinnedOnProtagonistAt = null;
+    lurePlaced = p.pins.some((x) => x.kind === 'power' && x.power === lureId);
+    heldWithOther = false;
+    endOpen = false;
+    endClosed = false;
   };
 
   /** The bar's span follows the edge; a jump (an edit, a new game) eases over SPAN_MS. */
@@ -367,10 +540,10 @@ export function createGame(content: Content, sim: SimClient): Game {
     );
   }
 
-  function start(seed: number, pins: Pin[], revealAll: boolean) {
+  /** Clears the controller for a player state (a new game, a saved one); returns the new session. */
+  function reset(p: PlayerState): number {
     const me = ++session;
-    player = { ...newGame(c, seed, seed), pins, nextSeq: pins.length + 1 };
-    if (revealAll) player = { ...player, revealed: c.nodes.map((n) => n.id).sort() };
+    player = p;
     view = { ...emptyView(), streamedUpTo: 0 };
     shuttle = PAUSED;
     busy = false;
@@ -387,12 +560,70 @@ export function createGame(content: Content, sim: SimClient): Game {
     waiting = null;
     span = minSpan();
     spanAnim = null;
-    sync();
+    bootNotice = null;
+    newPlaythrough(p);
+    return me;
+  }
+
+  /** The day's first re-run, from tick 0 to the frontier limit; `then` runs on its result. */
+  function firstRun(me: number, then: () => void): void {
     void recompute(player, false, () => undefined).then((reply) => {
-      if (me !== session || reply.kind !== 'result') return;
+      if (me !== session) return;
+      if (reply.kind !== 'result') {
+        console.error(`recompute: ${reply.kind === 'error' ? reply.message : reply.kind}`);
+        return;
+      }
       view = viewOf(reply.result);
       span = Math.max(view.edge, minSpan());
+      then();
       sync();
+    });
+  }
+
+  function start(seed: number, pins: Pin[], revealAll: boolean) {
+    let p: PlayerState = { ...newGame(c, seed, seed), pins, nextSeq: pins.length + 1 };
+    if (revealAll) p = { ...p, revealed: c.nodes.map((n) => n.id).sort() };
+    const me = reset(p);
+    phase = 'play';
+    ready = true;
+    sync();
+    firstRun(me, () => undefined);
+  }
+
+  function newDay(requested: number, seed: number | null, notice?: string) {
+    const me = reset(newGame(c, requested, seed ?? requested));
+    phase = 'teaser';
+    teaserUntil = performance.now() + flow.teaserMs;
+    ready = false;
+    bootNotice = notice ?? null;
+    sync();
+    const go = (vetted: number) => {
+      if (me !== session) return;
+      player = newGame(c, requested, vetted);
+      firstRun(me, () => {
+        ready = true;
+        if (phase === 'preparing') phase = 'play';
+        persist();
+      });
+    };
+    if (seed !== null) go(seed);
+    else
+      void sim.request({ kind: 'vet', requestedSeed: requested }).then((r) => {
+        if (r.kind === 'vetted') go(r.seed);
+        else console.error(`vet: ${r.kind === 'error' ? r.message : r.kind}`);
+      });
+  }
+
+  function resume(saved: PlayerState) {
+    const me = reset(saved);
+    phase = 'preparing';
+    ready = false;
+    sync();
+    firstRun(me, () => {
+      player = { ...player, playhead: Math.min(saved.playhead, view.edge) };
+      lastHead = player.playhead;
+      ready = true;
+      phase = 'play';
     });
   }
 
@@ -414,6 +645,7 @@ export function createGame(content: Content, sim: SimClient): Game {
     if (pinsKey(r.player.pins) === pinsKey(player.pins)) {
       markArrived(player, r.player);
       player = r.player;
+      persist();
       sync();
       return;
     }
@@ -499,6 +731,17 @@ export function createGame(content: Content, sim: SimClient): Game {
     pending = null;
     preview = null;
     spanTo(view.edge, nowMs, true);
+    lastHead = player.playhead; // an edit pulling the playhead back is not the player scrolling back
+    // what the hints read (06 §7): a card on a protagonist, a lure placed
+    if (
+      pinnedOnProtagonistAt === null &&
+      committed.pins.some(
+        (x) => x.kind === 'card' && 'cat' in x.target && committed.followed.includes(x.target.cat),
+      )
+    )
+      pinnedOnProtagonistAt = nowMs;
+    lurePlaced ||= committed.pins.some((x) => x.kind === 'power' && x.power === lureId);
+    persist();
     sync();
     void sim.request({ kind: 'commit' }).then((ok) => {
       if (me !== session) return;
@@ -663,14 +906,35 @@ export function createGame(content: Content, sim: SimClient): Game {
     ui,
     now: () => ({ player, view, shuttle, frac }),
     start,
+    newDay,
+    resume,
+    skipTeaser() {
+      teaserUntil = 0;
+    },
+    dismissHint() {
+      hints = dismissHint(hints);
+      sync();
+    },
+    keepPlaying() {
+      endOpen = false;
+      endClosed = true;
+      sync();
+    },
+    setSettings(patch) {
+      settings = { ...settings, ...patch };
+      persist();
+      sync();
+    },
+    persist,
     press(key) {
-      if (pending || confirmStep) return;
+      if (pending || confirmStep || phase !== 'play') return;
       shuttle = press(c, shuttle, key);
       acc = 0;
+      if (shuttle.dir === 'pause') persist();
       sync();
     },
     scrubTo(tick) {
-      if (pending) return;
+      if (pending || phase !== 'play') return;
       const r = setPlayhead(player, view, c, {
         tick: Math.max(0, Math.min(tick, view.edge)),
       });
@@ -679,12 +943,34 @@ export function createGame(content: Content, sim: SimClient): Game {
       frac = 0;
       scrubbing = true;
       shown = [];
+      persist();
       sync();
     },
     stepForward() {
-      if (!pending && !confirmStep) queued += 1;
+      if (!pending && !confirmStep && phase === 'play') queued += 1;
     },
     frame(dtMs, nowMs) {
+      if (phase !== 'play') {
+        if (phase === 'teaser' && nowMs >= teaserUntil) {
+          phase = ready ? 'play' : 'preparing';
+          see('teaser');
+          sync();
+        }
+        return;
+      }
+      // M7: what the hints read, the hints, the end screen, saving during playback
+      if (player.playhead < lastHead) ticksAfterBack ??= 0;
+      else if (ticksAfterBack !== null) ticksAfterBack += player.playhead - lastHead;
+      lastHead = player.playhead;
+      if (shuttle.dir === 'fwd' && !pending && !confirmStep) {
+        playbackMs += dtMs;
+        if (nowMs - lastSave >= flow.saveEveryMs) persist();
+      }
+      if (nowMs - lastHints >= HINTS_EVERY_MS) {
+        lastHints = nowMs;
+        updateHints(nowMs);
+        checkEnd(nowMs);
+      }
       if (spanAnim) {
         const k = Math.min(1, (nowMs - spanAnim.t0) / SPAN_MS);
         span = spanAnim.from + (spanAnim.to - spanAnim.from) * (1 - (1 - k) ** 3);
@@ -754,7 +1040,7 @@ export function createGame(content: Content, sim: SimClient): Game {
       locate = fn;
     },
     hold(next, at) {
-      if (pending || confirmStep) return;
+      if (pending || confirmStep || phase !== 'play') return;
       const same =
         next !== null &&
         held !== null &&
@@ -773,6 +1059,12 @@ export function createGame(content: Content, sim: SimClient): Game {
       }
       held = next;
       spot = focus = null;
+      // the `others` hint (06 §7): one roll per card held (presentation only, never the simulation's)
+      const f = view.frames[player.playhead];
+      if ('card' in next && f && !heldWithOther)
+        heldWithOther = othersInView(f, player.followed, player.revealed, () =>
+          Math.floor(Math.random() * 1_000_000),
+        );
       sync();
     },
     setSpot(next) {
@@ -786,11 +1078,11 @@ export function createGame(content: Content, sim: SimClient): Game {
       sync();
     },
     pinOn(target, at) {
-      if (pending || confirmStep || !held) return;
+      if (pending || confirmStep || !held || phase !== 'play') return;
       pickCard(held, target, at);
     },
     inspectObject(object, at) {
-      if (pending || confirmStep) return;
+      if (pending || confirmStep || phase !== 'play') return;
       whenIdle(() => {
         const r = inspect(player, view, c, { object });
         if (r.error) {
@@ -808,7 +1100,7 @@ export function createGame(content: Content, sim: SimClient): Game {
       sync();
     },
     act(fn, at) {
-      if (pending || confirmStep) return;
+      if (pending || confirmStep || phase !== 'play') return;
       whenIdle(() => apply(fn(player, view, c), at));
     },
     confirm,
