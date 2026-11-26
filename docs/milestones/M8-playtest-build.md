@@ -38,6 +38,12 @@ players find those cards dead, trace M4-5 then.
    workflow (do not run it).
 7. A crash screen: an error boundary with a plain message, "copy details" (error,
    seed, pins, watched facts, tuning version) and reload.
+8. Assist mode (`06` §2; Tagir, 2026-11-26, `docs/questions.md` M7-1), behind the setting M7 added:
+   story markers on the place or cat where each partial match tied to the anchor, a paid event or a
+   protagonist is forming, pulsing in ticks for a share of their cycle equal to their probability; the
+   interactable objects at that place marked with it; a ring on the forming stories a held card could
+   advance; disruption warnings in the break alert. Frames gain what the markers need; the renderer
+   draws them.
 
 Notes from M2 (2026-11-25):
 - Strain is a projection to the end of the day: 19–70 s on Chapter 1 (`docs/handoff/M2.md`,
@@ -50,6 +56,12 @@ Notes from M2 (2026-11-25):
   switch shown in this panel.
 
 ## Acceptance
+
+- [ ] With assist mode on, a forming story tied to the anchor shows a marker at its place whose lit share
+      of each cycle matches its probability (headless: the marker data; browser: a screenshot); off, none.
+      Only matches tied to the anchor, paid events or a protagonist are marked.
+- [ ] Holding a card rings the forming stories it could advance; an edit that drops a forming story's
+      chance past the knob lists it in the break alert.
 
 - [ ] Changing a tuning value in the panel changes the next recompute; "copy as JSON"
       produces a valid `tuning.json`.

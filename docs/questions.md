@@ -807,7 +807,7 @@ Chosen for now: while something is held, Tab cycles through the valid targets on
 ordinary tab order, which holds the pins, the buttons and the objects (Enter on an object inspects it).
 Answer: Tagir, 2026-11-25: the M6 plan with these defaults approved ("lets go"). Spec updated: `06` §8.
 
-## M7-1 — Assist mode has a setting but no highlights            (status: answered in part; spec updated)
+## M7-1 — Assist mode has a setting but no highlights            (status: answered, spec updated; built in M8)
 Where: `06` §2 (assist mode), §8 (settings); `src/ui/World.tsx`, marked `QUESTION(M7-1)`; M7 item 5
 Question: M7 adds the assist-mode setting, but no milestone builds its highlights (live partial matches of
 the anchor's requirement tree, of paid events and of unseen authored storylets, with opacity = match
@@ -823,7 +823,14 @@ something paid for, its opacity the match's probability, steady when likely, fli
 "almost" stories (one stage short of completing) are where a card makes the difference, the card-hint
 system driven by data; disruption warnings are the break alerts generalised to unfinished stories. Keep it
 scarce: only matches tied to the anchor, to paid events or to a protagonist. Spec updated: `06` §2.
-Still open:
+Answered 2026-11-26 (Tagir: "1 yes 2 yes 3 your default is ok 4 … any interactable object for now"), on the
+items below as they were then numbered 1, 3, 4, 5: built in M8 (item 8 of its brief); while a card is held,
+a forming story it could advance gets a ring; an edit that drops a forming story's chance by more than half
+(a knob) is listed in the break alert's bar under its own heading, information only; the items marked near a
+forming story are any interactable object at its place (one that can be inspected or have a card played on
+it). Spec updated: `06` §2. The two proposals in item 2 (full opacity while lit; still markers with reduced
+motion) stand as the defaults.
+Before the answers:
 1. When to build it: in M8 (the playtest build), or a milestone of its own before the playtests.
 2. Flicker: answered (Tagir, 2026-11-26): a pulse, not a flicker. Each marker draws a cycle length in a
    perceptible window (about 15–30 ticks, roughly 3–8 s) and shows for probability × cycle length in one
