@@ -807,7 +807,7 @@ Chosen for now: while something is held, Tab cycles through the valid targets on
 ordinary tab order, which holds the pins, the buttons and the objects (Enter on an object inspects it).
 Answer: Tagir, 2026-11-25: the M6 plan with these defaults approved ("lets go"). Spec updated: `06` §8.
 
-## M7-1 — Assist mode has a setting but no highlights            (status: open)
+## M7-1 — Assist mode has a setting but no highlights            (status: answered in part; spec updated)
 Where: `06` §2 (assist mode), §8 (settings); `src/ui/World.tsx`, marked `QUESTION(M7-1)`; M7 item 5
 Question: M7 adds the assist-mode setting, but no milestone builds its highlights (live partial matches of
 the anchor's requirement tree, of paid events and of unseen authored storylets, with opacity = match
@@ -816,7 +816,22 @@ Options seen: (a) the setting only, stored and passed to the renderer, which ign
 the highlights (frames gain match probabilities per place and cat; the renderer draws them), in M8 or with
 the dressing; (c) drop the setting until the highlights exist.
 Chosen for now: (a).
-Answer:
+Answer: Tagir, 2026-11-26: assist mode shows the potential authored storylets that are likely but have
+not happened yet, and the items near them. "A story is forming here, and here's what would advance or
+disrupt it": a ghost marker on a place or cat for each partial match relevant to the anchor or to
+something paid for, its opacity the match's probability, steady when likely, flickering when uncertain;
+"almost" stories (one stage short of completing) are where a card makes the difference, the card-hint
+system driven by data; disruption warnings are the break alerts generalised to unfinished stories. Keep it
+scarce: only matches tied to the anchor, to paid events or to a protagonist. Spec updated: `06` §2.
+Still open:
+1. When to build it: in M8 (the playtest build), or a milestone of its own before the playtests.
+2. Flicker: which probabilities count as uncertain, and how fast it flickers (knobs).
+3. "Almost" stories: does the marker only stand out, or does it also name the cards in hand that would
+   advance it (and ring them while one is held)?
+4. Disruption warnings: what counts as disrupting (a forming match's chance falling below a knob, or by a
+   share of it), and whether they share the break alert's bar.
+5. "Items near it": objects whose card, inspect or `onPerceived` feeds the match's next stage, or simply
+   objects at the same place.
 
 ## M7-2 — Hint decisions made in planning            (status: answered)
 Where: `06` §7, §9; `04` §2, §9
