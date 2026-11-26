@@ -80,6 +80,18 @@
     "focusSamples": 8,
     "displayBudget": 24
   },
+  "flow": {
+    "teaserMs": 6000,
+    "saveEveryMs": 5000,
+    "hintMs": 10000,
+    "ghostsAfterMs": 30000,
+    "inspectAfterTicks": 35,
+    "barelyAfterMs": 2000,
+    "scrollCards": 3,
+    "scrollAfterTick": 180,
+    "notreadyOn": ["door_lure.back_inside"],
+    "morningOn": ["usual_route.shop_open", "usual_route.shop_closed"]
+  },
   "budgets": {
     "recomputeMs": 100,
     "rerunTps": 120,

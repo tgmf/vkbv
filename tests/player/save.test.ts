@@ -66,6 +66,9 @@ describe('save, reload, continue (04 §9)', () => {
     p.start(1, 1);
     const good = serialize(p.player, settings);
     expect(deserialize(good)).toEqual({ player: p.player, settings });
+    // what was shown once per playthrough comes back with it (06 §7, §9)
+    const shown = { ...p.player, seen: ['end', 'teaser', 'watch'] };
+    expect(deserialize(serialize(shown, settings))).toEqual({ player: shown, settings });
     for (const bad of [
       '',
       'not json',
@@ -73,6 +76,7 @@ describe('save, reload, continue (04 §9)', () => {
       JSON.stringify({ player: p.player }),
       JSON.stringify({ player: { ...p.player, charge: 1.5 }, settings }),
       JSON.stringify({ player: { ...p.player, v: 1 }, settings }),
+      JSON.stringify({ player: { ...p.player, seen: [1] }, settings }),
       JSON.stringify({ player: p.player, settings: { ...settings, textSize: 110 } }),
     ])
       expect(deserialize(bad)).toBeNull();

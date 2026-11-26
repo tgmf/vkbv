@@ -120,6 +120,28 @@ export const TuningSchema = z.strictObject({
     focusSamples: int('Coherent trajectories offered to the focus layer (03 §16)').min(1),
     displayBudget: int('Most cat markers drawn at rest (06 §2)').min(1),
   }),
+  flow: z.strictObject({
+    teaserMs: int('How long the teaser shows before the day starts, unless skipped (06 §9)').min(0),
+    saveEveryMs: int('During playback the game is saved this often, in real ms (04 §9)').min(1),
+    hintMs: int('A hint stays this long unless dismissed, in real ms (06 §7)').min(1),
+    ghostsAfterMs: int('Hint `ghosts`: real ms of playback before it shows (06 §7)').min(0),
+    inspectAfterTicks: int(
+      'Hint `inspect`: ticks played after the first scroll back with no object inspected (06 §7)',
+    ).min(0),
+    barelyAfterMs: int(
+      'Hint `barely`: real ms after the first card lands on a protagonist (06 §7)',
+    ).min(0),
+    scrollCards: int('Hint `scroll`: cards found before it shows (06 §7)').min(1),
+    scrollAfterTick: int('Hint `scroll`: or the playhead past this tick (06 §7)').min(0),
+    notreadyOn: z
+      .array(z.string())
+      .describe(
+        'Hint `notready`: shows when one of these storylet states is first watched (06 §7)',
+      ),
+    morningOn: z
+      .array(z.string())
+      .describe('Hint `morning`: shows when one of these storylet states is first watched (06 §7)'),
+  }),
   budgets: z.strictObject({
     recomputeMs: int('Median time from an edit to the re-run’s first streamed frames (07 §4)').min(
       1,

@@ -100,6 +100,7 @@ const PlayerSchema = z.strictObject({
   anchorWatched: z.boolean(),
   playhead: int,
   marks: z.strictObject({ changedUnwatched: z.array(int) }),
+  seen: ids,
 });
 
 const SettingsSchema = z.strictObject({

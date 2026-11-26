@@ -37,6 +37,7 @@ export interface PlayerState {
   anchorWatched: boolean;
   playhead: number; // always 0..lanternEdge
   marks: { changedUnwatched: number[] }; // ticks of watched, unpaid facts that reopened
+  seen: string[]; // shown once per playthrough: the hints, 'teaser', 'end' (06 §7, §9), sorted
 }
 
 /** What the player layer reads of the latest re-run result, as the UI holds it (04 §1). */
@@ -83,6 +84,7 @@ export function newGame(c: Content, seedRequested: number, seed: number): Player
     anchorWatched: false,
     playhead: 0,
     marks: { changedUnwatched: [] },
+    seen: [],
   };
 }
 
