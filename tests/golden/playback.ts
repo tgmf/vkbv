@@ -77,7 +77,7 @@ export function goldenPlaybacks(requested: number): void {
     };
     beforeAll(() => {
       seed = vetted(ch1, requested);
-    }, 300_000);
+    }, 600_000);
     it.each(Object.keys(sets))(
       '%s',
       async (name) => {

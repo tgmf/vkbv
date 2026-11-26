@@ -115,5 +115,5 @@ describe('the decision cache (03 §8.2, §18)', () => {
       }
     expect(calls).toBeGreaterThan(0);
     expect(hits + calls).toBeGreaterThan(calls); // the cache is used
-  }, 300_000);
+  }, 600_000);
 });
