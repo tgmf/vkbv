@@ -720,7 +720,7 @@ mark.drive {
   pointer-events: none;
 }
 
-.hint {
+.hint-line {
   position: fixed;
   z-index: 30;
   display: flex;
@@ -736,7 +736,7 @@ mark.drive {
   pointer-events: none; /* never blocks input (06 §7) */
 }
 
-.hint button {
+.hint-line button {
   pointer-events: auto;
   min-width: 28px;
   padding: 0 6px;

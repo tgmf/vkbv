@@ -93,7 +93,7 @@ export function HintLine(props: { game: Game; text: Text }) {
     <Show when={id()}>
       {(h) => (
         <div
-          class="hint"
+          class="hint-line"
           role="status"
           data-testid="hint"
           data-hint={h()}
