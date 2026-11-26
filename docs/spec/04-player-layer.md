@@ -32,6 +32,7 @@ interface PlayerState {
   anchorWatched: boolean;
   playhead: number;                      // always 0..lanternEdge (§6)
   marks: { changedUnwatched: number[] }; // ticks of watched, unpaid facts that reopened
+  seen: string[];                        // shown once per playthrough: hint ids, 'teaser', 'end' (06 §7, §9), sorted
 }
 ```
 
@@ -84,7 +85,13 @@ for a page load. `npm run vet` vets seeds offline and writes the list of vetted 
 Only a seed the player types (`?seed=`) or a bookmark is vetted live, in the worker,
 behind a loading indicator, with the game's own fog knobs: coarser knobs would vet a different
 world, in which a seed can pass that play cannot solve (Tagir, 2026-11-25, `docs/questions.md` M4-1).
-It takes tens of seconds to a few minutes.
+It takes tens of seconds to a few minutes. A typed seed that is on the offline list skips it: vetting it
+again would give itself, since the list holds seeds that pass as candidate 0 (M7).
+
+**The seed in the address** (Tagir, M7). The address always carries the game's requested seed
+(`?seed=`), so a game can be bookmarked or shared. A saved game is resumed whatever the address says,
+and its seed is written into the address. Without a save, `?seed=` is the requested seed, or one is drawn
+from the offline list; "New game" in the settings draws a new one.
 
 The result is stored as `seed` and never changed during play. A bookmarked seed is
 always the vetted one, so it always gives the same world.
@@ -296,8 +303,8 @@ First time: add the object to `journal.stories`; its `grantsCard` card moves fro
 `src/player/save.ts`: `serialize(player, settings) -> string`,
 `deserialize(string) -> { player, settings } | null` (validated with Zod; any failure
 returns null), `load(storage)`, `store(storage, …)` with a storage object passed in so
-tests can use a fake. Key `acfw.ch1.v2`. The UI saves after every action and every 5
-seconds of playback. Wave results are never saved; they are recomputed from `seed`,
+tests can use a fake. Key `acfw.ch1.v2`. The UI saves after every action, when playback
+pauses, every `flow.saveEveryMs` (5 seconds) of playback, and when the page is left. Wave results are never saved; they are recomputed from `seed`,
 `pins` and `watched`. A null load starts a new game with a one-line notice. Players
 editing their save by hand is allowed: validate the shape, no checksums.
 

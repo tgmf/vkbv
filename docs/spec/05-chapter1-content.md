@@ -112,6 +112,11 @@ have **not** been checked against a model of this content; M4 measures them.
 | `render.focusLayerHz` | 3 | `06` §2; at most 3 |
 | `render.focusSamples` | 8 | coherent trajectories offered to the focus layer (`03` §16) |
 | `render.displayBudget` | 24 | most cat markers drawn at rest (`06` §2) |
+| `flow.teaserMs` | 6000 | how long the teaser shows unless skipped (`06` §9) |
+| `flow.saveEveryMs` | 5000 | saving during playback (`04` §9) |
+| `flow.hintMs` | 10000 | how long a hint stays unless dismissed (`06` §7) |
+| `flow.ghostsAfterMs`, `flow.inspectAfterTicks`, `flow.barelyAfterMs`, `flow.scrollCards`, `flow.scrollAfterTick` | 30000, 35, 2000, 3, 180 | the hints' triggers (`06` §7) |
+| `flow.notreadyOn`, `flow.morningOn` | `["door_lure.back_inside"]`, `["usual_route.shop_open", "usual_route.shop_closed"]` | the storylet states those two hints wait for (`06` §7) |
 | `budgets.recomputeMs` | 100 | from an edit to the re-run's first streamed frames (`07` §4) |
 | `budgets.rerunTps` | 120 | ticks per second a re-run streams at, at least (`07` §4) |
 | `budgets.observeMs` | 5 | median time of one observe at the lantern edge, in playback (`07` §4) |

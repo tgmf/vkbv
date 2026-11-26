@@ -807,4 +807,27 @@ Chosen for now: while something is held, Tab cycles through the valid targets on
 ordinary tab order, which holds the pins, the buttons and the objects (Enter on an object inspects it).
 Answer: Tagir, 2026-11-25: the M6 plan with these defaults approved ("lets go"). Spec updated: `06` §8.
 
+## M7-1 — Assist mode has a setting but no highlights            (status: open)
+Where: `06` §2 (assist mode), §8 (settings); `src/ui/World.tsx`, marked `QUESTION(M7-1)`; M7 item 5
+Question: M7 adds the assist-mode setting, but no milestone builds its highlights (live partial matches of
+the anchor's requirement tree, of paid events and of unseen authored storylets, with opacity = match
+probability). The frames carry no match probabilities per place or cat, and the renderer draws none.
+Options seen: (a) the setting only, stored and passed to the renderer, which ignores it (built); (b) build
+the highlights (frames gain match probabilities per place and cat; the renderer draws them), in M8 or with
+the dressing; (c) drop the setting until the highlights exist.
+Chosen for now: (a).
+Answer:
+
+## M7-2 — Hint decisions made in planning            (status: answered)
+Where: `06` §7, §9; `04` §2, §9
+Answer: Tagir, 2026-11-25, on the M7 plan:
+- `inspect`: 35 ticks played after the first scroll back, if no object was inspected at all yet.
+- `others`: a cat has a chance to stand somewhere; where the lantern reaches that place, roll against it.
+- The end screen's writer marker lives in `ch1/text` (`ui.end.line`).
+- The seed is always in the address; a saved game is resumed whatever it says, and writes its seed there.
+- The end screen opens after the strike's last animation.
+- Defaults accepted: shown hints in `PlayerState.seen`; hints wait their turn and stay 10 s or until
+  dismissed; assist mode as a setting only (M7-1).
+Spec updated: `04` §1, §2, §9; `05` §4; `06` §7, §8, §9.
+
 <!-- Gate notes and answers go above this line. -->
