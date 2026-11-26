@@ -1,11 +1,13 @@
-// Builds the dev inspector's view of one tick of one history (docs/milestones/M1.5-inspector.md).
+// Builds the debug panel's view of one tick of one history (docs/milestones/M1.5-inspector.md; the
+// State and Wave tabs of 06 §10, M8).
 import type { Content } from '../content/schemas/content';
 import { gaugeOf, test } from '../sim/conditions';
 import type { History } from '../sim/history';
 import { catNode, catPos, hhmm } from '../sim/space';
 import { traceLine } from '../sim/trace';
 import { newDecisionMemo, type CatId, type Ctx, type SimEvent, type SimState } from '../sim/types';
-import type { InspectView } from './protocol';
+import { WAVE_TOTAL, type ChainState, type Fog, type FogCase } from '../sim/fog';
+import type { CaseView, InspectView } from './protocol';
 
 /** How many earlier ticks of events the log shows besides the current one. */
 export const LOG_TICKS = 15;
@@ -83,6 +85,8 @@ export function inspectView(c: Content, src: InspectSource): InspectView {
         hooks: hookIds
           .filter((g) => cs.base[g] !== undefined)
           .map((g): [string, number] => [g, gaugeOf(ctx, def.id, g)]),
+        pressure: cs.pressure,
+        touchedBy: cs.touchedBy,
       };
     }),
     storylets: c.storylets.flatMap((def) => {
@@ -107,5 +111,46 @@ export function inspectView(c: Content, src: InspectSource): InspectView {
       source: 'card' in e.source ? e.source.card : e.source.power,
     })),
     events: src.recent.flatMap(({ tick, events }) => events.map((e) => traceLine(c, tick, e))),
+    pools: c.detectors.flatMap((d) =>
+      (s.pools[d.id] ?? []).map((m) => `${d.id} stage ${m.stage} since ${hhmm(c, m.stageTick)}`),
+    ),
+    cases: [],
+    chain: null,
+    stats: { cases: [], live: [], states: [], localCauses: 0 },
   };
 }
+
+/** A fog case's weight in ppm and its links' values (06 §10). */
+export function caseView(fc: FogCase, index: number): CaseView {
+  return {
+    index,
+    weightPpm: Math.trunc(fc.weight / (WAVE_TOTAL / 1_000_000)),
+    links: [`weather ${fc.weather}`, ...Object.entries(fc.links).map(([k, v]) => `${k}=${v}`)],
+  };
+}
+
+/** A fogged cat's chain in each case, most likely state first (06 §10, State). */
+export function chainView(fog: Fog, cat: CatId): NonNullable<InspectView['chain']> {
+  return {
+    cat,
+    cases: fog.cases.map((fc, i) => ({
+      ...caseView(fc, i),
+      states: [...(fc.cats[cat]?.chain ?? [])]
+        .sort((a, b) => b.p - a.p)
+        .map((x) => ({ p: x.p, text: stateText(x.s) })),
+    })),
+  };
+}
+
+const stateText = (s: ChainState): string =>
+  [
+    `${s.activity} @ ${s.place}`,
+    s.walk ? `walking ${s.walk.from} -> ${s.walk.path[s.walk.path.length - 1] ?? ''}` : '',
+    s.interrupt ? `interrupted ${s.interrupt.action}` : '',
+    s.control !== 'free' ? `[${s.control}]` : '',
+    Object.entries(s.bands)
+      .map(([g, b]) => `${g}:${b}`)
+      .join(' '),
+  ]
+    .filter(Boolean)
+    .join(' · ');

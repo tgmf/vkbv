@@ -15,33 +15,30 @@ jobs:
       - run: npm ci
       - run: npm run content:check
       - run: npm run check
-      - run: npm run build # includes the gzipped size check (07 §4)
+      - run: npm run build # includes the size checks: gzipped JS and dist/ zipped (07 §4, M8)
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test
+      # the browser tests run against the e2e build (an end-screen URL set, so `cta_click` can fire)
+      - run: npm run build:e2e
+      - run: npx playwright test --project=chromium
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
           path: test-results/
 
-  # Note for Tagir: deploying is switched off until you enable it.
-  # 1. GitHub Pages on main: enable Pages (source: GitHub Actions) in the repository settings,
-  #    then uncomment this job.
-  # deploy:
-  #   if: github.ref == 'refs/heads/main'
-  #   needs: check
-  #   runs-on: ubuntu-latest
-  #   permissions: { pages: write, id-token: write }
-  #   environment: { name: github-pages }
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-node@v4
-  #       with: { node-version-file: .nvmrc, cache: npm }
-  #     - run: npm ci && npm run build
-  #     - uses: actions/upload-pages-artifact@v3
-  #       with: { path: dist }
-  #     - uses: actions/deploy-pages@v4
-  #
-  # 2. itch.io: a separate, manual workflow (workflow_dispatch) that builds and runs
-  #    `butler push dist <user>/<game>:html5` with the BUTLER_API_KEY repository secret.
-  #    Never run it from a coding session.
+  # GitHub Pages (source: GitHub Actions), from main once the checks pass (07 §7).
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: ubuntu-latest
+    permissions: { pages: write, id-token: write }
+    environment: { name: github-pages, url: '${{ steps.pages.outputs.page_url }}' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci && npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: dist }
+      - id: pages
+        uses: actions/deploy-pages@v4

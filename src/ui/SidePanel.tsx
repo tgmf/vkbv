@@ -104,7 +104,9 @@ export function SidePanel(props: { game: Game; text: Text }) {
                   data-pulse={pulses(p) ? 'true' : 'false'}
                   aria-pressed={held() ? 'true' : 'false'}
                   aria-describedby={`why-${p.id}`}
-                  disabled={why() !== null || ui().pending !== null}
+                  // aria-disabled, not disabled: the button stays reachable by keyboard and reads its
+                  // reason (06 §8, M8's accessibility pass); a press is refused with that reason
+                  aria-disabled={why() !== null || ui().pending !== null ? 'true' : 'false'}
                   onClick={() => props.game.hold({ power: p.id })}
                 >
                   {props.text(p.nameKey)}

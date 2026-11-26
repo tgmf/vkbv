@@ -24,6 +24,19 @@ export interface Bubble {
   text: string;
 }
 
+/**
+ * A story marker of assist mode (06 §2, M8), as src/player computed it: on a cat, pulsing for a share
+ * `p` (ppm) of each cycle, with the interactable objects at its place marked with it and a ring when
+ * the held card could advance it. `key` seeds its cycle (render only).
+ */
+export interface AssistMarker {
+  key: string;
+  cat: CatId;
+  p: number;
+  ring: boolean;
+  objects: ObjectId[];
+}
+
 export interface SceneView {
   tick: number; // integer tick at the playhead
   frac: number; // 0..1 inside the tick (presentation only)
@@ -48,6 +61,8 @@ export interface SceneView {
    * is held the magnifying ring (and Gaze's ring) sits there (06 §4, §5).
    */
   pointer: [number, number] | null;
+  /** Added in M8: assist mode's story markers (empty with assist mode off). */
+  assist: AssistMarker[];
 }
 
 export interface SceneRenderer {

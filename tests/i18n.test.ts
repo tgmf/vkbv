@@ -36,10 +36,10 @@ describe('interface text (M7)', () => {
     expect(english).toEqual([]);
   });
 
-  it("the hints' storylet states (tuning.flow) exist in Chapter 1", () => {
+  it("the storylet states tuning.flow names (hints, telemetry's outOn) exist in Chapter 1", () => {
     const tuning = loadTuning(TUNING_FILE);
     const c = loadChapter(CHAPTER1_FILES, tuning);
-    for (const k of [...tuning.flow.notreadyOn, ...tuning.flow.morningOn]) {
+    for (const k of [...tuning.flow.notreadyOn, ...tuning.flow.morningOn, ...tuning.flow.outOn]) {
       const [s, st] = k.split('.');
       expect(c.storylet[s ?? '']?.states[st ?? ''], k).toBeDefined();
     }

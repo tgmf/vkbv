@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { couldAdvance, disruptions, storyMarks, tiedTo, writes } from '../../src/player/assist';
 import type { PlayerState, PlayerView } from '../../src/player/state';
-import type { Frame, Pin } from '../../src/sim/types';
+import type { Frame, Pin, WatchedFact } from '../../src/sim/types';
 import { ch1 } from '../sim/helpers';
 import { game, newGameView } from './helpers';
 
@@ -36,6 +36,28 @@ const lurePin: Pin = {
   power: 'lure',
   place: 'flat.door',
 };
+
+/** The player with one more watched fact, whose summary shows a storylet state. */
+function watching(p: PlayerState, state: string): PlayerState {
+  const fact: WatchedFact = {
+    tick: p.watched.length,
+    cat: 'marti',
+    digest: 0,
+    summary: {
+      self: { node: 'flat.study', activity: 'none', interrupt: null },
+      cats: [],
+      storylets: [state],
+      detectors: [],
+      factsSet: [],
+      events: [],
+      nodesSeen: [],
+      paidBy: {},
+      totalPressure: 0,
+      weather: 'dry',
+    },
+  };
+  return { ...p, watched: [...p.watched, fact] };
+}
 
 describe('what a card or power could advance (06 §2)', () => {
   it('a card that writes what the state’s exits read advances it', () => {
@@ -104,10 +126,11 @@ describe('story markers at the playhead (06 §2)', () => {
     expect(storyMarks(p, v, c, null, false)).toEqual([]);
   });
 
-  it('a storylet already watched is not marked', () => {
+  it('a story whose next states were all watched in this timeline is not marked', () => {
     const v = viewWith([{ storylet: 'door_lure', state: 'home', p: 400_000, cat: 'marti' }]);
-    const watched: PlayerState = { ...p, frontier: { ...p.frontier, storylets: ['door_lure'] } };
-    expect(storyMarks(watched, v, c, null, true)).toEqual([]);
+    // watching `home` itself (Marti perceives it at dawn) does not hide it; watching `at_door` does
+    expect(storyMarks(watching(p, 'door_lure.home'), v, c, null, true)).toHaveLength(1);
+    expect(storyMarks(watching(p, 'door_lure.at_door'), v, c, null, true)).toEqual([]);
   });
 
   it('a held card rings the stories it could advance; a power rings none', () => {
@@ -135,7 +158,7 @@ describe('disruption warnings (06 §2)', () => {
     const before = [at(0, []), at(1, door(800_000)), at(2, door(600_000))];
     const after = [at(0, []), at(1, door(300_000)), at(2, door(100_000))];
     expect(disruptions(p, c, before, after, 1)).toEqual([
-      { storylet: 'door_lure', before: 800_000, after: 300_000 },
+      { storylet: 'door_lure', before: 800_000, after: 300_000, tick: 1, cat: 'marti' },
     ]);
   });
 
@@ -152,8 +175,9 @@ describe('disruption warnings (06 §2)', () => {
       { storylet: 'parcel_drop', state: 'dropping', p: 900_000, cat: null },
     ];
     expect(disruptions(p, c, [at(0, parcel)], [at(0, [])], 0)).toEqual([]);
-    const watched: PlayerState = { ...p, frontier: { ...p.frontier, storylets: ['door_lure'] } };
-    expect(disruptions(watched, c, [at(0, door(900_000))], [at(0, [])], 0)).toEqual([]);
+    // at_door leads to out and back_inside: once both were watched it has happened
+    const both = watching(watching(p, 'door_lure.out'), 'door_lure.back_inside');
+    expect(disruptions(both, c, [at(0, door(900_000))], [at(0, [])], 0)).toEqual([]);
   });
 
   it('a story tied by a pin the edit withdraws is judged as the player stood before', () => {
@@ -162,7 +186,7 @@ describe('disruption warnings (06 §2)', () => {
     ];
     const withPin = { ...p, pins: [teaOnRoad, lurePin] };
     expect(disruptions(withPin, c, [at(0, work)], [at(0, [])], 0)).toEqual([
-      { storylet: 'roadworks_day', before: 700_000, after: 0 },
+      { storylet: 'roadworks_day', before: 700_000, after: 0, tick: 0, cat: null },
     ]);
   });
 });

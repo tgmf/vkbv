@@ -1,6 +1,7 @@
 // The break alert (06 §6): before an edit lands that would undo watched paid facts or move unique or
 // power pins to the new edge, a bar above the timeline lists them with Confirm and Cancel. Information,
 // not a penalty; not a modal: the rest of the screen stays visible, but the edit waits for the choice.
+// M8: with assist mode on, forming stories the edit would disrupt, under their own heading (06 §2).
 import { For, Show } from 'solid-js';
 import type { WatchedFact } from '../bridge/protocol';
 import { clockText } from './clock';
@@ -12,6 +13,9 @@ export function BreakAlert(props: { game: Game; text: Text }) {
   const c = () => props.game.content;
   const ui = () => props.game.ui;
   const notice = () => (ui().pending?.phase === 'alert' ? ui().pending?.notice : null);
+  const disrupted = () => ui().pending?.disrupted ?? [];
+  const catName = (id: string | null) =>
+    id === null ? '' : props.text(c().cat[id]?.nameKey ?? '');
 
   /** A watched fact as the alert names it: the lines it showed, or its time. */
   const what = (f: WatchedFact): string => {
@@ -49,6 +53,23 @@ export function BreakAlert(props: { game: Game; text: Text }) {
               )}
             </For>
           </ul>
+          <Show when={disrupted().length > 0}>
+            <h3>{props.text('ui.alert.stories')}</h3>
+            <ul>
+              <For each={disrupted()}>
+                {(d) => (
+                  <li data-testid="disrupted" data-storylet={d.storylet}>
+                    {d.cat === null
+                      ? props.text('ui.alert.storyAt', { time: clockText(c(), d.tick) })
+                      : props.text('ui.alert.story', {
+                          name: catName(d.cat),
+                          time: clockText(c(), d.tick),
+                        })}
+                  </li>
+                )}
+              </For>
+            </ul>
+          </Show>
           <div class="buttons">
             <button
               type="button"

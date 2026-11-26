@@ -76,5 +76,6 @@ export function teaserView(
     labels,
     follow: first,
     pointer: null,
+    assist: [],
   };
 }

@@ -1,4 +1,4 @@
-// The viewer (M5): the world as a wave and the timeline, on the dev page (`?dev=1`) with seed 49598663
+// The viewer (M5): the world as a wave and the timeline, in the debug mode (`?dev=1`) with seed 49598663
 // played as typed (docs/questions.md M5-3: requested seed 1's vetted seed; under `road_both` Marti
 // meets Rokko at 18:50, golden file road_both.s1). Screenshots go to test-results/.
 import { expect, test, type Page } from '@playwright/test';
@@ -112,7 +112,8 @@ test.describe('the viewer (M5)', () => {
         await expect(gavrila).toHaveAttribute('data-activity', 'tea_break'); // 63% on this seed
       }
       if (name === 'lure') {
-        // the dev page's state panel (the M1.5 inspector, merged): the lure's pin fired at 17:35
+        // the debug panel's State tab (the M1.5 inspector, merged): the lure's pin fired at 17:35
+        await page.getByTestId('debug-tab-state').click();
         await expect(page.getByTestId('log')).toContainText('715 17:35 pinFired', {
           timeout: 20_000,
         });

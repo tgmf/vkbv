@@ -1,0 +1,24 @@
+# Manual upload of the build to itch.io (07 §7). Run it by hand from the Actions tab; never from a
+# coding session. Needs the repository secret BUTLER_API_KEY and the variable ITCH_TARGET
+# (e.g. "user/game:html5").
+name: itch.io
+
+on: workflow_dispatch
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci && npm run build
+      - name: Install butler
+        run: |
+          curl -L -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
+          unzip butler.zip -d butler
+          chmod +x butler/butler
+      - name: Upload dist/
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: butler/butler push dist "${{ vars.ITCH_TARGET }}"

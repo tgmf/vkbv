@@ -11,8 +11,10 @@ export interface SimClient {
   dispose(): void;
 }
 
-export function createSimClient(): SimClient {
+/** `onError`: the worker threw (the crash screen, M8). */
+export function createSimClient(onError?: (message: string) => void): SimClient {
   const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
+  worker.addEventListener('error', (e) => onError?.(e.message || 'the simulation stopped'));
   let nextId = 1;
   const latestByKind = new Map<MainToWorker['kind'], number>();
   const pending = new Map<

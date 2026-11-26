@@ -31,7 +31,9 @@ export type MainToWorker =
   | { kind: 'debugHistory'; reqId: number; tick: number; index: number }
   // The dev page's state panel (M1.5 inspector, merged into `?dev=1` in M5): the current timeline's
   // lantern at `tick` (index 0), or the reference history of stream `index` with the current pins.
-  | { kind: 'inspect'; reqId: number; tick: number; index: number };
+  | { kind: 'inspect'; reqId: number; tick: number; index: number; cat?: CatId }
+  // The debug panel's Events tab (M8): the current timeline's lantern events, tick 0 to the edge.
+  | { kind: 'events'; reqId: number };
 
 /** Simulation types the UI reads in replies (src/ui may not import src/sim, 02 §2). */
 export type {
@@ -39,6 +41,7 @@ export type {
   FrameLine,
   Pin,
   RecomputeResult,
+  RerunStats,
   TickSamples,
   WatchedFact,
 } from '../sim/types';
@@ -73,9 +76,24 @@ export type WorkerToMain =
     }
   | { kind: 'history'; reqId: number; state: SimState; events: SimEvent[] }
   | { kind: 'inspected'; reqId: number; view: InspectView }
+  | { kind: 'events'; reqId: number; events: EventLine[] }
   | { kind: 'error'; reqId: number; message: string };
 
-/** What the dev page's state panel shows at one tick. Plain data; floats never occur. */
+/** One lantern event as the Events tab lists it (M8): its tick, type and details. */
+export interface EventLine {
+  tick: number;
+  type: string;
+  text: string;
+}
+
+/** A fog case as the debug panel shows it (06 §10): its weight in ppm and its links' values. */
+export interface CaseView {
+  index: number;
+  weightPpm: number;
+  links: string[];
+}
+
+/** What the debug panel's State and Wave tabs show at one tick. Plain data; floats never occur. */
 export interface InspectView {
   tick: number;
   lastTick: number;
@@ -93,6 +111,8 @@ export interface InspectView {
     interrupt: string | null;
     route: string[];
     hooks: [string, number][]; // gauge values, hooks only
+    pressure: number;
+    touchedBy: string[];
   }[];
   storylets: { id: string; state: string; ended: boolean; roles: string }[];
   facts: string[];
@@ -101,4 +121,11 @@ export interface InspectView {
   closedEdges: string[];
   effects: { kind: string; place: string; radiusM: number; left: number; source: string }[];
   events: string[]; // trace lines of the ticks before this one (what led to this state), oldest first
+  pools: string[]; // each detector's live partial matches (06 §10)
+  // M8, the lantern only (empty for a reference history):
+  cases: CaseView[]; // the fog's cases at this tick, with their links (06 §10, Wave)
+  /** The picked fogged cat's chain per case (06 §10, State); null when none is picked or it is live. */
+  chain: { cat: CatId; cases: (CaseView & { states: { p: number; text: string }[] })[] } | null;
+  /** The current timeline's per-tick counts, tick 0 to its edge (06 §10, Wave). */
+  stats: { cases: number[]; live: number[]; states: number[]; localCauses: number };
 }

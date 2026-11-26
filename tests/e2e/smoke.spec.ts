@@ -73,7 +73,7 @@ test('a save that cannot be read starts a new day with a notice', async ({ page 
 test('?debug=1 lists every tuning knob with its description', async ({ page }) => {
   await page.goto('./?debug=1');
   const debug = page.getByTestId('debug');
-  await expect(debug).toContainText('fog.maxLinks');
+  await expect(debug.getByTestId('knob-fog.maxLinks')).toBeVisible();
   await expect(debug).toContainText('Links besides the weather');
   await page.screenshot({ path: 'test-results/smoke-debug.png' });
   await page.keyboard.press('`');

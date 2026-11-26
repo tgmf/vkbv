@@ -1,13 +1,14 @@
-import { createEffect, createMemo, createSignal, For, onSettled, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from 'solid-js';
 import type { SimClient } from '../bridge/client';
 import type { Pin } from '../bridge/protocol';
-import type { TuningRow } from '../content/schemas';
+import type { Tuning, TuningRow } from '../content/schemas/tuning';
 import { LOCALES, setLocale, t, type Locale } from '../i18n/t';
 import { handOf } from '../player/targets';
 import { BreakAlert } from './BreakAlert';
 import { clockText } from './clock';
-import { DevPanel } from './DevPanel';
-import { EndScreen, HintLine, TeaserCard } from './Flow';
+import type { SummaryIds, Telemetry } from '../telemetry';
+import { DebugPanel } from './debug/Debug';
+import { EndScreen, HintLine, TeaserCard, TelemetryNotice } from './Flow';
 import type { Game } from './game';
 import { Hand } from './Hand';
 import { reducedMotion } from './motion';
@@ -32,14 +33,24 @@ function switchLocale(next: Locale): void {
   document.documentElement.lang = next;
 }
 export interface AppProps {
-  tuningRows: TuningRow[];
   game: Game;
   sim: SimClient;
   pinsets: Record<string, Pin[]>;
   seed: number;
+  /** The debug mode `?dev=1` (02 §6): the debug panel open, no teaser, no saving, no settings. */
   dev: boolean;
   /** Starts a new day after the settings' confirm step. */
   newGame: () => void;
+  // M8: the debug panel and telemetry
+  telemetry: Telemetry;
+  summaryIds: () => SummaryIds;
+  rowsOf: (t: Tuning) => TuningRow[];
+  defaults: Tuning;
+  retune: (raw: unknown) => string | null;
+  /** The build has a remote telemetry sink (07 §6). */
+  remote: boolean;
+  /** No saved settings were found: a first visit (the telemetry notice shows). */
+  firstVisit: boolean;
 }
 
 /** The layout of 06 §1: top bar, world view, side panel, hand, the break alert and the timeline. */
@@ -47,7 +58,9 @@ export function App(props: AppProps) {
   const c = () => props.game.content;
   const ui = () => props.game.ui;
   const scene = createSceneHandle();
-  const [debug, setDebug] = createSignal(new URLSearchParams(location.search).get('debug') === '1');
+  const [debug, setDebug] = createSignal(
+    untrack(() => props.dev) || new URLSearchParams(location.search).get('debug') === '1',
+  );
   const labels = createMemo(() => {
     const out: Record<string, string> = {};
     for (const n of c().nodes) out[`node:${n.id}`] = tr(n.nameKey);
@@ -71,7 +84,12 @@ export function App(props: AppProps) {
 
   onSettled(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLSelectElement ||
+        e.target instanceof HTMLTextAreaElement
+      )
+        return;
       const g = props.game;
       if (e.key === '`') {
         setDebug((d) => !d);
@@ -171,7 +189,7 @@ export function App(props: AppProps) {
           {clockText(c(), ui().playhead)}
         </span>
         <Show when={!props.dev}>
-          <Settings game={props.game} text={tr} newGame={props.newGame} />
+          <Settings game={props.game} text={tr} newGame={props.newGame} remote={props.remote} />
         </Show>
         <div class="lang" role="group" aria-label={tr('ui.language')}>
           <For each={LOCALES}>
@@ -209,35 +227,22 @@ export function App(props: AppProps) {
       <Timeline game={props.game} text={tr} />
       <EndScreen game={props.game} text={tr} />
       <HintLine game={props.game} text={tr} />
-      <Show when={props.dev}>
-        <DevPanel game={props.game} sim={props.sim} pinsets={props.pinsets} seed={props.seed} />
-      </Show>
+      <TelemetryNotice game={props.game} text={tr} show={props.remote && props.firstVisit} />
       <Show when={debug()}>
-        <DebugPanel rows={props.tuningRows} />
+        <DebugPanel
+          game={props.game}
+          sim={props.sim}
+          pinsets={props.pinsets}
+          seed={props.seed}
+          telemetry={props.telemetry}
+          summaryIds={props.summaryIds}
+          rowsOf={props.rowsOf}
+          defaults={props.defaults}
+          retune={props.retune}
+          dev={props.dev}
+        />
       </Show>
     </div>
-  );
-}
-
-/** Developer view of every tuning knob with its documentation. Read-only until M8. Not player-facing, so not translated. */
-function DebugPanel(props: { rows: TuningRow[] }) {
-  return (
-    <aside class="debug" data-testid="debug">
-      <h2>tuning.json</h2>
-      <table>
-        <tbody>
-          <For each={props.rows}>
-            {(row) => (
-              <tr>
-                <th scope="row">{row.key}</th>
-                <td class="value">{row.value}</td>
-                <td class="desc">{row.description}</td>
-              </tr>
-            )}
-          </For>
-        </tbody>
-      </table>
-    </aside>
   );
 }
 

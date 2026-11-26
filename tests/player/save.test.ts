@@ -23,6 +23,7 @@ const settings: Settings = {
   focusLayer: true,
   assist: false,
   volume: 80,
+  telemetry: false,
 };
 
 /** A fake storage, as `localStorage` would be. */
@@ -81,5 +82,14 @@ describe('save, reload, continue (04 §9)', () => {
     ])
       expect(deserialize(bad)).toBeNull();
     expect(load(memory())).toBeNull();
+  });
+
+  it('a save from before M8, without the telemetry setting, loads with it on', () => {
+    const p = driver(files);
+    p.start(1, 1);
+    const old: Partial<Settings> = { ...settings };
+    delete old.telemetry;
+    const got = deserialize(JSON.stringify({ player: p.player, settings: old }));
+    expect(got?.settings).toEqual({ ...settings, telemetry: true });
   });
 });

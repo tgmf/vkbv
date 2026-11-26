@@ -12,7 +12,10 @@
 //  6. the lure withdrawn (the break alert): the timeline frays; the lure placed again: the anchor again.
 // After each step the page is reloaded and must come back the same: the save, the watched facts, the
 // charge, the edge and the end. A screenshot per step goes to test-results/fp-*.png.
+// M8: it is also the scripted telemetry session (07 §6): the end screen's follow link (the e2e build
+// sets VITE_URL_FOLLOW only) and a pin dragged to another tick, so every event shows in the kept buffer.
 import { expect, test, type Page } from '@playwright/test';
+import { EVENT_NAMES, type TelemetryEvent } from '../../src/telemetry/events';
 import {
   charge,
   edge,
@@ -23,6 +26,7 @@ import {
   playToEnd,
   resumed,
   saveOf,
+  tickXY,
   unfocus,
   watchConsole,
   zoomOut,
@@ -119,6 +123,7 @@ test('the first playthrough, seed 1', async ({ page }) => {
   const errors = watchConsole(page);
   await recordHints(page);
   await page.setViewportSize({ width: 1280, height: 720 });
+  await page.context().route('https://example.invalid/**', (r) => r.fulfill({ body: 'ok' }));
 
   // 1. A new game on a typed seed: the teaser while it is vetted live, then "preparing the day"
   await page.goto('./?seed=1');
@@ -171,11 +176,15 @@ test('the first playthrough, seed 1', async ({ page }) => {
   await playToEnd(page);
   await expect(page.getByTestId('strike')).toHaveCount(1);
   await expect(page.getByTestId('end-screen')).toBeVisible({ timeout: 20_000 });
-  // no button without a URL: this build sets none of VITE_URL_*
-  for (const b of ['follow', 'wishlist', 'newsletter'])
+  // no button without a URL: the e2e build sets only VITE_URL_FOLLOW
+  for (const b of ['wishlist', 'newsletter'])
     await expect(page.getByTestId(`end-${b}`)).toHaveCount(0);
+  await expect(page.getByTestId('end-follow')).toBeVisible();
   await expect(page.getByTestId('keep-playing')).toBeVisible();
   await shot(page, '08-end-screen');
+  const popup = page.waitForEvent('popup');
+  await page.getByTestId('end-follow').click(); // `cta_click`
+  await (await popup).close();
   // Rokko's thread, locked, with its line on hover
   await page.getByTestId('locked-thread').hover();
   await expect(page.getByTestId('locked-tip')).toBeVisible();
@@ -199,6 +208,19 @@ test('the first playthrough, seed 1', async ({ page }) => {
   await page.getByTestId('place-town.roadworks').focus();
   await page.keyboard.press('Enter');
   await landEdit(page);
+  // the Box pin dragged back to 08:55 (`pin_moved`)
+  const boxPin = page.locator('[data-testid^="pin-"]', {
+    has: page.locator('title', { hasText: 'Box' }),
+  });
+  const pb = await boxPin.boundingBox();
+  if (!pb) throw new Error('no Box pin');
+  const [tx] = await tickXY(page, 195);
+  await page.mouse.move(pb.x + pb.width / 2, pb.y + pb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(tx, pb.y + pb.height / 2, { steps: 5 });
+  await page.mouse.up();
+  await landEdit(page);
+  await expect(boxPin).toHaveAttribute('data-tick', '195');
   await shot(page, '11-roadworks');
   await playToEnd(page);
   await expect(page.getByTestId('strike')).toHaveCount(1);
@@ -241,5 +263,16 @@ test('the first playthrough, seed 1', async ({ page }) => {
     expect(shown, shown.join(' ')).toContain(h);
   const saved = JSON.parse((await saveOf(page)) ?? '{}') as { player?: { seen?: string[] } };
   expect(saved.player?.seen).toEqual([...shown, 'end', 'teaser'].sort());
+
+  // the scripted session produced every telemetry event (07 §6), across its page loads
+  const events = await page.evaluate<TelemetryEvent[]>(
+    `JSON.parse(localStorage.getItem('acfw.telemetry') ?? '[]')`,
+  );
+  const names = new Set(events.map((e) => e.name));
+  expect(
+    EVENT_NAMES.filter((n) => !names.has(n)),
+    'telemetry events never recorded',
+  ).toEqual([]);
+  expect(new Set(events.map((e) => e.session)).size).toBeGreaterThan(5); // one per page load
   expect(errors).toEqual([]);
 });

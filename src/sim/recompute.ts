@@ -20,6 +20,7 @@ import type {
   Pin,
   RecomputeResult,
   RerunStats,
+  SimEvent,
   WatchedFact,
 } from './types';
 import { newDecisionMemo } from './types';
@@ -52,6 +53,8 @@ export interface Timeline {
    * edge whose step was taken (`{}` for a last tick): playback behind the edge reads them.
    */
   views: Record<CatId, WatchedFact>[];
+  /** Index t: the lantern's events of the step from tick t (none at a last tick): the debug panel. */
+  events: SimEvent[][];
   /** Index t: what the focus layer's samples read at tick t (samples.ts). */
   trace: TickTrace[];
   result: RecomputeResult;
@@ -174,6 +177,7 @@ export function* rerun(
   const checkpoints = kept ? kept.checkpoints.slice(0, k + 1) : [start];
   const frames: Frame[] = kept ? kept.result.frames.slice(0, from) : [];
   const views = kept ? kept.views.slice(0, from) : [];
+  const events = kept ? kept.events.slice(0, from) : [];
   const trace = kept ? kept.trace.slice(0, from) : [];
   const old = kept?.result.stats;
   const stats: RerunStats = {
@@ -211,9 +215,11 @@ export function* rerun(
     frame: Frame,
     view: Record<CatId, WatchedFact>,
     tr: TickTrace,
+    next: Wave | null,
   ) => {
     frames.push(frame);
     views.push(view);
+    events.push(next ? next.tickEvents : []);
     trace.push(tr);
     stats.cases.push(w.fog.cases.length);
     stats.live.push(w.lantern.live.length);
@@ -259,12 +265,12 @@ export function* rerun(
       tested = w;
       end = { kind: 'limit', tick: edgeWave.lantern.sim.tick };
       if (!before) {
-        record(t, w, frame, view, tr);
+        record(t, w, frame, view, tr, next);
         yield { tick: t, frame };
       }
       break;
     }
-    record(t, w, frame, view, tr);
+    record(t, w, frame, view, tr, next);
     yield { tick: t, frame };
     if (next === null) {
       edgeWave = w;
@@ -295,6 +301,7 @@ export function* rerun(
     edgeWave,
     ahead,
     views,
+    events,
     trace,
     result: {
       frames,
@@ -369,6 +376,7 @@ export function extendEdge(setup: FogSetup, tl: Timeline): Timeline | null {
     edgeWave: w,
     ahead,
     views: [...tl.views, view],
+    events: [...tl.events, next ? next.tickEvents : []],
     trace,
     result: {
       ...r,

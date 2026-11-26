@@ -16,7 +16,8 @@ import { followedCats } from '../sim/readers';
 import { extendEdge, rerun, type Timeline } from '../sim/recompute';
 import type { Frame, Pin, SimEvent } from '../sim/types';
 import { vet } from '../sim/vet';
-import { historySource, inspectView, LOG_TICKS } from './inspect';
+import { describe } from '../sim/trace';
+import { caseView, chainView, historySource, inspectView, LOG_TICKS } from './inspect';
 import type { MainToWorker, WorkerToMain } from './protocol';
 
 export interface HostFiles {
@@ -172,13 +173,29 @@ export function createHost(files: HostFiles, deps: HostDeps): Host {
         if (!state) return fail(msg.reqId, `tick ${msg.tick} is past the history's end`);
         return post({ kind: 'history', reqId: msg.reqId, state, events: events[msg.tick] ?? [] });
       }
-      case 'inspect': {
-        // the dev page's state panel: the lantern at the tick, or a reference history
+      case 'events': {
+        // the debug panel's Events tab: the lantern's events of every tick up to the edge
         const tl = current;
         if (!tl) return fail(msg.reqId, 'no current wave');
+        const events = tl.events.flatMap((list, tick) =>
+          list.map((e) => ({ tick, type: e.type, text: describe(e) })),
+        );
+        return post({ kind: 'events', reqId: msg.reqId, events });
+      }
+      case 'inspect': {
+        // the debug panel's State and Wave tabs: the lantern at the tick, or a reference history
+        const tl = current;
+        if (!tl) return fail(msg.reqId, 'no current wave');
+        const s = tl.result.stats;
+        const stats = {
+          cases: s.cases,
+          live: s.live,
+          states: s.states,
+          localCauses: s.localCauses,
+        };
         if (msg.index > 0) {
           const view = inspectView(c, historySource(referenceOf(c, tl, msg.index), msg.tick));
-          return post({ kind: 'inspected', reqId: msg.reqId, view });
+          return post({ kind: 'inspected', reqId: msg.reqId, view: { ...view, stats } });
         }
         const tick = Math.max(0, Math.min(msg.tick, tl.result.edge));
         const recent: { tick: number; events: SimEvent[] }[] = [];
@@ -198,7 +215,17 @@ export function createHost(files: HostFiles, deps: HostDeps): Host {
           lastTick: tl.result.edge,
           live: w.lantern.live,
         });
-        return post({ kind: 'inspected', reqId: msg.reqId, view });
+        const cat = msg.cat !== undefined && !w.lantern.live.includes(msg.cat) ? msg.cat : null;
+        return post({
+          kind: 'inspected',
+          reqId: msg.reqId,
+          view: {
+            ...view,
+            cases: w.fog.cases.map(caseView),
+            chain: cat === null ? null : chainView(w.fog, cat),
+            stats,
+          },
+        });
       }
       case 'observe': {
         // playback (03 §15.2): behind the edge the timeline already holds the tick's watched fact;

@@ -74,46 +74,6 @@ body {
   overflow: hidden;
 }
 
-.debug {
-  position: fixed;
-  top: 48px;
-  right: 8px;
-  bottom: 8px;
-  width: min(640px, 90vw);
-  overflow: auto;
-  padding: 8px 12px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  font: 12px/1.4 var(--mono);
-}
-
-.debug h2 {
-  margin: 0 0 8px;
-  font-size: 0.8125rem;
-}
-
-.debug table {
-  border-collapse: collapse;
-}
-
-.debug th,
-.debug td {
-  padding: 2px 8px 2px 0;
-  text-align: left;
-  vertical-align: top;
-  font-weight: normal;
-}
-
-.debug .value {
-  color: var(--accent);
-  white-space: nowrap;
-}
-
-.debug .desc {
-  width: 60%;
-  color: var(--muted);
-}
-
 .content-error {
   padding: 24px;
   color: var(--error);
@@ -188,6 +148,16 @@ button[aria-pressed='true'] {
   font-weight: 600;
   color: var(--text);
   text-shadow: 0 1px 2px #000;
+}
+
+.scene-story {
+  font-size: 1.125rem;
+  color: #e3c2ff;
+  text-shadow: 0 0 6px #b77cff;
+}
+
+.scene-story.ring {
+  color: #ffffff;
 }
 
 .scene-cluster {
@@ -352,7 +322,8 @@ button[aria-pressed='true'] {
   color: var(--muted);
 }
 
-button:disabled {
+button:disabled,
+button[aria-disabled='true'] {
   opacity: 0.5;
   cursor: default;
 }
@@ -904,37 +875,73 @@ html[data-motion='reduce'] [data-pulse='true'] {
   outline: 3px solid rgb(255 210 120 / 0.8);
 }
 
-/* --- dev page (?dev=1) ---------------------------------------------------------------------- */
-.dev {
+/* --- the debug panel (06 §10; ?debug=1, the backquote, the debug mode ?dev=1) ------------------ */
+.debug {
   position: fixed;
   top: 48px;
   right: 8px;
-  width: min(460px, 40vw);
+  width: min(520px, 42vw);
   max-height: calc(100vh - 240px);
   overflow: auto;
   padding: 6px 10px;
-  background: rgb(38 41 48 / 0.94);
+  background: rgb(38 41 48 / 0.96);
   border: 1px solid var(--line);
   font: 12px/1.4 var(--mono);
+  z-index: 20;
 }
 
-.dev .controls {
+.debug .tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.debug .tabs button {
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.debug .tabs button[aria-selected='true'] {
+  color: var(--bg);
+  background: var(--accent);
+}
+
+.debug .controls {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
 }
 
-.dev input[type='number'] {
+.debug input[type='number'] {
   width: 96px;
 }
 
-.dev h3 {
+.debug .value input {
+  width: 150px;
+  font: inherit;
+  color: var(--accent);
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+
+.debug textarea {
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.debug h3 {
   margin: 10px 0 4px;
   font-size: 0.75rem;
   color: var(--accent);
 }
 
-.dev .log {
+.debug .log,
+.debug .raw {
   margin: 0;
   max-height: 180px;
   overflow: auto;
@@ -942,31 +949,106 @@ html[data-motion='reduce'] [data-pulse='true'] {
   color: var(--muted);
 }
 
-.dev table {
+.debug .raw {
+  max-height: 320px;
+}
+
+.debug table {
   border-collapse: collapse;
   width: 100%;
 }
 
-.dev th,
-.dev td {
+.debug th,
+.debug td {
   padding: 1px 6px 1px 0;
   text-align: left;
   vertical-align: top;
   font-weight: normal;
 }
 
-.dev .gauges,
-.dev small,
-.dev .small,
-.dev .fogged {
+.debug .desc,
+.debug .gauges,
+.debug small,
+.debug .small,
+.debug .fogged {
   color: var(--muted);
 }
 
-.dev .ended {
+.debug .value {
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.debug .error {
+  color: var(--error);
+  white-space: pre-wrap;
+}
+
+.debug .ended {
   opacity: 0.5;
 }
 
-.dev ul {
+.debug ul,
+.debug ol.events {
   margin: 0;
   padding-left: 16px;
+}
+
+.debug .link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+}
+
+.debug .spark {
+  margin: 4px 0;
+  color: var(--text);
+}
+
+.debug .numbers {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 0 0 6px;
+}
+
+.debug .numbers dd {
+  margin: 0;
+}
+
+/* --- the telemetry notice and the crash screen (M8) ---------------------------------------- */
+.telemetry-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 140px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 6px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  z-index: 15;
+}
+
+.crash {
+  max-width: 640px;
+  margin: 10vh auto;
+  padding: 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+.crash h1 {
+  margin-top: 0;
+  font-size: 1.25rem;
+}
+
+.crash textarea {
+  width: 100%;
+  margin-top: 12px;
+  font: 0.875rem/1.4 var(--mono);
+  color: var(--text);
+  background: var(--bg);
 }

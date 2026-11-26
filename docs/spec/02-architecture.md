@@ -37,11 +37,12 @@ src/
                lantern.ts backward.ts observe.ts frames.ts samples.ts recompute.ts vet.ts
                phi-table.ts trace.ts types.ts
   player/      state.ts actions.ts rewards.ts frontier.ts playback.ts (the shuttle's rules) save.ts
-               targets.ts (what a held card or power can do, M6)
+               targets.ts (what a held card or power can do, M6) assist.ts (assist mode's rules, M8)
+               debug.ts (the debug panel's Player tab, M8)
   bridge/      protocol.ts host.ts (the worker's code, also run headless in Node) sim.worker.ts
-               client.ts inspect.ts (the dev page's state panel, M5)
-  render/      SceneRenderer.ts index.ts three/ (graybox implementation: graybox.ts textures.ts
-               fogPass.ts)
+               client.ts inspect.ts (the debug panel's State and Wave tabs, M5, M8)
+  render/      SceneRenderer.ts index.ts pulse.ts (assist mode's pulse, M8) three/ (graybox
+               implementation: graybox.ts textures.ts fogPass.ts)
   ui/          Solid components, theme.css
   content/     schemas/ (Zod) load.ts data/
                data/tuning.json
@@ -127,7 +128,8 @@ type MainToWorker =
   | { kind: 'commit'; reqId: number }                      // make a preview the current wave; replies `ready` (`error` without one)
   | { kind: 'observe'; reqId: number; tick: number; cat: CatId }
   | { kind: 'debugHistory'; reqId: number; tick: number; index: number } // index 0: the lantern state; i > 0: reference histories (stream i)
-  | { kind: 'inspect'; reqId: number; tick: number; index: number }; // dev page's state panel (M5): as debugHistory, as a readable view
+  | { kind: 'inspect'; reqId: number; tick: number; index: number; cat?: CatId } // debug panel's State and Wave tabs (M5, M8): as debugHistory, as a readable view; `cat`: a fogged cat's chain per case
+  | { kind: 'events'; reqId: number };                     // debug panel's Events tab (M8): the lantern's events, tick 0 to the edge
 type WorkerToMain =
   | { kind: 'ready'; reqId: number }
   | { kind: 'vetted'; reqId: number; seed: number }
@@ -138,7 +140,8 @@ type WorkerToMain =
       end: RecomputeResult['end'] }                       // at the edge: the new edge's frame and
                                                           // samples, Gaze there, where it ends
   | { kind: 'history'; reqId: number; state: SimState; events: SimEvent[] }
-  | { kind: 'inspected'; reqId: number; view: InspectView }                 // dev page (M5)
+  | { kind: 'inspected'; reqId: number; view: InspectView }                 // debug panel (M5, M8)
+  | { kind: 'events'; reqId: number; events: EventLine[] }                  // debug panel (M8)
   | { kind: 'error'; reqId: number; message: string };
 ```
 
@@ -167,7 +170,16 @@ interface SceneView {                  // what the renderer gets every animation
   follow: CatId | null;                // the cat the camera follows; null once the player pans
   // added in M6:
   pointer: [number, number] | null;    // the pointer over the canvas (CSS px); the magnifying ring
-}                                      // and Gaze's ring sit there while something is held
+                                       // and Gaze's ring sit there while something is held
+  // added in M8:
+  assist: AssistMarker[];              // assist mode's story markers (06 §2); empty when it is off
+}
+interface AssistMarker {               // src/player's story markers (06 §2)
+  key: string;                         // seeds its pulse cycle (render only)
+  cat: CatId; p: number;               // on that cat, lit for p (ppm) of each cycle
+  ring: boolean;                       // the held card could advance it
+  objects: ObjectId[];                 // the interactable objects at its place, marked with it
+}
 interface Highlight {                  // `held`: src/player's valid targets (06 §4)
   cats: CatId[]; objects: ObjectId[]; places: NodeId[];
   focus: Pick | null;                  // the keyboard's focused target, drawn with a focus ring

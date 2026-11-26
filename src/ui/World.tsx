@@ -4,6 +4,7 @@
 // inspect panel. Floats live here and in src/render only.
 import { createSignal, For, onSettled, Show } from 'solid-js';
 import type { Target } from '../player/actions';
+import { storyMarks } from '../player/assist';
 import { createGrayboxRenderer, type Bubble, type SceneView } from '../render';
 import { reducedMotion } from './motion';
 import type { Game } from './game';
@@ -95,7 +96,6 @@ export function World(props: WorldProps) {
       previousPath: props.game.previousPath(now),
       settings: {
         focusLayer: settings.focusLayer,
-        // QUESTION(M7-1): no milestone builds assist-mode highlights; the renderer draws none yet
         assist: settings.assist,
         reducedMotion: motionOff,
       },
@@ -104,6 +104,14 @@ export function World(props: WorldProps) {
       // the strike (06 §9): the view holds on the meeting for the ticks after it
       follow: follow() || struck(tick) ? (player.followed[0] ?? null) : null,
       pointer: pointer && rect ? [pointer[0] - rect.left, pointer[1] - rect.top] : null,
+      // assist mode (06 §2): story markers from src/player, drawn by the renderer
+      assist: storyMarks(player, view, c(), u.held, settings.assist).map((m) => ({
+        key: m.storylet,
+        cat: m.cat,
+        p: m.p,
+        ring: m.ring,
+        objects: m.objects,
+      })),
     };
   };
 

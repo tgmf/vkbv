@@ -3,17 +3,21 @@
 // through the bridge and asks src/player for every rule; it never simulates and decides no rule.
 // M6 adds holding a card or power, edits (a preview first, the break alert, commit or cancel), edit
 // feedback, inspecting, and short notices where something was refused.
+// M8 adds the debug panel's hooks (retune, strain, the Player tab's buttons), telemetry (07 §6) and
+// assist mode's disruption warnings in the break alert (06 §2).
 import { createStore, markRaw } from 'solid-js';
 import type { SimClient } from '../bridge/client';
 import type {
   Frame,
   Pin,
   RecomputeResult,
+  RerunStats,
   TickSamples,
   WatchedFact,
   WorkerToMain,
 } from '../bridge/protocol';
 import type { Content } from '../content/schemas/content';
+import type { Tuning } from '../content/schemas/tuning';
 import {
   advance,
   applyPreview,
@@ -27,6 +31,8 @@ import {
   type Refusal,
   type Target,
 } from '../player/actions';
+import { disruptions, type Disruption } from '../player/assist';
+import { debugAction, type DebugAction } from '../player/debug';
 import {
   forward,
   forwardLimit,
@@ -56,6 +62,7 @@ import {
   type HintId,
   type HintState,
 } from './hints';
+import type { Track } from '../telemetry';
 import { storyDots } from './story';
 
 /**
@@ -72,18 +79,26 @@ export const defaultSettings = (c: Content): Settings => ({
   focusLayer: true,
   assist: c.tuning.flags.assist,
   volume: 100,
+  telemetry: true,
 });
 
 export interface GameOptions {
   settings?: Settings;
-  /** Saves the player and the settings (04 §9); absent on the dev page, which saves nothing. */
+  /** Saves the player and the settings (04 §9); absent in the debug mode, which saves nothing. */
   save?: (player: PlayerState, settings: Settings) => void;
+  /** Telemetry (07 §6); absent in tests. */
+  track?: Track;
+  /** What `session_start` records besides the game: the build and the viewport. */
+  info?: () => { build: string; viewport: string };
 }
 
 export interface View extends PlayerView {
   samples: TickSamples[];
   /** While a re-run streams: the last tick that has arrived (02 §3); null otherwise. */
   streamedUpTo: number | null;
+  /** The last re-run's debug numbers and reopened facts (06 §10, the Wave tab); null before one. */
+  stats: RerunStats | null;
+  reopened: WatchedFact[];
 }
 
 /** A line shown as a speech bubble (06 §2), its text key not yet through t(). */
@@ -112,6 +127,8 @@ export interface Pending {
   after: PlayerState;
   /** The view before the edit: the frames the facts the alert lists were watched in. */
   old: View;
+  /** Assist mode: forming stories the edit would disrupt (06 §2), listed under their own heading. */
+  disrupted: Disruption[];
 }
 
 /** What edit feedback shows after an edit lands (06 §6), until `until` (real ms). */
@@ -150,7 +167,7 @@ export interface Game {
   readonly ui: UiState;
   /** Plain state for the animation loop. */
   now(): { player: PlayerState; view: View; shuttle: Shuttle; frac: number };
-  /** The dev page: a seed played as given, with pins, no teaser and no saving. */
+  /** The debug panel's Pin sets tab: a seed played as given, with pins, no teaser. */
   start(seed: number, pins: Pin[], revealAll: boolean): void;
   /**
    * A new day (M7): the teaser plays while the seed is vetted (when `seed` is null) and the first
@@ -196,6 +213,17 @@ export interface Game {
   cancel(): void;
   /** Escape: cancel a confirm step or the alert, else close a panel, else put the held thing down. */
   escape(): void;
+  // M8: the debug panel and telemetry
+  /** New content (a tuning change): the worker loads it, and the day is re-run from the player. */
+  retune(next: Content): void;
+  /** Strain (03 §14): a projection from the edge, tens of seconds of the worker's time. */
+  computeStrain(): void;
+  /** One of the Player tab's buttons (06 §10). */
+  debug(action: DebugAction): void;
+  /** Records a telemetry event the components see (the end screen's buttons). */
+  track: Track;
+  /** The page is being left: `session_end` (07 §6). */
+  endSession(): void;
 }
 
 export interface UiState {
@@ -228,6 +256,9 @@ export interface UiState {
   endOpen: boolean;
   settings: Settings;
   seen: string[];
+  /** The tuning the game runs with (the debug panel's Tuning tab). */
+  tuning: Tuning;
+  strainRunning: boolean;
 }
 
 const emptyView = (): View => ({
@@ -237,6 +268,8 @@ const emptyView = (): View => ({
   end: { kind: 'limit', tick: 0 },
   gazeFacts: [],
   streamedUpTo: null,
+  stats: null,
+  reopened: [],
 });
 
 const viewOf = (r: RecomputeResult): View => ({
@@ -246,15 +279,24 @@ const viewOf = (r: RecomputeResult): View => ({
   end: r.end,
   gazeFacts: r.gazeFacts,
   streamedUpTo: null,
+  stats: r.stats,
+  reopened: r.reopened,
 });
+
+const BEHIND_TICKS = 30; // `card_played.behindLimit`, `scroll_back` (07 §6)
+const RECOMPUTE_EVERY = 10; // `recompute` events: every 10th, and every one over budget (07 §6)
 
 const pinsKey = (pins: readonly Pin[]): string => JSON.stringify(pins);
 
 export function createGame(content: Content, sim: SimClient, opts: GameOptions = {}): Game {
-  const c = content;
-  const flow = c.tuning.flow;
-  const gazeId = c.powers.find((p) => p.effects.some((e) => e.prim === 'collapse'))?.id;
-  const lureId = c.powers.find((p) => p.effects.some((e) => e.prim === 'attract'))?.id;
+  // the content changes only when the debug panel retunes it (`retune`)
+  let c = content;
+  let flow = c.tuning.flow;
+  const powerWith = (prim: string) =>
+    c.powers.find((p) => p.effects.some((e) => e.prim === prim))?.id;
+  let gazeId = powerWith('collapse');
+  let lureId = powerWith('attract');
+  const track: Track = opts.track ?? (() => undefined);
   const costOf = (id: string | undefined) => (id ? (c.power[id]?.cost ?? 0) : Infinity);
   let player = newGame(c, 0, 0);
   let view = emptyView();
@@ -307,6 +349,14 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
     watched: [],
     set: new Set(),
   };
+  // M8: telemetry's counters for this page load (07 §6)
+  const counts = { pins: 0, withdrawals: 0, scrollBacks: 0, powers: 0, gazes: 0, recomputes: 0 };
+  const watchedStates = new Set<string>(); // `story_watched`: first time in this session
+  let maxPlayed = 0; // the highest tick ever played through (`behindLimit`)
+  let back: { from: number; to: number } | null = null; // a backward move under way (`scroll_back`)
+  let wasAtFray = false;
+  let hadAnchor = false;
+  let strainRunning = false;
 
   const minSpan = () => Math.max(c.tuning.timeline.minSpanTicks, 1);
   const targetsNow = (): Targets | null => (held ? targetsOf(player, view, c, held) : null);
@@ -340,6 +390,8 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
     endOpen: false,
     settings,
     seen: [],
+    tuning: markRaw(c.tuning),
+    strainRunning: false,
   });
   const sync = () => {
     const targets = targetsNow();
@@ -367,6 +419,7 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
             notice: pending.notice,
             after: pending.after,
             old: pending.before.view,
+            disrupted: pending.disrupted,
           })
         : null;
       d.feedback = feedback ? markRaw(feedback) : null;
@@ -379,6 +432,8 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
       d.endOpen = endOpen;
       d.settings = settings;
       d.seen = markRaw(seen);
+      d.tuning = markRaw(c.tuning);
+      d.strainRunning = strainRunning;
     });
   };
 
@@ -428,6 +483,7 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
     const r = stepHints(hints, seen, triggered(hintFacts(nowMs), flow), nowMs, flow.hintMs);
     const changed = r.state.visible?.id !== hints.visible?.id;
     hints = r.state;
+    if (changed && hints.visible) track('hint_shown', { id: hints.visible.id });
     if (r.seen.length !== seen.length) {
       seen = r.seen;
       persist();
@@ -514,7 +570,10 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
   function recompute(p: PlayerState, isPreview: boolean, onFrom: (from: number) => void) {
     const me = session;
     let first = true;
-    return sim.request(
+    const t0 = performance.now();
+    let firstMs: number | null = null;
+    let fromTick = 0;
+    const request = sim.request(
       {
         kind: 'recompute',
         seed: p.seed,
@@ -526,7 +585,11 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
       (patch) => {
         if (me !== session) return;
         const { from, frames } = patch.frames;
-        if (first) onFrom(from);
+        if (first) {
+          onFrom(from);
+          firstMs = Math.round(performance.now() - t0);
+          fromTick = from;
+        }
         first = false;
         view = {
           ...view,
@@ -538,6 +601,95 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
         sync();
       },
     );
+    // telemetry (07 §6): the time to the first streamed frames, every 10th and every one over budget
+    return request.then((reply) => {
+      if (reply.kind === 'result') {
+        counts.recomputes += 1;
+        const r = reply.result;
+        const ms = firstMs ?? Math.round(performance.now() - t0);
+        if (counts.recomputes % RECOMPUTE_EVERY === 0 || ms > c.tuning.budgets.recomputeMs)
+          track('recompute', {
+            ms,
+            ticks: Math.max(0, r.edge - fromTick),
+            cases: r.stats.cases[r.edge] ?? 0,
+            live: r.stats.live[r.edge] ?? 0,
+          });
+      }
+      return reply;
+    });
+  }
+
+  /** A day has started (the first re-run arrived): `session_start` and the counters it reads. */
+  function started(): void {
+    maxPlayed = player.watched.reduce((a, f) => Math.max(a, f.tick), 0);
+    hadAnchor = player.anchorWatched;
+    wasAtFray = false;
+    back = null;
+    const info = opts.info?.() ?? { build: 'test', viewport: '' };
+    track('session_start', {
+      ...info,
+      locale: settings.lang,
+      seed: player.seedRequested,
+      vettedSeed: player.seed,
+      playedCardRule: c.tuning.player.playedCardRule,
+    });
+  }
+
+  /** A backward move ended: `scroll_back` when it went back 30 ticks or more (07 §6). */
+  function flushBack(): void {
+    if (back && back.from - back.to >= BEHIND_TICKS) {
+      counts.scrollBacks += 1;
+      track('scroll_back', { fromTick: back.from, toTick: back.to });
+    }
+    back = null;
+  }
+
+  /** The telemetry of an edit that landed (07 §6): what was played, withdrawn, moved, reopened. */
+  function trackEdit(before: PlayerState, after: PlayerState, result: RecomputeResult): void {
+    for (const x of after.pins) {
+      const old = before.pins.find((y) => y.id === x.id);
+      if (old) {
+        if (old.tick !== x.tick)
+          track('pin_moved', { kind: x.kind, fromTick: old.tick, toTick: x.tick });
+        continue;
+      }
+      if (x.kind === 'card') {
+        counts.pins += 1;
+        track('card_played', {
+          card: x.card,
+          targetKind: 'cat' in x.target ? 'cat' : 'object' in x.target ? 'object' : 'place',
+          tick: x.tick,
+          special: x.special,
+          behindLimit: x.tick <= maxPlayed - BEHIND_TICKS,
+        });
+      } else {
+        counts.powers += 1;
+        if (x.power === gazeId) counts.gazes += 1;
+        track('power_used', { power: x.power, tick: x.tick, place: x.place });
+      }
+    }
+    for (const x of before.pins)
+      if (!after.pins.some((y) => y.id === x.id)) {
+        counts.withdrawals += 1;
+        track('pin_withdrawn', { kind: x.kind, fromTick: x.tick, toTick: null });
+      }
+    if (result.reopened.length > 0)
+      track('reopened', {
+        paid: result.breaks.length,
+        unpaid: result.reopened.length - result.breaks.length,
+      });
+  }
+
+  /** The earliest tick at which two pin lists differ (assist mode's disruption check starts there). */
+  function editTickOf(a: readonly Pin[], b: readonly Pin[]): number {
+    const key = (x: Pin) => JSON.stringify(x);
+    const inB = new Set(b.map(key));
+    const inA = new Set(a.map(key));
+    const ticks = [
+      ...a.filter((x) => !inB.has(key(x))).map((x) => x.tick),
+      ...b.filter((x) => !inA.has(key(x))).map((x) => x.tick),
+    ];
+    return ticks.length > 0 ? Math.min(...ticks) : 0;
   }
 
   /** Clears the controller for a player state (a new game, a saved one); returns the new session. */
@@ -587,7 +739,7 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
     phase = 'play';
     ready = true;
     sync();
-    firstRun(me, () => undefined);
+    firstRun(me, started);
   }
 
   function newDay(requested: number, seed: number | null, notice?: string) {
@@ -604,6 +756,7 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
         ready = true;
         if (phase === 'preparing') phase = 'play';
         persist();
+        started();
       });
     };
     if (seed !== null) go(seed);
@@ -624,6 +777,7 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
       lastHead = player.playhead;
       ready = true;
       phase = 'play';
+      started();
     });
   }
 
@@ -637,6 +791,7 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
 
   /** Applies an action's result: a refusal becomes a notice; an edit goes through a preview. */
   function apply(r: ActionResult, at?: [number, number]): void {
+    flushBack();
     if (r.error) {
       refuse(r.error, at);
       sync();
@@ -660,6 +815,7 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
       notice: null,
       after: r.player,
       before: { player, view },
+      disrupted: [],
     };
     const me = session;
     const after = r.player;
@@ -675,16 +831,38 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
       }
       preview = reply.result;
       const notice = previewNotice(after, c, reply.result);
+      // assist mode: forming stories the edit drops by more than the knob's share (06 §2)
+      const before = pending.before;
+      const disrupted = settings.assist
+        ? disruptions(
+            before.player,
+            c,
+            before.view.frames,
+            reply.result.frames,
+            editTickOf(before.player.pins, after.pins),
+          )
+        : [];
       view = { ...viewOf(reply.result), streamedUpTo: null };
-      if (notice.alert) {
-        pending = { ...pending, phase: 'alert', notice };
+      if (notice.alert || disrupted.length > 0) {
+        pending = { ...pending, phase: 'alert', notice, disrupted };
         sync();
       } else land();
     });
   }
 
+  /** `break_alert` (07 §6): the alert was answered. */
+  function trackAlert(confirmed: boolean): void {
+    if (pending?.phase !== 'alert' || !pending.notice) return;
+    const n = pending.notice;
+    track('break_alert', {
+      count: n.breaks.length + n.moves.length + pending.disrupted.length,
+      confirmed,
+    });
+  }
+
   function cancelEdit(): void {
     if (!pending) return;
+    trackAlert(false);
     player = pending.before.player;
     view = pending.before.view;
     pending = null;
@@ -701,6 +879,8 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
     const nowMs = performance.now();
     const committed = applyPreview(p.after, view, c, { result }).player;
     const before = p.before;
+    trackAlert(true);
+    trackEdit(before.player, p.after, result);
     // edit feedback (06 §6)
     const dotsBefore = storyDots(c, before.player.watched).map((d) => d.t);
     const dotsAfter = new Set(storyDots(c, committed.watched).map((d) => d.t));
@@ -815,6 +995,24 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
     }
     markArrived(player, r.player);
     player = moved ? { ...r.player, playhead: Math.min(at, view.edge) } : r.player;
+    // telemetry (07 §6): each storylet state watched the first time, the anchor
+    maxPlayed = Math.max(maxPlayed, reply.fact.tick + 1);
+    for (const st of reply.fact.summary.storylets)
+      if (!watchedStates.has(st)) {
+        watchedStates.add(st);
+        track('story_watched', { state: st, tick: reply.fact.tick });
+      }
+    if (!hadAnchor && player.anchorWatched) {
+      hadAnchor = true;
+      track('anchor_reached', {
+        realSeconds: Math.round(performance.now() / 1000),
+        pins: counts.pins,
+        withdrawals: counts.withdrawals,
+        scrollBacks: counts.scrollBacks,
+        powers: counts.powers,
+        gazes: counts.gazes,
+      });
+    }
     if (moved) return;
     shown = [
       ...shown.filter((l) => l.until > until - BUBBLE_MS),
@@ -841,6 +1039,7 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
     if (factAt(t) && t + 1 <= view.edge) {
       const r = advance(player, view, c, { fact: null });
       if (!r.error) player = r.player;
+      maxPlayed = Math.max(maxPlayed, t + 1);
       shown = [...shown, ...linesOf(t, nowMs + BUBBLE_MS)];
       return;
     }
@@ -902,7 +1101,9 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
   }
 
   return {
-    content,
+    get content() {
+      return c;
+    },
     ui,
     now: () => ({ player, view, shuttle, frac }),
     start,
@@ -958,6 +1159,13 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
         }
         return;
       }
+      // M8: telemetry's backward moves and the fray
+      if (player.playhead < lastHead) back = { from: back?.from ?? lastHead, to: player.playhead };
+      else if (back && player.playhead > back.to) flushBack();
+      const atFray =
+        view.end.kind === 'fray' && view.streamedUpTo === null && player.playhead === view.edge;
+      if (atFray && !wasAtFray) track('fray_seen', { tick: player.playhead });
+      wasAtFray = atFray;
       // M7: what the hints read, the hints, the end screen, saving during playback
       if (player.playhead < lastHead) ticksAfterBack ??= 0;
       else if (ticksAfterBack !== null) ticksAfterBack += player.playhead - lastHead;
@@ -1092,6 +1300,7 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
         }
         const card = r.rewards?.flatMap((x) => x.cards ?? [])[0] ?? null;
         inspecting = { object, card };
+        track('inspect', { object, tick: player.playhead });
         apply(r);
       });
     },
@@ -1116,6 +1325,69 @@ export function createGame(content: Content, sim: SimClient, opts: GameOptions =
         held = spot = focus = null;
         sync();
       }
+    },
+    retune(next) {
+      c = next;
+      flow = c.tuning.flow;
+      gazeId = powerWith('collapse');
+      lureId = powerWith('attract');
+      const p = { ...(pending ? pending.before.player : player), seen };
+      ++session; // replies for the old content are dropped
+      phase = 'preparing';
+      ready = false;
+      sync();
+      void sim.request({ kind: 'init', tuning: next.tuning }).then((reply) => {
+        if (reply.kind === 'ready') resume(p);
+        else console.error(`init: ${reply.kind === 'error' ? reply.message : reply.kind}`);
+      });
+    },
+    computeStrain() {
+      if (pending || busy || strainRunning || phase !== 'play') return;
+      shuttle = PAUSED;
+      strainRunning = true;
+      sync();
+      const me = session;
+      void sim
+        .request({
+          kind: 'recompute',
+          seed: player.seed,
+          pins: player.pins,
+          watched: player.watched,
+          frontier: player.frontier,
+          preview: false,
+          strain: true,
+        })
+        .then((reply) => {
+          if (me !== session) return;
+          strainRunning = false;
+          if (reply.kind === 'result') view = { ...viewOf(reply.result), samples: view.samples };
+          sync();
+        });
+    },
+    debug(action) {
+      if (pending || confirmStep || phase !== 'play') return;
+      whenIdle(() => {
+        const next = debugAction(player, c, action);
+        // watched facts live in the worker's timeline too: the day is re-run without them
+        if (action === 'clearWatched') {
+          resume({ ...next, seen });
+          return;
+        }
+        markArrived(player, next);
+        player = next;
+        persist();
+        sync();
+      });
+    },
+    track,
+    endSession() {
+      flushBack();
+      track('session_end', {
+        realSeconds: Math.round(performance.now() / 1000),
+        story: player.frontier.story,
+        lanternEdge: view.edge,
+        anchorWatched: player.anchorWatched,
+      });
     },
   };
 }

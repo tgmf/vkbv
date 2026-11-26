@@ -110,6 +110,7 @@ pass.
 | Observe one tick in playback (at the lantern edge: advance the lantern and fog one tick) | ≤ `budgets.observeMs` (5 ms) median; the test fails above 3× | Vitest (`tests/budget/observe.test.ts`, `npm run bench`) |
 | Frame time while scrubbing, all 12 cats with ghosts | 60 fps on a mid-range laptop; no long task over 50 ms | Playwright (`tests/e2e/frame-time.spec.ts`, on the GPU when there is one; it records the renderer, and checks 60 fps only on a hardware renderer: CI has none, so there it records the numbers), noted in the handoff from a local run |
 | JavaScript, graybox build | ≤ 400 kB gzipped (three.js included) | build script prints sizes; CI fails above |
+| `dist/` as a zip (the itch.io upload) | < 5 MB | `scripts/size.ts` in `npm run build` (M8); CI fails above |
 | First load, local production build | interactive ≤ 3 s | Playwright |
 | Console | no errors or warnings during the scripted run | Playwright |
 
@@ -174,7 +175,9 @@ switch in settings on first load. The graybox uses local export only.
 ## 7. Continuous integration
 
 GitHub Actions on every push: clean install, `npm run content:check`, `npm run check`,
-`npm run build`, size check, `npm run e2e` (Chromium). On `main`: deploy `dist/` to
+`npm run build` (with the size checks), then the browser tests on Chromium against the e2e build
+(`npm run build:e2e`: Vite mode `e2e`, whose `.env.e2e` sets one end-screen URL so `cta_click` can be
+tested; M8). On `main`: deploy `dist/` to
 GitHub Pages. A manual workflow uploads `dist/` to itch.io with butler using a
 repository secret; never run it from a coding session.
 

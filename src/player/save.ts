@@ -14,6 +14,7 @@ export interface Settings {
   focusLayer: boolean;
   assist: boolean;
   volume: number; // 0..100, unused until M9
+  telemetry: boolean; // the remote sink's off switch (07 §6); absent in saves before M8: on
 }
 
 export interface SaveStorage {
@@ -110,6 +111,7 @@ const SettingsSchema = z.strictObject({
   focusLayer: z.boolean(),
   assist: z.boolean(),
   volume: int.min(0).max(100),
+  telemetry: z.boolean().default(true),
 });
 
 const SaveSchema = z.strictObject({ player: PlayerSchema, settings: SettingsSchema });

@@ -152,7 +152,19 @@ export function tiedTo(
   };
 }
 
-/** The story markers at the playhead (06 §2), with assist mode `on`: tied, not yet watched, forming, on a cat. */
+/** Every storylet state watched in this timeline, as `storylet.state`. */
+const watchedStates = (p: PlayerState): Set<string> =>
+  new Set(p.watched.flatMap((f) => f.summary.storylets));
+
+/**
+ * Whether a forming story has not happened yet (06 §2, M8): some state its current state leads to has
+ * not been watched in this timeline. (Marti perceives every storylet he holds a role in from its first
+ * state, so "the storylet was watched" would hide the lure's story from dawn.)
+ */
+const unseen = (c: Content, seen: Set<string>, storylet: StoryletId, state: string): boolean =>
+  (c.storylet[storylet]?.states[state]?.exits ?? []).some((e) => !seen.has(`${storylet}.${e.to}`));
+
+/** The story markers at the playhead (06 §2), with assist mode `on`: tied, not yet happened, forming, on a cat. */
 export function storyMarks(
   p: PlayerState,
   view: PlayerView,
@@ -163,10 +175,11 @@ export function storyMarks(
   const frame = view.frames[p.playhead];
   if (!on || !frame) return [];
   const tied = tiedTo(p, c);
+  const seen = watchedStates(p);
   const out: StoryMark[] = [];
   for (const f of frame.forming) {
     if (f.cat === null || !tied(f.storylet, f.state)) continue;
-    if (p.frontier.storylets.includes(f.storylet)) continue;
+    if (!unseen(c, seen, f.storylet, f.state)) continue;
     const node = frame.cats[f.cat]?.[0]?.node;
     if (node === undefined) continue;
     const objects = c.objects
@@ -185,25 +198,42 @@ export function storyMarks(
   return out;
 }
 
-/** A forming story an edit would disrupt: its highest chance after the edit tick, before and after. */
+/**
+ * A forming story an edit would disrupt: its highest chance after the edit tick, before and after, and
+ * where the alert places it (the tick of that peak before the edit and the cat it formed on).
+ */
 export interface Disruption {
   storylet: StoryletId;
   before: number;
   after: number;
+  tick: number;
+  cat: CatId | null;
 }
 
-/** Each tied, unwatched story's highest forming chance over frames `from`..end. */
+interface Peak {
+  p: number;
+  tick: number;
+  cat: CatId | null;
+}
+
+/** Each tied, unwatched story's highest forming chance over frames `from`..end (the first such tick). */
 function peaks(
   p: PlayerState,
+  c: Content,
   frames: readonly Frame[],
   from: number,
   tied: (storylet: StoryletId, state: string) => boolean,
-): Record<string, number> {
-  const out: Record<string, number> = {};
+): Record<string, Peak> {
+  const seen = watchedStates(p);
+  const out: Record<string, Peak> = {};
   for (let t = Math.max(0, from); t < frames.length; t++)
     for (const f of frames[t]?.forming ?? [])
-      if (!p.frontier.storylets.includes(f.storylet) && tied(f.storylet, f.state))
-        out[f.storylet] = Math.max(out[f.storylet] ?? 0, f.p);
+      if (
+        unseen(c, seen, f.storylet, f.state) &&
+        tied(f.storylet, f.state) &&
+        f.p > (out[f.storylet]?.p ?? 0)
+      )
+        out[f.storylet] = { p: f.p, tick: t, cat: f.cat };
   return out;
 }
 
@@ -220,14 +250,13 @@ export function disruptions(
   from: number,
 ): Disruption[] {
   const tied = tiedTo(p, c);
-  const was = peaks(p, before, from, tied);
-  const now = peaks(p, after, from, tied);
+  const was = peaks(p, c, before, from, tied);
+  const now = peaks(p, c, after, from, tied);
   const share = c.tuning.assist.disruptSharePm;
-  return c.storylets
-    .map((sl) => sl.id)
-    .filter((id) => {
-      const b = was[id] ?? 0;
-      return b > 0 && (now[id] ?? 0) * 1000 < b * (1000 - share);
-    })
-    .map((id) => ({ storylet: id, before: was[id] ?? 0, after: now[id] ?? 0 }));
+  return c.storylets.flatMap((sl) => {
+    const b = was[sl.id];
+    const a = now[sl.id]?.p ?? 0;
+    if (!b || a * 1000 >= b.p * (1000 - share)) return [];
+    return [{ storylet: sl.id, before: b.p, after: a, tick: b.tick, cat: b.cat }];
+  });
 }

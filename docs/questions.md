@@ -867,14 +867,18 @@ Answer: Tagir, 2026-11-26, on the M8 plan:
 2. The telemetry buffer is kept in localStorage across page loads (one session id per load), so a reload
    during a playtest loses nothing; a Clear button empties it (`07` §6).
 3. Assist mode as proposed (`06` §2 updated): a forming story is an authored storylet started and not yet
-   finished at the tick, with P(it is in such a state); markers only for storylets not yet watched
-   (`frontier.storylets`) that are main storylets, have a protagonist role, or that a pinned card or
+   finished at the tick, with P(it is in such a state); markers only for stories that have not happened
+   yet that are main storylets, have a protagonist role, or that a pinned card or
    power could advance in their current state (the "paid event" reading: a story with a card on it. A
    charge payout in `economy` was the plan's reading, dropped while building: 15 of Chapter 1's 16
    storylets have one, so it marked nearly everything; the fog tracks no `touchedBy`); storylets only, not
    detectors (a detector has no place); a card "could advance" a forming story when it writes a gauge,
    flag, pin, power, `heard` event or activity the exits of the story's current state read, or triggers
-   that storylet.
+   that storylet. Two refinements made while building, both in `06` §2: a story is forming only while
+   its state can move on (an exit with no gate or an open one: `door_lure` waits in `home` from dawn
+   until a lure is near); and "not happened yet" means some state its current state leads to has not
+   been watched in this timeline (`frontier.storylets` holds `door_lure` from dawn, since Marti
+   perceives the storylets he has a role in from their first state).
 4. Strain is computed on a button in the Wave tab (the existing `recompute` with `strain: true`; the
    worker is busy meanwhile), not with every recompute.
 5. The simulated-only world (M2-22) is a milestone of its own, M8.5, after M8.

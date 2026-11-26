@@ -31,6 +31,7 @@ import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRe
 import type { Content } from '../../content/schemas/content';
 import type { CatId, Ghost, NodeId } from '../../sim/types';
 import type { Highlight, Pick, SceneRenderer, SceneView } from '../SceneRenderer';
+import { pulseLit, pulseOf } from '../pulse';
 import { createFogPass } from './fogPass';
 import {
   catTexture,
@@ -257,7 +258,8 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
     r.material.opacity = opacity;
     return r;
   };
-  const cssPool: Record<string, CSS2DObject[]> = { cluster: [], bubble: [], name: [] };
+  const cssPool: Record<string, CSS2DObject[]> = { cluster: [], bubble: [], name: [], story: [] };
+  const pulses: Record<string, { cycle: number; phase: number }> = {};
   const cssAt = (kind: string, i: number): CSS2DObject => {
     const pool = cssPool[kind] ?? [];
     let o = pool[i];
@@ -684,6 +686,37 @@ export function createGrayboxRenderer(c: Content, opts: GrayboxOptions): SceneRe
             : 1.1;
       ringAt(ri++, r, '#ffffff', 1).position.set(focused.x, 0.55, focused.z);
     }
+    // assist mode (06 §2): a story marker on its cat and a mark on the objects at its place, lit for
+    // its probability's share of each cycle; with reduced motion, still at that opacity
+    let ai = 0;
+    const [lo, hi] = c.tuning.assist.cycleTicks;
+    for (const a of view.assist) {
+      const at = drawn[a.cat] ?? view.frame.cats[a.cat]?.[0];
+      if (!at) continue;
+      const [x, z] = 'x' in at ? [at.x, at.z] : at.pos;
+      const pulse = (pulses[a.key] ??= pulseOf(a.key, lo, hi));
+      const shown = motion ? (pulseLit(a.p, view.tick + view.frac, pulse) ? 1 : 0) : a.p / PPM;
+      const o = cssAt('story', ai++);
+      o.element.textContent = '✦';
+      o.element.dataset['story'] = a.key;
+      o.element.dataset['lit'] = shown > 0 ? 'on' : 'off';
+      o.element.classList.toggle('ring', a.ring);
+      o.element.style.opacity = String(shown);
+      o.position.set(x, 0.45 + h * 1.05, z);
+      if (shown === 0) continue;
+      ringAt(ri++, h * 0.62, '#d9a8ff', 0.9 * shown).position.set(x, 0.47, z);
+      if (a.ring) ringAt(ri++, h * 0.8, '#ffffff', shown).position.set(x, 0.48, z);
+      for (const id of a.objects) {
+        const ob = objects[id];
+        if (ob?.visible)
+          ringAt(ri++, 0.95, '#d9a8ff', 0.9 * shown).position.set(
+            ob.position.x,
+            0.5,
+            ob.position.z,
+          );
+      }
+    }
+    hideFrom('story', ai);
     for (let i = si; i < sprites.length; i++) {
       const s = sprites[i];
       if (s) s.visible = false;

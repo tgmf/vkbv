@@ -1,5 +1,6 @@
 // The chapter's flow (M7): the teaser card and "preparing the day" (06 §9, 04 §2), the hint of the
 // moment (06 §7) and the end screen (06 §9). None of them is a modal: the rest of the screen stays.
+// M8: the telemetry notice (07 §6) and the crash screen (M8 item 7).
 import { createSignal, For, onSettled, Show } from 'solid-js';
 import type { Game } from './game';
 import type { HintId } from './hints';
@@ -149,6 +150,7 @@ export function EndScreen(props: { game: Game; text: Text }) {
                 href={b.url}
                 target="_blank"
                 rel="noopener"
+                onClick={() => props.game.track('cta_click', { which: b.id })}
               >
                 {props.text(`ui.end.${b.id}`)}
               </a>
@@ -165,5 +167,68 @@ export function EndScreen(props: { game: Game; text: Text }) {
         </div>
       </section>
     </Show>
+  );
+}
+
+/** With a remote telemetry sink, a one-line notice on the first visit, with its off switch (07 §6). */
+export function TelemetryNotice(props: { game: Game; text: Text; show: boolean }) {
+  const [open, setOpen] = createSignal(true);
+  return (
+    <Show when={props.show && open()}>
+      <p class="telemetry-notice" role="status" data-testid="telemetry-notice">
+        {props.text('ui.telemetry.notice')}{' '}
+        <button
+          type="button"
+          data-testid="telemetry-off"
+          onClick={() => {
+            props.game.setSettings({ telemetry: false });
+            setOpen(false);
+          }}
+        >
+          {props.text('ui.telemetry.off')}
+        </button>
+        <button type="button" onClick={() => setOpen(false)}>
+          {props.text('ui.close')}
+        </button>
+      </p>
+    </Show>
+  );
+}
+
+/**
+ * The crash screen (M8 item 7): a plain message, "copy details" (the error, the seed, the pins, the
+ * watched facts, the tuning version) and reload. Shown for an error the page could not handle.
+ */
+export function CrashScreen(props: { text: Text; details: () => string }) {
+  const [copied, setCopied] = createSignal(false);
+  return (
+    <section class="crash" role="alert" data-testid="crash">
+      <h1>{props.text('ui.crash.title')}</h1>
+      <p>{props.text('ui.crash.text')}</p>
+      <div class="buttons">
+        <button
+          type="button"
+          data-testid="crash-copy"
+          onClick={() => {
+            void navigator.clipboard
+              ?.writeText(props.details())
+              .then(() => setCopied(true))
+              .catch(() => undefined);
+          }}
+        >
+          {props.text(copied() ? 'ui.crash.copied' : 'ui.crash.copy')}
+        </button>
+        <button type="button" data-testid="crash-reload" onClick={() => location.reload()}>
+          {props.text('ui.crash.reload')}
+        </button>
+      </div>
+      <textarea
+        readonly
+        rows="8"
+        aria-label={props.text('ui.crash.copy')}
+        data-testid="crash-details"
+        value={props.details()}
+      />
+    </section>
   );
 }

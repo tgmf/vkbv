@@ -1,13 +1,15 @@
-// Frames' forming stories (06 §2, assist mode, M8): each storylet started and not finished, with
-// P(it is in such a state), its likeliest state and the cat of its first bound role.
+// Frames' forming stories (06 §2, assist mode, M8): each storylet started and not finished that can
+// move on now (an exit with no gate or an open one), with P(it is in such a state), its likeliest such
+// state and the cat of its first bound role.
 import { describe, expect, it } from 'vitest';
 import { fogSetup } from '../../src/sim/fog';
 import { INACTIVE } from '../../src/sim/fog-quantities';
 import { frameOf, storyletChances } from '../../src/sim/frames';
 import { advance, initialWave, type Wave } from '../../src/sim/lantern';
+import { rerunAll } from '../../src/sim/recompute';
 import { PPM } from '../../src/sim/math';
 import type { Frame, Pin } from '../../src/sim/types';
-import { powerPin, tiny } from './helpers';
+import { ch1Coarse, powerPin, tiny } from './helpers';
 
 function framed(seed: number, until: number, pins: Pin[]) {
   const setup = fogSetup(tiny, seed);
@@ -44,7 +46,7 @@ describe('forming stories in frames (06 §2)', () => {
       for (const x of f.forming) expect(running(x.storylet, x.state)).toBe(true);
   });
 
-  it('p is the chance of the running states, the state the likeliest of them', () => {
+  it('p is at most the chance of the running states, the state the likeliest of those counted', () => {
     let fogHeld = 0;
     for (const f of frames) {
       const w = waves[f.tick];
@@ -58,8 +60,10 @@ describe('forming stories in frames (06 §2)', () => {
           expect(x).toBeUndefined();
           continue;
         }
-        const best = states.reduce((a, b) => (b[1] > a[1] ? b : a));
-        expect(x).toMatchObject({ p: Math.min(PPM, total), state: best[0] });
+        if (!x) continue; // every running state waits on a shut exit
+        expect(x.p).toBeLessThanOrEqual(Math.min(PPM, total));
+        const p = Object.fromEntries(states);
+        expect(p[x.state]).toBeGreaterThan(0);
         if (w.lantern.heldStorylets.includes(sl.id)) fogHeld += 1;
       }
     }
@@ -68,6 +72,19 @@ describe('forming stories in frames (06 §2)', () => {
     const shift = frames.flatMap((f) => f.forming.filter((x) => x.storylet === 'shift'));
     expect(shift.some((x) => x.cat !== null)).toBe(true);
   });
+
+  it('a storylet waiting on shut exits is not forming (Chapter 1: the lure’s `home`)', () => {
+    const at = (pins: Pin[], tick: number) => {
+      const setup = fogSetup(ch1Coarse, 4);
+      const open = { story: 100_000, pastTicks: 0, storylets: setup.main };
+      const r = rerunAll(setup, null, { pins, watched: [], frontier: open }).result;
+      return r.frames[tick]?.forming.find((x) => x.storylet === 'door_lure');
+    };
+    // door_lure waits in `home` from dawn; its one exit needs the lure near Marti
+    expect(at([], 300)).toBeUndefined();
+    const lure: Pin = { id: 'pin1', seq: 1, tick: 715, kind: 'power', power: 'lure', place: 'flat.door' };
+    expect(at([lure], 718)).toMatchObject({ p: PPM, cat: 'marti' });
+  }, 120_000);
 
   it('frames stay plain JSON', () => {
     const f = frames[40];

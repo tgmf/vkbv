@@ -1,5 +1,6 @@
 // Settings (06 §8): text size, reduced motion, the focus layer, assist mode and a new game (confirmed in
-// place). The language stays in the top bar. A panel under the top bar, not a modal.
+// place). The language stays in the top bar. A panel under the top bar, not a modal. M8: the remote
+// telemetry sink's off switch, shown only when the build has one (07 §6).
 import { createSignal, For, Show } from 'solid-js';
 import type { Settings as SettingsT } from '../player/save';
 import type { Game } from './game';
@@ -9,7 +10,13 @@ type Text = (key: string, p?: Record<string, string | number>) => string;
 const SIZES = [100, 125, 150] as const;
 const MOTION = ['system', 'on', 'off'] as const;
 
-export function Settings(props: { game: Game; text: Text; newGame: () => void }) {
+export function Settings(props: {
+  game: Game;
+  text: Text;
+  newGame: () => void;
+  /** The build sends telemetry (`VITE_TELEMETRY_URL` set, `flags.telemetry` on). */
+  remote: boolean;
+}) {
   const [open, setOpen] = createSignal(false);
   const [confirming, setConfirming] = createSignal(false);
   const s = () => props.game.ui.settings;
@@ -77,6 +84,17 @@ export function Settings(props: { game: Game; text: Text; newGame: () => void })
             />
             {props.text('ui.settings.assist')}
           </label>
+          <Show when={props.remote}>
+            <label>
+              <input
+                type="checkbox"
+                data-testid="telemetry-setting"
+                checked={s().telemetry}
+                onChange={(e) => set({ telemetry: e.currentTarget.checked })}
+              />
+              {props.text('ui.settings.telemetry')}
+            </label>
+          </Show>
           <Show
             when={confirming()}
             fallback={
