@@ -191,7 +191,7 @@ Terms borrowed from research on curated emergent narrative (Ryan; Kreminski's Fe
 | Pool | The set of live partial matches. In the lantern it is part of the logged state and its hash; in the fog each stage carries a probability. | Pruned of stale matches, matches with a missing cat, and per-pattern overflow. |
 | Pattern signature | The stage reached in each tracked pattern: a fact in the lantern, a probability per stage in the fog. | No longer used for trimming (retired 2026-11-21). |
 | Match probability | The chance that a match is at a given stage, estimated in the fog from its ingredients. | Drives highlights. |
-| Highlight (assist) | A marker on a place or cat for a partial match tied to the anchor, a paid event or an unseen authored storylet. Opacity = match probability. | Settings toggle. |
+| Highlight (assist) | A marker on a place or cat for a partial match tied to the anchor, a paid event or a protagonist, in an authored storylet not yet watched. It pulses: lit for a share of each cycle equal to the match probability (Tagir, 2026-11-26; still, at that opacity, with reduced motion). | Settings toggle. `06` §2. |
 
 ## Player layer
 

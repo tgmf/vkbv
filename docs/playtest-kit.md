@@ -54,14 +54,14 @@ the break alert; anything they laughed at.
 
 | Number | Definition |
 | --- | --- |
-| `minutesPlayed` | last event time minus first, in minutes |
+| `minutesPlayed` | last event time minus first, in minutes, summed over the page loads (sessions) in the buffer |
 | `reachedAnchor` | an `anchor_reached` event exists |
-| `minutesToAnchor` | time of `anchor_reached` |
+| `minutesToAnchor` | time of the first `anchor_reached`, counted as `minutesPlayed` is |
 | `pins`, `withdrawals`, `moves`, `lures`, `gazes` | counts |
 | `scrollBacks` | count of `scroll_back` events |
 | `pinsBehindLimit` | count of `card_played` with `behindLimit` true |
 | `pinsBehindLimitAfterFray` | the same, counting only those after the first `fray_seen` |
-| `luresBeforeFirstMartiOut` | lure placements before the first watched `door_lure.out` |
+| `luresBeforeFirstMartiOut` | lure placements before the first `story_watched` of `door_lure.out` |
 | `breakAlerts`, `breakAlertsConfirmed` | counts |
 | `recomputeMedianMs`, `recomputeMaxMs` | from `recompute` events |
 | `hintsShown` | list of hint ids in order |

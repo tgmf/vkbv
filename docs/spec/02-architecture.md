@@ -222,6 +222,8 @@ these checks; port them, do not call it. `npm run content:check` runs the loader
 - `import.meta.env.VITE_BUILD` is `graybox` or `dressed`.
 - Feature flags come from `tuning.json → flags` and can be overridden by URL query for
   testing (`?flag.assist=1`). No other configuration mechanism.
-- `?seed=`, `?rule=` (played-card rule) and `?debug=1` are read by the UI. The UI keeps `?seed=` equal to
-  the game's requested seed (`04` §2).
-- The debug panel is in every build behind `?debug=1` or the backquote key.
+- `?seed=`, `?rule=` (played-card rule, overriding `player.playedCardRule`), `?debug=1` and `?dev=1`
+  are read by the UI. The UI keeps `?seed=` equal to the game's requested seed (`04` §2).
+- The debug panel is in every build behind `?debug=1` or the backquote key. `?dev=1` is the debug mode:
+  the same panel, open, on a page that shows no teaser and saves nothing, so experiments never overwrite
+  a game (Tagir, M8-1).

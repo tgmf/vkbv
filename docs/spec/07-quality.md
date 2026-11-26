@@ -158,12 +158,15 @@ cookies.
 | `scroll_back` | fromTick, toTick (a move back of 30 ticks or more) |
 | `fray_seen` | tick |
 | `hint_shown` | id |
+| `story_watched` | state (`storylet.state`), tick: the first time in a session each storylet state is watched (Tagir, M8-1) |
 | `recompute` | ms, ticks re-run, cases, live cats (every 10th, and every one over budget) |
 | `anchor_reached` | realSeconds, pins, withdrawals, scrollBacks, powers, gazes |
 | `cta_click` | which |
 | `session_end` | realSeconds, frontier.story, lanternEdge, anchorWatched |
 
-Sinks: an in-memory buffer (always; shown in the debug panel; JSON export) and
+Sinks: a buffer (always; kept in localStorage across page loads, one session id per load, so a
+reload during a playtest loses nothing; shown in the debug panel; JSON export; a clear button; Tagir,
+M8-1) and
 `navigator.sendBeacon` batches to `VITE_TELEMETRY_URL` when it is set and
 `flags.telemetry` is true. With a remote sink, show a one-line notice with an off
 switch in settings on first load. The graybox uses local export only.

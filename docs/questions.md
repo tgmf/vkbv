@@ -485,6 +485,7 @@ playtests of the wave, a fallback if the re-run budget (`07` §4) fails, debuggi
 Answer: Tagir, 2026-11-23: add a simulated-only version for testing. Not part of M2 item 11; when to
 build it (after item 13's budget numbers, or with the playtest build) and what the UI draws in it wait
 for Tagir. Needs a spec line and a glossary name.
+Update (Tagir, 2026-11-26, M8-1): a milestone of its own, M8.5, after M8.
 
 ## M2-23 — How much to calibrate on test content            (status: answered)
 Where: M2 acceptance ("Quick calibration passes. `npm run calibrate` passes"); `07` §3; M2 item 12
@@ -855,5 +856,30 @@ Answer: Tagir, 2026-11-25, on the M7 plan:
 - Defaults accepted: shown hints in `PlayerState.seen`; hints wait their turn and stay 10 s or until
   dismissed; assist mode as a setting only (M7-1).
 Spec updated: `04` §1, §2, §9; `05` §4; `06` §7, §8, §9.
+
+## M8-1 — Decisions on the M8 plan            (status: answered, spec updated)
+Where: `docs/milestones/M8-playtest-build.md`; `06` §10; `07` §6; `docs/playtest-kit.md` §4
+Answer: Tagir, 2026-11-26, on the M8 plan:
+1. `luresBeforeFirstMartiOut` (playtest kit §4) could not be computed from `07` §6's events: no event
+   recorded a watched `door_lure.out`. "Whatever is more useful; make the docs agree": a telemetry event
+   `story_watched { state, tick }` the first time each storylet state is watched in a session (`07` §6,
+   playtest kit §4 updated).
+2. The telemetry buffer is kept in localStorage across page loads (one session id per load), so a reload
+   during a playtest loses nothing; a Clear button empties it (`07` §6).
+3. Assist mode as proposed (`06` §2 updated): a forming story is an authored storylet started and not yet
+   finished at the tick, with P(it is in such a state); markers only for storylets not yet watched
+   (`frontier.storylets`) that are main storylets, have a protagonist role, or have a charge payout in
+   `economy` (the "paid event" reading the fog can serve: it tracks no `touchedBy`); storylets only, not
+   detectors (a detector has no place); a held card "could advance" a forming story when the card writes a
+   gauge, flag, pin or activity the exits of the story's current state read, or triggers that storylet.
+4. Strain is computed on a button in the Wave tab (the existing `recompute` with `strain: true`; the
+   worker is busy meanwhile), not with every recompute.
+5. The simulated-only world (M2-22) is a milestone of its own, M8.5, after M8.
+6. The browser suite runs with 3 workers; Firefox and WebKit are installed for the local run; the e2e
+   build sets `VITE_URL_FOLLOW` so the end screen's `cta_click` can be tested.
+7. GitHub Pages is on (source: GitHub Actions): CI's deploy job is switched on.
+8. `?dev=1` stays, as the debug mode (option b, a deviation from the brief's "delete `?dev=1`"): the
+   same debug panel open on a page that shows no teaser and saves nothing, so experiments never overwrite
+   a game; `?debug=1` and the backquote open the same panel on the normal page (`02` §6, `06` §10).
 
 <!-- Gate notes and answers go above this line. -->
