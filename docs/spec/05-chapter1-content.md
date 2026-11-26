@@ -117,6 +117,9 @@ have **not** been checked against a model of this content; M4 measures them.
 | `flow.hintMs` | 10000 | how long a hint stays unless dismissed (`06` §7) |
 | `flow.ghostsAfterMs`, `flow.inspectAfterTicks`, `flow.barelyAfterMs`, `flow.scrollCards`, `flow.scrollAfterTick` | 30000, 35, 2000, 3, 180 | the hints' triggers (`06` §7) |
 | `flow.notreadyOn`, `flow.morningOn` | `["door_lure.back_inside"]`, `["usual_route.shop_open", "usual_route.shop_closed"]` | the storylet states those two hints wait for (`06` §7) |
+| `flow.outOn` | `["door_lure.out"]` | the storylet states that mean "Marti is out", for telemetry's `luresBeforeFirstMartiOut` (`docs/playtest-kit.md` §4, M8) |
+| `assist.cycleTicks` | `[15, 30]` | each assist marker's pulse cycle is drawn once from this range, in ticks (`06` §2) |
+| `assist.disruptSharePm` | 500 | an edit that drops a forming story's chance by more than this share lists it in the break alert (`06` §2) |
 | `budgets.recomputeMs` | 100 | from an edit to the re-run's first streamed frames (`07` §4) |
 | `budgets.rerunTps` | 120 | ticks per second a re-run streams at, at least (`07` §4) |
 | `budgets.observeMs` | 5 | median time of one observe at the lantern edge, in playback (`07` §4) |

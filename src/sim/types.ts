@@ -12,6 +12,7 @@ export type ObjectId = string;
 export type CardId = string;
 export type PowerId = string;
 export type PinId = string;
+export type StoryletId = string;
 export type Pos = [number, number]; // integer metres [x, z]
 
 // --- pins (03 §11) ------------------------------------------------------------------------------
@@ -379,6 +380,12 @@ export interface Frame {
    * the fog holds. A pin neither has seen yet is left out.
    */
   pins: Record<PinId, number>;
+  /**
+   * Forming stories (06 §2, assist mode, M8): each storylet started and not finished at this tick, in
+   * file order, with P(it is in such a state), its most likely such state and the cat bound to its
+   * first role (null: none bound yet).
+   */
+  forming: { storylet: StoryletId; state: string; p: number; cat: CatId | null }[];
 }
 
 export interface FrameLine {

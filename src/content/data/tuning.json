@@ -90,7 +90,12 @@
     "scrollCards": 3,
     "scrollAfterTick": 180,
     "notreadyOn": ["door_lure.back_inside"],
-    "morningOn": ["usual_route.shop_open", "usual_route.shop_closed"]
+    "morningOn": ["usual_route.shop_open", "usual_route.shop_closed"],
+    "outOn": ["door_lure.out"]
+  },
+  "assist": {
+    "cycleTicks": [15, 30],
+    "disruptSharePm": 500
   },
   "budgets": {
     "recomputeMs": 100,

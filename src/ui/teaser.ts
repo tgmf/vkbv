@@ -58,6 +58,7 @@ export function teaserView(
     lanterns: [{ cat: first, rangeMm: SIGHT_M * 1000, seen: [scene.node] }],
     lines: [],
     pins: {},
+    forming: [],
   };
   return {
     tick: 0,

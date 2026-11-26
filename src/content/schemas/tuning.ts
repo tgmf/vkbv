@@ -141,6 +141,23 @@ export const TuningSchema = z.strictObject({
     morningOn: z
       .array(z.string())
       .describe('Hint `morning`: shows when one of these storylet states is first watched (06 §7)'),
+    outOn: z
+      .array(z.string())
+      .describe(
+        'Telemetry: the storylet states that mean "Marti is out", for `luresBeforeFirstMartiOut` (docs/playtest-kit.md §4)',
+      ),
+  }),
+  assist: z.strictObject({
+    cycleTicks: z
+      .tuple([z.int().min(1), z.int().min(1)])
+      .describe(
+        "Assist mode: each story marker's pulse cycle is drawn once from this range, in ticks (06 §2)",
+      ),
+    disruptSharePm: int(
+      "Assist mode: an edit that drops a forming story's chance by more than this share (per mille) lists it in the break alert (06 §2)",
+    )
+      .min(0)
+      .max(1000),
   }),
   budgets: z.strictObject({
     recomputeMs: int('Median time from an edit to the re-run’s first streamed frames (07 §4)').min(

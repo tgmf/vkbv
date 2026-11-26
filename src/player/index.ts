@@ -5,3 +5,5 @@ export * from './rewards';
 export * from './save';
 export * from './state';
 export * from './targets';
+export * from './assist';
+export * from './debug';

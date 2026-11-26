@@ -197,7 +197,56 @@ export function frameOf(
     lanterns: lanternsOf(c, wave),
     lines: linesOf(c, sim, next?.tickEvents ?? []),
     pins: pinsFired(sim, wave.fog, pins),
+    forming: formingOf(c, wave),
   };
+}
+
+/**
+ * Forming stories (06 §2, assist mode): each storylet started and not finished at this tick, with
+ * P(it is in such a state), its most likely such state (ties in file order) and the cat bound to its
+ * first role that holds one (the lantern's run, or the fog's heaviest case with roles bound).
+ */
+function formingOf(c: Content, wave: Wave): Frame['forming'] {
+  const chances = storyletChances(c, wave.fog, wave.lantern);
+  const out: Frame['forming'] = [];
+  for (const sl of c.storylets) {
+    let p = 0;
+    let state: string | null = null;
+    let best = 0;
+    for (const [st, x] of Object.entries(chances[sl.id] ?? {})) {
+      if (st === INACTIVE || (sl.states[st]?.exits.length ?? 0) === 0) continue;
+      p += x;
+      if (x > best) {
+        best = x;
+        state = st;
+      }
+    }
+    if (state === null || p === 0) continue;
+    const roles = wave.lantern.heldStorylets.includes(sl.id)
+      ? fogRoles(wave.fog, sl.id)
+      : (wave.lantern.sim.storylets[sl.id]?.roles ?? null);
+    let cat: CatId | null = null;
+    for (const r of Object.keys(sl.roles)) {
+      cat = roles?.[r]?.[0] ?? null;
+      if (cat !== null) break;
+    }
+    out.push({ storylet: sl.id, state, p: Math.min(PPM, p), cat });
+  }
+  return out;
+}
+
+/** A fog-held storylet's roles in its heaviest case that has them bound (ties: the first case). */
+function fogRoles(fog: Fog, id: string): Record<string, CatId[]> | null {
+  let roles: Record<string, CatId[]> | null = null;
+  let w = -1;
+  for (const fc of fog.cases) {
+    const r = fc.q.storylets[id]?.roles;
+    if (r && fc.weight > w) {
+      roles = r;
+      w = fc.weight;
+    }
+  }
+  return roles;
 }
 
 /**
