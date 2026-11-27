@@ -7,8 +7,10 @@ const PORT = 4318;
 export default defineConfig({
   testDir: 'tests/e2e',
   outputDir: 'test-results',
-  // three at a time: more starve the pages that vet live and play the day (M7 handoff; Tagir, M8-1)
-  workers: 3,
+  // three at a time locally: more starve the pages that vet live and play the day (M7 handoff; Tagir,
+  // M8-1). CI keeps Playwright's default (half the runner's cores: 2 on GitHub's 4): three pages drawing
+  // in SwiftShader, each with its simulation worker, timed out there
+  ...(process.env['CI'] ? {} : { workers: 3 }),
   use: { baseURL: `http://localhost:${PORT}${SUB_PATH}` },
   // CI runs Chromium only (07 §7); all three engines run locally before release (02 §1)
   projects: [
